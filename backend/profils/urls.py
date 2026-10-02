@@ -9,6 +9,7 @@ routeur.register("scolarites", views.ScolariteViewSet, basename="scolarite")
 urlpatterns = [
     path("profils/me/", views.ProfilMoiView.as_view()),
     path("profils/me/situation/", views.SituationMoiView.as_view()),
+    path("profils/<int:user_id>/", views.ProfilPublicView.as_view()),
     path("referentiels/", views.ReferentielsView.as_view()),
     path("", include(routeur.urls)),
 ]

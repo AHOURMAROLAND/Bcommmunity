@@ -1,10 +1,12 @@
 from django.core.cache import cache
 from django.db import IntegrityError, transaction
+from django.shortcuts import get_object_or_404
 from rest_framework import generics, viewsets
-from rest_framework.exceptions import ValidationError
+from rest_framework.exceptions import NotFound, ValidationError
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from amis.services import carte, ids_bloques, profils_actifs, relations
 from scolarite.models import Cycle, Scolarite
 
 from .models import Domaine, Profil, SituationActuelle
@@ -85,4 +87,41 @@ class ReferentielsView(APIView):
                 "domaines": DomaineSerializer(Domaine.objects.all(), many=True).data,
             }
             cache.set("referentiels", data, 600)
+        return Response(data)
+
+
+class ProfilPublicView(APIView):
+    def get(self, request, user_id):
+        moi = request.user
+        if user_id == moi.pk or user_id in ids_bloques(moi):
+            raise NotFound()
+        rel = relations(moi)
+        profil = get_object_or_404(
+            profils_actifs().prefetch_related("scolarites__classe__cycle"), user_id=user_id)
+        est_ami = user_id in rel.amis
+        if profil.visibilite_profil == "personne":
+            raise NotFound()
+        restreint = profil.visibilite_profil == "amis" and not est_ami
+
+        data = carte(profil, rel)
+        data["restreint"] = restreint
+        if restreint:
+            data["situation"] = None
+            return Response(data)
+
+        data.update(bio=profil.bio, ville=profil.ville)
+        v = profil.visibilite_parcours
+        if v == "tous" or (v == "amis" and est_ami):
+            mes = list(Scolarite.objects.filter(profil__user=moi)
+                       .values_list("classe_id", "annee_debut", "annee_fin"))
+            lignes = []
+            for s in sorted(profil.scolarites.all(), key=lambda x: -x.annee_debut):
+                commun = any(c == s.classe_id and d <= s.annee_fin and f >= s.annee_debut for c, d, f in mes)
+                lignes.append({"id": s.pk, "classe": s.classe.nom, "filiere": s.classe.filiere,
+                               "cycle": s.classe.cycle.nom, "annee_debut": s.annee_debut,
+                               "annee_fin": s.annee_fin, "en_commun": commun})
+            data["parcours"] = lignes
+            data["classes_communes"] = sum(1 for x in lignes if x["en_commun"])
+        else:
+            data["parcours"] = None
         return Response(data)

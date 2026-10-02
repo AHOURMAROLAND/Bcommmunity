@@ -10,4 +10,5 @@ urlpatterns = [
     path(settings.ADMIN_URL, admin.site.urls),
     path("api/", include("comptes.urls")),
     path("api/", include("profils.urls")),
+    path("api/", include("amis.urls")),
 ]

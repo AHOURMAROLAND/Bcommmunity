@@ -1,0 +1,78 @@
+name: CI
+on:
+  push: { branches: [main] }
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env: { POSTGRES_PASSWORD: postgres, POSTGRES_DB: test }
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 10
+      redis:
+        image: redis:7
+        ports: ["6379:6379"]
+    env:
+      DJANGO_DEBUG: "1"
+      DJANGO_SECRET_KEY: ci-secret
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/test
+      REDIS_URL: redis://localhost:6379/0
+    defaults: { run: { working-directory: backend } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12", cache: pip }
+      - run: pip install -r requirements.txt
+      - run: ruff check .
+      - run: python manage.py makemigrations --check --dry-run
+      - run: pytest -q
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: frontend } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm, cache-dependency-path: frontend/package-lock.json }
+      - run: npm ci
+      - run: npm run lint --if-present
+      - run: npm run build
+
+  fermer-issues:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [backend, frontend]
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const codes = new Set();
+            for (const c of context.payload.commits) {
+              for (const m of c.message.matchAll(/\b(?:closes|fixes|resolves)\s+\[?(M\d+-\d+)\]?/gi)) {
+                codes.add(m[1].toUpperCase());
+              }
+            }
+            for (const code of codes) {
+              const q = `repo:${owner}/${repo} is:issue is:open in:title "[${code}]"`;
+              const { data } = await github.rest.search.issuesAndPullRequests({ q });
+              for (const i of data.items.filter(i => i.title.startsWith(`[${code}]`))) {
+                await github.rest.issues.createComment({ owner, repo, issue_number: i.number,
+                  body: `Validé automatiquement : CI verte sur ${context.sha.slice(0, 7)}.` });
+                await github.rest.issues.update({ owner, repo, issue_number: i.number,
+                  state: "closed", state_reason: "completed" });
+              }
+            }
+            const jalons = await github.paginate(github.rest.issues.listMilestones, { owner, repo, state: "open" });
+            for (const j of jalons.filter(j => j.open_issues === 0 && j.closed_issues > 0)) {
+              await github.rest.issues.updateMilestone({ owner, repo, milestone_number: j.number, state: "closed" });
+            }

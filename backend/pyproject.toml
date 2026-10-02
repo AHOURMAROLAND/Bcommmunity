@@ -1,0 +1,13 @@
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W"]
+ignore = [
+    "E501",  # line length handled by formatter
+    "RUF012", # mutable class attributes in Django models/serializers/views
+]
+
+[tool.ruff.lint.per-file-ignores]
+"*/migrations/*" = ["E501", "RUF012"]

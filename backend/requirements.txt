@@ -1,0 +1,16 @@
+Django>=5.1,<5.3
+djangorestframework
+djangorestframework-simplejwt
+django-cors-headers
+django-filter
+psycopg[binary]
+argon2-cffi
+django-redis
+redis
+dj-database-url
+whitenoise
+gunicorn
+pillow
+pytest
+pytest-django
+ruff

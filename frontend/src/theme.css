@@ -1,0 +1,24 @@
+@import "tailwindcss";
+
+:root {
+  --bg: #ffffff; --carte: #f3f5fa; --texte: #0b1f4b; --texte-doux: #5b6785;
+  --bordure: #dde3ef; --primaire: #0b1f4b; --sur-primaire: #ffffff;
+  --accent: #4f7fe0; --danger: #e5484d; --en-ligne: #2bb673;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0b1730; --carte: #13244a; --texte: #ffffff; --texte-doux: #a9b6d6;
+    --bordure: #25396b; --primaire: #ffffff; --sur-primaire: #0b1f4b;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0b1730; --carte: #13244a; --texte: #ffffff; --texte-doux: #a9b6d6;
+  --bordure: #25396b; --primaire: #ffffff; --sur-primaire: #0b1f4b;
+}
+
+html, body, #root { height: 100%; }
+body {
+  margin: 0; background: var(--bg); color: var(--texte);
+  font-family: "Quicksand", system-ui, -apple-system, "Segoe UI", sans-serif; font-weight: 500;
+}
+h1, h2, h3, .titre { font-weight: 700; }

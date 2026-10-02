@@ -1,12 +1,14 @@
 from django.contrib.auth import authenticate
 from django.contrib.auth.password_validation import validate_password
+from django.contrib.auth.tokens import default_token_generator
+from django.utils.encoding import force_str
+from django.utils.http import urlsafe_base64_decode
 from rest_framework import serializers
 from rest_framework.validators import UniqueValidator
 
-from profils.models import Profil, SituationActuelle
-
 from .auth import verifier_acces
 from .models import User
+from .services import creer_compte
 
 
 class UtilisateurSerializer(serializers.ModelSerializer):
@@ -35,10 +37,7 @@ class InscriptionSerializer(serializers.ModelSerializer):
         return attrs
 
     def create(self, donnees):
-        user = User.objects.create_user(**donnees)  # valide = False par défaut
-        profil = Profil.objects.create(user=user)
-        SituationActuelle.objects.create(profil=profil)
-        return user
+        return creer_compte(**donnees)
 
 
 class ConnexionSerializer(serializers.Serializer):
@@ -52,3 +51,30 @@ class ConnexionSerializer(serializers.Serializer):
         verifier_acces(user)
         attrs["user"] = user
         return attrs
+
+
+class GoogleSerializer(serializers.Serializer):
+    credential = serializers.CharField(max_length=4096)
+    statut = serializers.ChoiceField(choices=User.Statut.choices, required=False)
+
+
+class OubliSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+
+
+class ReinitialisationSerializer(serializers.Serializer):
+    uid = serializers.CharField(max_length=40)
+    token = serializers.CharField(max_length=100)
+    password = serializers.CharField(max_length=128, trim_whitespace=False)
+
+    def validate(self, a):
+        invalide = serializers.ValidationError({"detail": "Lien invalide ou expiré."})
+        try:
+            user = User.objects.get(pk=force_str(urlsafe_base64_decode(a["uid"])))
+        except (TypeError, ValueError, OverflowError, User.DoesNotExist):
+            raise invalide
+        if not default_token_generator.check_token(user, a["token"]):
+            raise invalide
+        validate_password(a["password"], user=user)
+        a["user"] = user
+        return a

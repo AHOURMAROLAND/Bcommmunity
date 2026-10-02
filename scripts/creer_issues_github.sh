@@ -32,6 +32,8 @@ M1 Fondations|M1-12|Django admin personnalisé (validation, suspension)|admin
 M1 Fondations|M1-13|Client API, thèmes clair et sombre, police Quicksand|frontend
 M1 Fondations|M1-14|Écrans inscription, connexion, attente de validation|frontend
 M1 Fondations|M1-15|Onboarding : profil, parcours, situation|frontend
+M1 Fondations|M1-16|Connexion et inscription avec Google|backend
+M1 Fondations|M1-17|Mot de passe oublié (demande et réinitialisation)|backend
 M2 Reseau|M2-01|Annuaire et filtres|backend
 M2 Reseau|M2-02|Suggestions de camarades|backend
 M2 Reseau|M2-03|Amitiés : demander, accepter, refuser, retirer|backend

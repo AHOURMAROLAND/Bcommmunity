@@ -34,6 +34,7 @@ INSTALLED_APPS = [
     "profils",
     "scolarite",
     "amis",
+    "publications",
 ]
 
 MIDDLEWARE = [
@@ -94,6 +95,8 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
+MEDIA_URL = "media/"
+MEDIA_ROOT = BASE_DIR / "media"
 STORAGES = {
     "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
     "staticfiles": {"BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage"},
@@ -103,7 +106,8 @@ STORAGES = {
 X_FRAME_OPTIONS = "DENY"
 SECURE_REFERRER_POLICY = "same-origin"
 SECURE_CONTENT_TYPE_NOSNIFF = True
-DATA_UPLOAD_MAX_MEMORY_SIZE = 1_000_000
+DATA_UPLOAD_MAX_MEMORY_SIZE = 5_242_880
+FILE_UPLOAD_MAX_MEMORY_SIZE = 5_242_880
 SESSION_COOKIE_HTTPONLY = True
 if not DEBUG:
     SECURE_SSL_REDIRECT = True

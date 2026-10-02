@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 import { Bouton, Champ, Marque } from "../components/ui";
 import { tousMessages } from "../api/erreurs";
+import AccesGoogle from "../components/AccesGoogle";
 
 export default function Connexion() {
   const { connexion } = useAuth();
@@ -35,18 +36,25 @@ export default function Connexion() {
     <main className="page">
       <div className="boite">
         <Marque sous="Retrouvez vos camarades et votre école." />
-        <form className="carte" onSubmit={soumettre} noValidate>
+        <div className="carte">
           <h1 style={{ marginTop: 0, fontSize: "1.3rem" }}>Se connecter</h1>
-          <Champ label="Adresse e-mail" type="email" autoComplete="username" required
-            value={email} onChange={(e) => setEmail(e.target.value)} />
-          <Champ label="Mot de passe" type="password" autoComplete="current-password" required
-            value={password} onChange={(e) => setPassword(e.target.value)} />
-          {erreur && <p role="alert" className="erreur" style={{ marginBottom: "1rem" }}>{erreur}</p>}
-          <Bouton type="submit" chargement={envoi}>Se connecter</Bouton>
+          <AccesGoogle texte="signin_with" />
+          <p className="doux" style={{ textAlign: "center", margin: "1rem 0" }}>ou avec votre e-mail</p>
+          <form onSubmit={soumettre} noValidate>
+            <Champ label="Adresse e-mail" type="email" autoComplete="username" required
+              value={email} onChange={(e) => setEmail(e.target.value)} />
+            <Champ label="Mot de passe" type="password" autoComplete="current-password" required
+              value={password} onChange={(e) => setPassword(e.target.value)} />
+            {erreur && <p role="alert" className="erreur" style={{ marginBottom: "1rem" }}>{erreur}</p>}
+            <Bouton type="submit" chargement={envoi}>Se connecter</Bouton>
+          </form>
+          <p style={{ textAlign: "center", marginBottom: 0 }}>
+            <Link className="lien" to="/mot-de-passe-oublie">Mot de passe oublié ?</Link>
+          </p>
           <p className="doux" style={{ textAlign: "center", marginBottom: 0 }}>
             Pas encore de compte ? <Link className="lien" to="/inscription">S'inscrire</Link>
           </p>
-        </form>
+        </div>
       </div>
     </main>
   );

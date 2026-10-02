@@ -58,9 +58,28 @@ export function AuthProvider({ children }) {
     }
   }, [qc]);
 
+  const connexionGoogle = useCallback(async (credential, statut) => {
+    qc.clear();
+    try {
+      const data = await api("/auth/google/", {
+        method: "POST", body: statut ? { credential, statut } : { credential } });
+      if (data.access) {
+        setAccessToken(data.access);
+        setUtilisateur(data.utilisateur);
+        return { etat: "connecte" };
+      }
+      return { etat: "cree" };
+    } catch (err) {
+      if (err.status === 404 && err.data?.code === "inscription_requise") {
+        return { etat: "statut_requis", infos: err.data };
+      }
+      throw err;
+    }
+  }, [qc]);
+
   const valeur = useMemo(
-    () => ({ utilisateur, chargement, connexion, deconnexion }),
-    [utilisateur, chargement, connexion, deconnexion]
+    () => ({ utilisateur, chargement, connexion, deconnexion, connexionGoogle }),
+    [utilisateur, chargement, connexion, deconnexion, connexionGoogle]
   );
   return <AuthContext.Provider value={valeur}>{children}</AuthContext.Provider>;
 }

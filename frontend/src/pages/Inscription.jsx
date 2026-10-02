@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { api } from "../api/client";
 import { Bouton, Champ, Marque, Selecteur } from "../components/ui";
 import { erreursChamps, tousMessages } from "../api/erreurs";
+import AccesGoogle from "../components/AccesGoogle";
 
 const VIDE = { prenom: "", nom: "", email: "", statut: "eleve", password: "", confirmation: "" };
 
@@ -68,6 +69,10 @@ export default function Inscription() {
   return (
     <main className="page"><div className="boite">
       <Marque sous="Rejoignez la communauté de votre école." />
+      <div className="carte" style={{ marginBottom: "1rem" }}>
+        <AccesGoogle texte="signup_with" />
+        <p className="doux" style={{ textAlign: "center", marginBottom: 0 }}>ou créez un compte avec votre e-mail</p>
+      </div>
       <form className="carte" onSubmit={soumettre} noValidate>
         <h1 style={{ marginTop: 0, fontSize: "1.3rem" }}>Créer un compte</h1>
         <Champ label="Prénom" autoComplete="given-name" value={f.prenom} onChange={maj("prenom")} erreur={erreurs.prenom} />

@@ -3,11 +3,19 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import { useAuth } from "./auth/AuthContext";
 import { useProfil } from "./api/hooks";
 import { Chargement } from "./components/ui";
+import Coque from "./components/Coque";
 
 const Connexion = lazy(() => import("./pages/Connexion"));
 const Inscription = lazy(() => import("./pages/Inscription"));
+const MotDePasseOublie = lazy(() => import("./pages/MotDePasseOublie"));
+const Reinitialiser = lazy(() => import("./pages/Reinitialiser"));
 const EnAttente = lazy(() => import("./pages/EnAttente"));
 const Onboarding = lazy(() => import("./pages/Onboarding"));
+const Annuaire = lazy(() => import("./pages/Annuaire"));
+const ProfilPublic = lazy(() => import("./pages/ProfilPublic"));
+const Amis = lazy(() => import("./pages/Amis"));
+const MonProfil = lazy(() => import("./pages/MonProfil"));
+const Bientot = lazy(() => import("./pages/Bientot"));
 
 function Invite({ children }) {
   const { utilisateur, chargement } = useAuth();
@@ -35,10 +43,20 @@ export default function App() {
       <Routes>
         <Route path="/connexion" element={<Invite><Connexion /></Invite>} />
         <Route path="/inscription" element={<Invite><Inscription /></Invite>} />
+        <Route path="/mot-de-passe-oublie" element={<Invite><MotDePasseOublie /></Invite>} />
+        <Route path="/reinitialiser" element={<Reinitialiser />} />
         <Route path="/en-attente" element={<EnAttente />} />
         <Route path="/onboarding" element={<Connecte><Onboarding /></Connecte>} />
-        <Route path="/fil" element={
-          <Connecte><Portail><div className="page"><h1>Fil</h1></div></Portail></Connecte>} />
+
+        <Route element={<Connecte><Portail><Coque /></Portail></Connecte>}>
+          <Route path="/fil" element={<Bientot titre="Fil" jalon="M3" />} />
+          <Route path="/annuaire" element={<Annuaire />} />
+          <Route path="/amis" element={<Amis />} />
+          <Route path="/messages" element={<Bientot titre="Messages" jalon="M4" />} />
+          <Route path="/profil" element={<MonProfil />} />
+          <Route path="/profil/:id" element={<ProfilPublic />} />
+        </Route>
+
         <Route path="*" element={<Navigate to="/fil" replace />} />
       </Routes>
     </Suspense>

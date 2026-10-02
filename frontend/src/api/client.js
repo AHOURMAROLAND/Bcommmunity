@@ -4,7 +4,7 @@ let rafraichissement = null; // une seule requête de refresh à la fois
 
 export class ApiError extends Error {
   constructor(status, data) {
-    super(data?.detail ?? "Une erreur est survenue.");
+    super(typeof data?.detail === "string" ? data.detail : "Une erreur est survenue.");
     this.status = status;
     this.data = data;
   }
@@ -43,6 +43,12 @@ export async function api(chemin, options = {}, dejaRetente = false) {
     try { await rafraichir(); } catch { accessToken = null; throw new ApiError(401, null); }
     return api(chemin, options, true);
   }
-  if (!r.ok) throw new ApiError(r.status, await lire(r));
+  if (!r.ok) {
+    const data = await lire(r);
+    if (r.status === 403 && ["non_valide", "suspendu", "banni"].includes(data?.code)) {
+      window.dispatchEvent(new CustomEvent("acces-bloque", { detail: data }));
+    }
+    throw new ApiError(r.status, data);
+  }
   return r.status === 204 ? null : r.json();
 }

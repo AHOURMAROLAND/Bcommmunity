@@ -22,3 +22,28 @@ body {
   font-family: "Quicksand", system-ui, -apple-system, "Segoe UI", sans-serif; font-weight: 500;
 }
 h1, h2, h3, .titre { font-weight: 700; }
+
+.page { min-height: 100%; display: flex; flex-direction: column; align-items: center; padding: 1.5rem 1rem; }
+.boite { width: 100%; max-width: 28rem; }
+.carte { background: var(--carte); border: 1px solid var(--bordure); border-radius: 1rem; padding: 1.25rem; }
+.champ {
+  width: 100%; box-sizing: border-box; padding: 0.7rem 0.9rem; border-radius: 0.75rem;
+  background: var(--bg); color: var(--texte); border: 1px solid var(--bordure); font: inherit;
+}
+.champ:focus-visible, .btn:focus-visible, .choix:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.champ[aria-invalid="true"] { border-color: var(--danger); }
+.erreur { color: var(--danger); font-size: 0.85rem; margin: 0.25rem 0 0; }
+.doux { color: var(--texte-doux); }
+.btn {
+  width: 100%; padding: 0.8rem 1rem; border-radius: 0.75rem; border: 1px solid var(--primaire);
+  background: var(--primaire); color: var(--sur-primaire); font: inherit; font-weight: 700; cursor: pointer;
+}
+.btn[disabled] { opacity: 0.6; cursor: not-allowed; }
+.btn-sec { background: transparent; color: var(--texte); border-color: var(--bordure); }
+.choix {
+  text-align: left; padding: 0.9rem; border-radius: 0.75rem; border: 1px solid var(--bordure);
+  background: var(--bg); color: var(--texte); font: inherit; cursor: pointer; width: 100%;
+}
+.choix[aria-pressed="true"] { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); }
+.lien { color: var(--accent); font-weight: 600; }
+.pastille { display: inline-block; padding: 0.1rem 0.6rem; border-radius: 999px; background: var(--bordure); font-size: 0.8rem; }

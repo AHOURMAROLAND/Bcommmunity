@@ -1,16 +1,60 @@
+from django.core.files.storage import default_storage
 from django.utils import timezone
 from rest_framework import serializers
 
-from config.imagerie import ImageInvalide, nettoyer_image
+from config.imagerie import ImageInvalide, preparer_image
 
 from .models import Commentaire, Publication
 from .texte import extrait, nettoyer_html, texte_brut
+
+CHAMPS_IMAGE = (("image", "grande"), ("image_m", "moyenne"), ("image_s", "mini"))
+
+
+def noms_images(pub):
+    return [getattr(pub, c).name for c, _ in CHAMPS_IMAGE if getattr(pub, c)]
+
+
+def poser_images(pub, v):
+    for champ, cle in CHAMPS_IMAGE:
+        f = v.get(cle)
+        if f:
+            getattr(pub, champ).save(f.name, f, save=False)
+        else:
+            setattr(pub, champ, None)
+    pub.image_largeur, pub.image_hauteur = v["largeur"], v["hauteur"]
+
+
+def retirer_images(pub):
+    for champ, _ in CHAMPS_IMAGE:
+        setattr(pub, champ, None)
+    pub.image_largeur = pub.image_hauteur = None
+
+
+def largeur_variante(larg, haut, cote):
+    return round(larg * min(1, cote / max(larg, haut)))
+
+
+def donnees_image(o):
+    if not o.image:
+        return None
+    larg, haut = o.image_largeur, o.image_hauteur
+    d = {"src": o.image.url, "moyenne": o.image_m.url if o.image_m else None,
+         "mini": o.image_s.url if o.image_s else None, "largeur": larg, "hauteur": haut, "srcset": ""}
+    if larg and haut:
+        parts = []
+        if o.image_s:
+            parts.append(f"{o.image_s.url} {largeur_variante(larg, haut, 480)}w")
+        if o.image_m:
+            parts.append(f"{o.image_m.url} {largeur_variante(larg, haut, 1080)}w")
+        parts.append(f"{o.image.url} {larg}w")
+        d["srcset"] = ", ".join(parts)
+    return d
 
 
 def resume_auteur(u):
     p = getattr(u, "profil", None)
     return {"id": u.pk, "prenom": u.prenom, "nom": u.nom, "statut": u.statut,
-            "photo": p.photo.url if p and p.photo else None}
+            "photo": p.url_mini if p else None}
 
 
 class PublicationSerializer(serializers.ModelSerializer):
@@ -28,7 +72,7 @@ class PublicationSerializer(serializers.ModelSerializer):
         return resume_auteur(o.auteur)
 
     def get_image(self, o):
-        return o.image.url if o.image else None
+        return donnees_image(o)
 
     def get_a_aime(self, o):
         return bool(getattr(o, "a_aime", False))
@@ -57,7 +101,7 @@ class PublicationEcritureSerializer(serializers.Serializer):
         if f is None:
             return None
         try:
-            return nettoyer_image(f)
+            return preparer_image(f)
         except ImageInvalide as e:
             raise serializers.ValidationError(str(e))
 
@@ -74,7 +118,7 @@ class PublicationEcritureSerializer(serializers.Serializer):
         if d["statut"] == "publie":
             pub.publie_le = timezone.now()
         if d.get("image"):
-            pub.image.save(d["image"].name, d["image"], save=False)
+            poser_images(pub, d["image"])
         pub.save()
         return pub
 
@@ -88,15 +132,20 @@ class PublicationEcritureSerializer(serializers.Serializer):
         self._pret(pub.statut, pub.contenu)
         if pub.statut == "publie" and pub.publie_le is None:
             pub.publie_le = timezone.now()
-        ancien = pub.image.name if pub.image else None
-        if d.get("supprimer_image") and not d.get("image"):
-            pub.image = None
+
+        anciens = noms_images(pub)
+        change = False
         if d.get("image"):
-            pub.image.save(d["image"].name, d["image"], save=False)
+            poser_images(pub, d["image"])
+            change = True
+        elif d.get("supprimer_image"):
+            retirer_images(pub)
+            change = True
         pub.extrait = extrait(pub.contenu)
         pub.save()
-        if ancien and ancien != (pub.image.name if pub.image else None):
-            pub.image.storage.delete(ancien)
+        if change:
+            for nom in anciens:
+                default_storage.delete(nom)
         return pub
 
 

@@ -23,6 +23,12 @@ class Visibilite(models.TextChoices):
 class Profil(models.Model):
     user = models.OneToOneField(User, related_name="profil", on_delete=models.CASCADE)
     photo = models.ImageField(upload_to="profils/", null=True, blank=True)
+    photo_s = models.ImageField(upload_to="profils/", null=True, blank=True)
+
+    @property
+    def url_mini(self):
+        f = self.photo_s or self.photo
+        return f.url if f else None
     bio = models.CharField(max_length=500, blank=True)
     ville = models.CharField(max_length=100, blank=True)
     annee_sortie = models.PositiveSmallIntegerField(null=True, blank=True,

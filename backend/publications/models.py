@@ -14,6 +14,10 @@ class Publication(models.Model):
     contenu = models.TextField(blank=True)  # HTML déjà nettoyé
     extrait = models.CharField(max_length=300, blank=True)
     image = models.ImageField(upload_to="publications/%Y/%m/", null=True, blank=True)
+    image_m = models.ImageField(upload_to="publications/%Y/%m/", null=True, blank=True)
+    image_s = models.ImageField(upload_to="publications/%Y/%m/", null=True, blank=True)
+    image_largeur = models.PositiveIntegerField(null=True, blank=True)
+    image_hauteur = models.PositiveIntegerField(null=True, blank=True)
     apercu_public = models.BooleanField(default=True)
     statut = models.CharField(max_length=10, choices=Statut.choices, default=Statut.BROUILLON)
     masquee = models.BooleanField(default=False)
@@ -48,6 +52,8 @@ class Commentaire(models.Model):
 
 
 @receiver(post_delete, sender=Publication)
-def supprimer_image(sender, instance, **kwargs):
-    if instance.image:
-        instance.image.delete(save=False)
+def supprimer_images(sender, instance, **kwargs):
+    for champ in ("image", "image_m", "image_s"):
+        f = getattr(instance, champ)
+        if f:
+            f.delete(save=False)

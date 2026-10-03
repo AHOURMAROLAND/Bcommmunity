@@ -9,7 +9,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from amis.services import carte, ids_bloques, profils_actifs, relations
-from config.imagerie import ImageInvalide, nettoyer_image
+from config.imagerie import ImageInvalide, preparer_avatar
 from scolarite.models import Cycle, Scolarite
 
 from .models import Domaine, Profil, SituationActuelle
@@ -107,8 +107,10 @@ class ProfilPublicView(APIView):
         restreint = profil.visibilite_profil == "amis" and not est_ami
 
         data = carte(profil, rel)
+        data["photo_grande"] = profil.photo.url if profil.photo else None
         data["restreint"] = restreint
         if restreint:
+            data["photo"] = None
             data["situation"] = None
             return Response(data)
 
@@ -139,22 +141,25 @@ class PhotoProfilView(APIView):
         if not fichier:
             raise ValidationError({"image": "Choisissez une image."})
         try:
-            propre = nettoyer_image(fichier, cote_max=640, carre=True)
+            v = preparer_avatar(fichier)
         except ImageInvalide as e:
             raise ValidationError({"image": str(e)})
         profil = profil_de(request.user)
-        ancien = profil.photo.name if profil.photo else None
-        profil.photo.save(propre.name, propre, save=True)
-        if ancien:
-            default_storage.delete(ancien)
-        return Response({"photo": profil.photo.url})
+        anciens = [f.name for f in (profil.photo, profil.photo_s) if f]
+        profil.photo.save(v["grande"].name, v["grande"], save=False)
+        profil.photo_s.save(v["mini"].name, v["mini"], save=False)
+        profil.save(update_fields=["photo", "photo_s"])
+        for nom in anciens:
+            default_storage.delete(nom)
+        return Response({"photo": profil.photo.url, "photo_mini": profil.photo_s.url})
 
     def delete(self, request):
         profil = profil_de(request.user)
-        if profil.photo:
-            nom = profil.photo.name
-            profil.photo = None
-            profil.save(update_fields=["photo"])
+        anciens = [f.name for f in (profil.photo, profil.photo_s) if f]
+        profil.photo = None
+        profil.photo_s = None
+        profil.save(update_fields=["photo", "photo_s"])
+        for nom in anciens:
             default_storage.delete(nom)
         return Response(status=204)
 

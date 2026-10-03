@@ -77,17 +77,21 @@ class ProfilSerializer(serializers.ModelSerializer):
     nom = serializers.CharField(source="user.nom", read_only=True)
     statut = serializers.CharField(source="user.statut", read_only=True)
     photo = serializers.SerializerMethodField()
+    photo_mini = serializers.SerializerMethodField()
     situation = SituationSerializer(read_only=True, allow_null=True)
     scolarites = ScolariteSerializer(many=True, read_only=True)
 
     class Meta:
         model = Profil
-        fields = ("id", "prenom", "nom", "statut", "photo", "bio", "ville", "annee_sortie",
+        fields = ("id", "prenom", "nom", "statut", "photo", "photo_mini", "bio", "ville", "annee_sortie",
                   "onboarding_termine", "visibilite_profil", "visibilite_parcours",
                   "visibilite_situation", "qui_peut_inviter", "situation", "scolarites")
 
     def get_photo(self, o):
         return o.photo.url if o.photo else None
+
+    def get_photo_mini(self, o):
+        return o.url_mini
 
     def validate_annee_sortie(self, valeur):
         if valeur and valeur > timezone.now().year + 1:

@@ -57,15 +57,31 @@ def test_html_nettoye():
     assert 'href="https://ok.fr"' in c
 
 
-def test_image_invalide_rejetee_et_valide_reduite_en_webp():
+def test_image_invalide_rejetee_et_valide_en_trois_tailles():
     a = membre("Alice")
     faux = SimpleUploadedFile("a.png", b"pas une image", content_type="image/png")
     assert publier(a, image=faux).status_code == 400
-    bon = SimpleUploadedFile("a.png", png(), content_type="image/png")
+    bon = SimpleUploadedFile("a.png", png((3000, 2000)), content_type="image/png")
     r = publier(a, image=bon)
-    assert r.status_code == 201 and r.data["image"].endswith(".webp")
-    with Image.open(Publication.objects.get().image.path) as im:
-        assert max(im.size) <= 1280
+    assert r.status_code == 201
+    img = r.data["image"]
+    assert img["src"].endswith(".webp") and (img["largeur"], img["hauteur"]) == (2048, 1365)
+    assert img["moyenne"] and img["mini"] and "480w" in img["srcset"] and "1080w" in img["srcset"]
+
+
+def test_petite_image_non_agrandie_et_sans_variantes_inutiles():
+    a = membre("Alice")
+    petite = SimpleUploadedFile("a.png", png((400, 300)), content_type="image/png")
+    img = publier(a, image=petite).data["image"]
+    assert (img["largeur"], img["hauteur"]) == (400, 300) and img["moyenne"] is None and img["mini"] is None
+
+
+def test_ratio_extreme_et_image_trop_petite_refuses():
+    a = membre("Alice")
+    large = SimpleUploadedFile("a.png", png((3000, 600)), content_type="image/png")
+    assert publier(a, image=large).status_code == 400
+    mini = SimpleUploadedFile("b.png", png((100, 100)), content_type="image/png")
+    assert publier(a, image=mini).status_code == 400
 
 
 def test_like_idempotent_et_compteur():
@@ -122,10 +138,11 @@ def test_commentaire_impossible_sur_un_brouillon_d_autrui():
     assert api(b).post(f"/api/publications/{pid}/commentaires/", {"texte": "x"}, format="json").status_code == 404
 
 
-def test_photo_de_profil_carree():
+def test_photo_de_profil_carree_en_deux_tailles():
     a = membre("Alice")
-    fichier = SimpleUploadedFile("p.png", png((800, 500)), content_type="image/png")
+    fichier = SimpleUploadedFile("p.png", png((1600, 1200)), content_type="image/png")
     r = api(a).post("/api/profils/me/photo/", {"image": fichier}, format="multipart")
     assert r.status_code == 200
-    with Image.open(Profil.objects.get(user=a).photo.path) as im:
-        assert im.size == (640, 640)
+    p = Profil.objects.get(user=a)
+    with Image.open(p.photo.path) as g, Image.open(p.photo_s.path) as m:
+        assert g.size == (800, 800) and m.size == (160, 160)

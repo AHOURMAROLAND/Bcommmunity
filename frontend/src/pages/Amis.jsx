@@ -53,7 +53,7 @@ function Demandes() {
   );
 }
 
-function MesAmis() {
+export function MesAmis() {
   const retirer = useRetirerAmi();
   return (
     <Liste requete={useAmis()} vide="Vous n'avez pas encore d'amis. Consultez l'annuaire ou les suggestions."

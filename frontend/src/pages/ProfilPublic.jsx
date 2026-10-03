@@ -2,10 +2,25 @@ import { useState } from "react";
 import { Navigate, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, ChevronRight, GraduationCap, MessageCircle, MoreHorizontal } from "lucide-react";
 import { useAnnulerDemande, useBloquer, useProfilPublic, useRetirerAmi } from "../api/amis";
+import { useFil } from "../api/publications";
 import { useAuth } from "../auth/AuthContext";
-import Avatar from "../components/Avatar";
+import Banniere from "../components/Banniere";
 import BoutonRelation from "../components/BoutonRelation";
+import PublicationCard from "../components/PublicationCard";
 import { Bouton, Chargement } from "../components/ui";
+
+function PublicationsDe({ id }) {
+  const q = useFil(id);
+  const items = q.data?.pages.flatMap((p) => p.results) ?? [];
+  if (q.isPending) return <Chargement />;
+  if (!items.length) return <p className="doux">Aucune publication.</p>;
+  return (
+    <>
+      {items.map((p) => <PublicationCard key={p.id} p={p} />)}
+      {q.hasNextPage && <Bouton secondaire chargement={q.isFetchingNextPage} onClick={() => q.fetchNextPage()}>Voir plus</Bouton>}
+    </>
+  );
+}
 
 export default function ProfilPublic() {
   const { id } = useParams();
@@ -44,39 +59,31 @@ export default function ProfilPublic() {
       <div className="entete">
         <button className="puce" onClick={() => navigate(-1)} aria-label="Retour"><ArrowLeft size={18} /> Retour</button>
         <div style={{ position: "relative" }}>
-          <button className="puce" aria-label="Plus d'options" aria-expanded={menu} onClick={() => setMenu((v) => !v)}>
-            <MoreHorizontal size={18} />
-          </button>
+          <button className="puce" aria-label="Plus d'options" aria-expanded={menu} onClick={() => setMenu((v) => !v)}><MoreHorizontal size={18} /></button>
           {menu && (
             <div className="carte" style={{ position: "absolute", right: 0, zIndex: 5, width: "14rem" }}>
               {d.relation === "amis" && (
-                <Bouton secondaire onClick={() => window.confirm("Retirer cet ami ?") && retirer.mutate(d.id)}>
-                  Retirer des amis
-                </Bouton>
+                <>
+                  <Bouton secondaire onClick={() => window.confirm("Retirer cet ami ?") && retirer.mutate(d.id)}>Retirer des amis</Bouton>
+                  <div style={{ height: "0.5rem" }} />
+                </>
               )}
-              <div style={{ height: "0.5rem" }} />
               <Bouton secondaire onClick={bloquerCompte}>Bloquer</Bouton>
             </div>
           )}
         </div>
       </div>
 
-      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", gap: "0.3rem" }}>
-        <Avatar prenom={d.prenom} nom={d.nom} taille={112} />
-        <h1 style={{ margin: "0.5rem 0 0" }}>{d.prenom} {d.nom}</h1>
-        <p className="doux" style={{ margin: 0 }}>
-          {d.statut === "ancien" ? "Ancien élève" : "Élève"}{d.annee_sortie ? `, promo ${d.annee_sortie}` : ""}
-        </p>
-        {d.situation?.texte && <p style={{ margin: 0, fontWeight: 600 }}>{d.situation.texte}</p>}
-        {d.ville && <p className="doux" style={{ margin: 0 }}>{d.ville}</p>}
-      </div>
+      <Banniere photo={d.photo} prenom={d.prenom} nom={d.nom} />
+      <h1 style={{ margin: "0.75rem 0 0" }}>{d.prenom} {d.nom}</h1>
+      <p className="doux" style={{ margin: 0 }}>{d.statut === "ancien" ? "Ancien élève" : "Élève"}{d.annee_sortie ? ` · promo ${d.annee_sortie}` : ""}</p>
+      {d.situation?.texte && <p style={{ margin: "0.2rem 0 0" }}>{d.situation.texte}</p>}
+      {d.ville && <p className="doux" style={{ margin: 0 }}>{d.ville}</p>}
 
-      <div className="duo" style={{ margin: "1rem 0" }}>
+      <div className="duo" style={{ margin: "1rem 0 0.5rem" }}>
         <div style={{ flex: 1 }}><BoutonRelation c={d} /></div>
         <div style={{ flex: 1 }}>
-          <button className="btn btn-sec" disabled title="Disponible prochainement">
-            <MessageCircle size={16} /> Inviter à discuter
-          </button>
+          <button className="btn btn-sec" disabled title="Disponible avec le jalon M4"><MessageCircle size={16} /> Inviter à discuter</button>
         </div>
       </div>
       {d.relation === "envoyee" && (
@@ -90,11 +97,8 @@ export default function ProfilPublic() {
         <>
           {d.bio && <p>{d.bio}</p>}
           <h2>Parcours scolaire</h2>
-          {d.parcours === null ? (
-            <p className="doux">Cette personne ne partage pas son parcours.</p>
-          ) : lignes.length === 0 ? (
-            <p className="doux">Parcours non renseigné.</p>
-          ) : (
+          {d.parcours === null ? <p className="doux">Cette personne ne partage pas son parcours.</p>
+            : lignes.length === 0 ? <p className="doux">Parcours non renseigné.</p> : (
             <>
               <ol className="frise">
                 {visibles.map((l) => (
@@ -106,17 +110,17 @@ export default function ProfilPublic() {
                 ))}
               </ol>
               {lignes.length > 3 && (
-                <button className="carte" style={{ display: "flex", width: "100%", alignItems: "center", gap: "0.75rem",
-                  cursor: "pointer", font: "inherit", color: "inherit" }} onClick={() => setTout((v) => !v)}>
+                <button className="carte" style={{ display: "flex", width: "100%", alignItems: "center", gap: "0.75rem", cursor: "pointer", font: "inherit", color: "inherit" }}
+                  onClick={() => setTout((v) => !v)}>
                   <GraduationCap size={22} />
-                  <span style={{ flex: 1, textAlign: "left" }}>
-                    {tout ? "Réduire le parcours" : `Voir tout le parcours (${lignes.length})`}
-                  </span>
+                  <span style={{ flex: 1, textAlign: "left" }}>{tout ? "Réduire le parcours" : `Voir tout le parcours (${lignes.length})`}</span>
                   <ChevronRight size={18} />
                 </button>
               )}
             </>
           )}
+          <h2>Publications</h2>
+          <PublicationsDe id={d.id} />
         </>
       )}
     </div>

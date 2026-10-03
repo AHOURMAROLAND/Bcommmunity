@@ -1,46 +1,37 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "./client";
 
-const suite = (derniere, toutes) => (derniere.next ? toutes.length + 1 : undefined);
+const curseur = (url) => (url ? new URL(url, window.location.origin).searchParams.get("cursor") : undefined);
 
-export function usePublications(filtres = {}) {
-  const p = new URLSearchParams(Object.entries(filtres).filter(([, v]) => v !== "" && v != null));
-  const queryStr = p.toString();
+function useCurseur(cle, chemin, params = "") {
   return useInfiniteQuery({
-    queryKey: ["publications", queryStr],
-    queryFn: ({ pageParam }) =>
-      api(`/publications/?${queryStr}${queryStr ? "&" : ""}page=${pageParam}`),
-    initialPageParam: 1,
-    getNextPageParam: suite,
+    queryKey: [cle, chemin, params],
+    queryFn: ({ pageParam }) => {
+      const p = new URLSearchParams(params);
+      if (pageParam) p.set("cursor", pageParam);
+      return api(`${chemin}?${p}`);
+    },
+    initialPageParam: null,
+    getNextPageParam: (d) => curseur(d.next),
   });
 }
 
-export function usePublication(id) {
-  return useQuery({
-    queryKey: ["publication", id],
-    queryFn: () => api(`/publications/${id}/`),
-    enabled: Boolean(id),
-  });
-}
+export const useFil = (auteur) => useCurseur("fil", "/publications/", auteur ? `auteur=${auteur}` : "");
+export const useMesPublications = () => useCurseur("mes-publications", "/publications/mes/");
+export const useCommentaires = (id) => useCurseur("commentaires", `/publications/${id}/commentaires/`);
 
-export function useCreerPublication() {
+export const usePublication = (id, actif = true) =>
+  useQuery({ queryKey: ["publication", id], queryFn: () => api(`/publications/${id}/`), enabled: actif, retry: false });
+
+const CLES = ["fil", "mes-publications", "publication"];
+
+export function useEnregistrerPublication(id) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (formData) => api("/publications/", { method: "POST", formData }),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["publications"] });
-    },
-  });
-}
-
-export function useModifierPublication() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: ({ id, formData }) => api(`/publications/${id}/`, { method: "PATCH", formData }),
-    onSuccess: (_, { id }) => {
-      qc.invalidateQueries({ queryKey: ["publications"] });
-      qc.invalidateQueries({ queryKey: ["publication", id] });
-    },
+    mutationFn: (formData) =>
+      id ? api(`/publications/${id}/`, { method: "PATCH", formData })
+         : api("/publications/", { method: "POST", formData }),
+    onSuccess: () => CLES.forEach((k) => qc.invalidateQueries({ queryKey: [k] })),
   });
 }
 
@@ -48,67 +39,42 @@ export function useSupprimerPublication() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (id) => api(`/publications/${id}/`, { method: "DELETE" }),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["publications"] });
-    },
+    onSuccess: () => CLES.forEach((k) => qc.invalidateQueries({ queryKey: [k] })),
   });
 }
 
-export function useToggleLike() {
+export function useAjouterCommentaire(id) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (id) => api(`/publications/${id}/like/`, { method: "POST" }),
-    onSuccess: (data, id) => {
-      // Met à jour les requêtes en cache
-      qc.setQueriesData({ queryKey: ["publications"] }, (ancien) => {
-        if (!ancien?.pages) return ancien;
-        return {
-          ...ancien,
-          pages: ancien.pages.map((page) => ({
-            ...page,
-            results: page.results.map((pub) =>
-              pub.id === id ? { ...pub, a_aime: data.aime, nb_likes: data.nb_likes } : pub
-            ),
-          })),
-        };
-      });
-      qc.invalidateQueries({ queryKey: ["publication", id] });
-    },
+    mutationFn: (texte) => api(`/publications/${id}/commentaires/`, { method: "POST", body: { texte } }),
+    onSuccess: () => ["commentaires", "publication", "fil"].forEach((k) => qc.invalidateQueries({ queryKey: [k] })),
   });
 }
 
-export function useCommentaires(pubId) {
-  return useInfiniteQuery({
-    queryKey: ["commentaires", pubId],
-    queryFn: ({ pageParam }) =>
-      api(`/publications/${pubId}/commentaires/?page=${pageParam}`),
-    initialPageParam: 1,
-    getNextPageParam: suite,
-    enabled: Boolean(pubId),
-  });
-}
-
-export function useAjouterCommentaire(pubId) {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (texte) =>
-      api(`/publications/${pubId}/commentaires/`, { method: "POST", body: { texte } }),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["commentaires", pubId] });
-      qc.invalidateQueries({ queryKey: ["publications"] });
-      qc.invalidateQueries({ queryKey: ["publication", pubId] });
-    },
-  });
-}
-
-export function useSupprimerCommentaire(pubId) {
+export function useSupprimerCommentaire() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (id) => api(`/commentaires/${id}/`, { method: "DELETE" }),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["commentaires", pubId] });
-      qc.invalidateQueries({ queryKey: ["publications"] });
-      qc.invalidateQueries({ queryKey: ["publication", pubId] });
-    },
+    onSuccess: () => ["commentaires", "publication", "fil"].forEach((k) => qc.invalidateQueries({ queryKey: [k] })),
   });
+}
+
+export function useChangerPhoto() {
+  const qc = useQueryClient();
+  const invalider = () => ["profil", "profil-public", "fil", "annuaire", "amis"]
+    .forEach((k) => qc.invalidateQueries({ queryKey: [k] }));
+  return {
+    envoyer: useMutation({
+      mutationFn: (fichier) => {
+        const fd = new FormData();
+        fd.append("image", fichier);
+        return api("/profils/me/photo/", { method: "POST", formData: fd });
+      },
+      onSuccess: invalider,
+    }),
+    retirer: useMutation({
+      mutationFn: () => api("/profils/me/photo/", { method: "DELETE" }),
+      onSuccess: invalider,
+    }),
+  };
 }

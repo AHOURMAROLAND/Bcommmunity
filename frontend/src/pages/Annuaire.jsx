@@ -94,7 +94,7 @@ export default function Annuaire() {
               <li key={c.id}>
                 <article className="carte-membre">
                   <Link to={`/profil/${c.id}`} className="carte-lien">
-                    <Avatar prenom={c.prenom} nom={c.nom} taille={72} />
+                    <Avatar prenom={c.prenom} nom={c.nom} photo={c.photo} taille={72} />
                     <h2>{c.prenom} {c.nom}</h2>
                     <span className="doux" style={{ fontSize: "0.85rem" }}>
                       {c.situation?.texte || (c.statut === "ancien" ? "Ancien élève" : "Élève")}

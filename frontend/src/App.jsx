@@ -1,5 +1,5 @@
 import { lazy, Suspense } from "react";
-import { Navigate, Route, Routes } from "react-router-dom";
+import { Navigate, Outlet, Route, Routes } from "react-router-dom";
 import { useAuth } from "./auth/AuthContext";
 import { useProfil } from "./api/hooks";
 import { Chargement } from "./components/ui";
@@ -11,11 +11,14 @@ const MotDePasseOublie = lazy(() => import("./pages/MotDePasseOublie"));
 const Reinitialiser = lazy(() => import("./pages/Reinitialiser"));
 const EnAttente = lazy(() => import("./pages/EnAttente"));
 const Onboarding = lazy(() => import("./pages/Onboarding"));
+const Fil = lazy(() => import("./pages/Fil"));
 const Annuaire = lazy(() => import("./pages/Annuaire"));
 const ProfilPublic = lazy(() => import("./pages/ProfilPublic"));
 const Amis = lazy(() => import("./pages/Amis"));
-const Fil = lazy(() => import("./pages/Fil"));
 const MonProfil = lazy(() => import("./pages/MonProfil"));
+const ModifierProfil = lazy(() => import("./pages/ModifierProfil"));
+const PublicationPage = lazy(() => import("./pages/PublicationPage"));
+const Publier = lazy(() => import("./pages/Publier"));
 const Bientot = lazy(() => import("./pages/Bientot"));
 
 function Invite({ children }) {
@@ -38,6 +41,10 @@ function Portail({ children }) {
   return children;
 }
 
+function Plein() {
+  return <main className="contenu"><Outlet /></main>;
+}
+
 export default function App() {
   return (
     <Suspense fallback={<Chargement />}>
@@ -49,12 +56,19 @@ export default function App() {
         <Route path="/en-attente" element={<EnAttente />} />
         <Route path="/onboarding" element={<Connecte><Onboarding /></Connecte>} />
 
+        <Route element={<Connecte><Portail><Plein /></Portail></Connecte>}>
+          <Route path="/publier" element={<Publier />} />
+          <Route path="/publier/:id" element={<Publier />} />
+        </Route>
+
         <Route element={<Connecte><Portail><Coque /></Portail></Connecte>}>
           <Route path="/fil" element={<Fil />} />
+          <Route path="/publications/:id" element={<PublicationPage />} />
           <Route path="/annuaire" element={<Annuaire />} />
           <Route path="/amis" element={<Amis />} />
           <Route path="/messages" element={<Bientot titre="Messages" jalon="M4" />} />
           <Route path="/profil" element={<MonProfil />} />
+          <Route path="/profil/modifier" element={<ModifierProfil />} />
           <Route path="/profil/:id" element={<ProfilPublic />} />
         </Route>
 

@@ -72,7 +72,7 @@ function Etape1({ profil, onSuivant }) {
   );
 }
 
-function Etape2({ profil, onSuivant, onRetour, dernier }) {
+export function Etape2({ profil, onSuivant, onRetour, dernier }) {
   const ref = useReferentiels();
   const ajouter = useAjouterScolarite();
   const retirer = useRetirerScolarite();
@@ -155,7 +155,7 @@ const TYPES = [
   { id: "autre", titre: "Autre / je préfère ne pas dire" },
 ];
 
-function Etape3({ profil, onRetour, onTerminer }) {
+export function Etape3({ profil, onRetour, onTerminer }) {
   const ref = useReferentiels();
   const majSituation = useMajSituation();
   const s = profil?.situation;

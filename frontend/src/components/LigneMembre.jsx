@@ -5,7 +5,7 @@ export default function LigneMembre({ c, sous, children }) {
   return (
     <li className="ligne-membre">
       <Link to={`/profil/${c.id}`} aria-label={`Profil de ${c.prenom} ${c.nom}`}>
-        <Avatar prenom={c.prenom} nom={c.nom} />
+        <Avatar prenom={c.prenom} nom={c.nom} photo={c.photo} />
       </Link>
       <div className="infos">
         <Link to={`/profil/${c.id}`} style={{ color: "inherit", textDecoration: "none" }}>

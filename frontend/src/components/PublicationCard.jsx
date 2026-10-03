@@ -7,6 +7,7 @@ import { ilYa } from "../utils/date";
 import { partager } from "../utils/partager";
 import Avatar from "./Avatar";
 import HtmlSur from "./HtmlSur";
+import ImageHD, { ImageZoom } from "./ImageHD";
 
 export default function PublicationCard({ p, detail = false }) {
   const navigate = useNavigate();
@@ -72,9 +73,7 @@ export default function PublicationCard({ p, detail = false }) {
       {detail ? <h1 className="titre-pub">{p.titre}</h1>
         : <h2 className="titre-pub"><Link to={`/publications/${p.id}`} style={{ color: "inherit", textDecoration: "none" }}>{p.titre}</Link></h2>}
       {detail ? <HtmlSur html={p.contenu} /> : <p className="extrait">{p.extrait}</p>}
-      {p.image && (
-        <img className="image-pub" src={p.image} alt="" loading={detail ? "eager" : "lazy"} decoding="async" />
-      )}
+      {p.image && (detail ? <ImageZoom img={p.image} /> : <ImageHD img={p.image} />)}
 
       <p className="doux compteurs">
         {nb} j'aime · {p.nb_commentaires} commentaire{p.nb_commentaires > 1 ? "s" : ""}

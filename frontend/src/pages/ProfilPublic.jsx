@@ -7,12 +7,13 @@ import { useAuth } from "../auth/AuthContext";
 import Banniere from "../components/Banniere";
 import BoutonRelation from "../components/BoutonRelation";
 import PublicationCard from "../components/PublicationCard";
-import { Bouton, Chargement } from "../components/ui";
+import { Bouton } from "../components/ui";
+import { SqCartes, SqProfil } from "../components/Squelettes";
 
 function PublicationsDe({ id }) {
   const q = useFil(id);
   const items = q.data?.pages.flatMap((p) => p.results) ?? [];
-  if (q.isPending) return <Chargement />;
+  if (q.isPending) return <SqCartes n={1} />;
   if (!items.length) return <p className="doux">Aucune publication.</p>;
   return (
     <>
@@ -34,7 +35,7 @@ export default function ProfilPublic() {
   const [tout, setTout] = useState(false);
 
   if (String(utilisateur.id) === id) return <Navigate to="/profil" replace />;
-  if (q.isPending) return <Chargement />;
+  if (q.isPending) return <SqProfil />;
   if (q.isError) {
     return (
       <div>
@@ -74,7 +75,7 @@ export default function ProfilPublic() {
         </div>
       </div>
 
-      <Banniere photo={d.photo} prenom={d.prenom} nom={d.nom} />
+      <Banniere photo={d.photo_grande ?? d.photo} prenom={d.prenom} nom={d.nom} />
       <h1 style={{ margin: "0.75rem 0 0" }}>{d.prenom} {d.nom}</h1>
       <p className="doux" style={{ margin: 0 }}>{d.statut === "ancien" ? "Ancien élève" : "Élève"}{d.annee_sortie ? ` · promo ${d.annee_sortie}` : ""}</p>
       {d.situation?.texte && <p style={{ margin: "0.2rem 0 0" }}>{d.situation.texte}</p>}

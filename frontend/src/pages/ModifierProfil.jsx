@@ -4,8 +4,11 @@ import { ArrowLeft } from "lucide-react";
 import { useChangerPhoto } from "../api/publications";
 import { useMajProfil, useProfil } from "../api/hooks";
 import { tousMessages } from "../api/erreurs";
+import { COTE_AVATAR, TYPES_IMAGE, verifierFichier } from "../utils/image";
 import Avatar from "../components/Avatar";
-import { Bouton, Champ, Chargement, Selecteur } from "../components/ui";
+import RecadrageImage from "../components/RecadrageImage";
+import { Bouton, Champ, Selecteur } from "../components/ui";
+import { SqFormulaire } from "../components/Squelettes";
 import { Etape2, Etape3 } from "./Onboarding";
 
 const VISIBILITES = [["tous", "Tout le monde"], ["amis", "Mes amis"], ["personne", "Personne"]];
@@ -17,12 +20,13 @@ export default function ModifierProfil() {
   const maj = useMajProfil();
   const photo = useChangerPhoto();
   const [section, setSection] = useState(params.get("section"));
+  const [aRecadrer, setARecadrer] = useState(null);
   const [erreur, setErreur] = useState("");
   const [bio, setBio] = useState(null);
   const [ville, setVille] = useState(null);
   const [vis, setVis] = useState({});
 
-  if (profil.isPending) return <Chargement />;
+  if (profil.isPending) return <SqFormulaire />;
   const p = profil.data;
   const ancien = p.statut === "ancien";
   const retour = () => (section ? setSection(null) : navigate("/profil"));
@@ -36,16 +40,29 @@ export default function ModifierProfil() {
     } catch (err) { setErreur(tousMessages(err)); }
   }
 
-  async function choisirPhoto(e) {
+  function choisirPhoto(e) {
     const f = e.target.files?.[0];
     e.target.value = "";
     if (!f) return;
+    const probleme = verifierFichier(f);
+    if (probleme) { setErreur(probleme); return; }
     setErreur("");
-    try { await photo.envoyer.mutateAsync(f); } catch (err) { setErreur(tousMessages(err)); }
+    setARecadrer(f);
+  }
+
+  async function envoyerPhoto(fichier) {
+    setARecadrer(null);
+    try { await photo.envoyer.mutateAsync(fichier); } catch (err) { setErreur(tousMessages(err)); }
   }
 
   return (
     <div>
+      {aRecadrer && (
+        <RecadrageImage fichier={aRecadrer} rond coteMax={COTE_AVATAR} titre="Recadrer la photo de profil"
+          ratios={[{ id: "1-1", label: "Carré", valeur: 1 }]} ratioDefaut="1-1"
+          onValider={envoyerPhoto} onAnnuler={() => setARecadrer(null)} />
+      )}
+
       <button className="puce" onClick={retour} style={{ marginBottom: "0.75rem" }}><ArrowLeft size={18} /> Retour</button>
 
       {section === "parcours" && (
@@ -62,11 +79,11 @@ export default function ModifierProfil() {
         <>
           <h1 style={{ marginTop: 0 }}>Modifier le profil</h1>
           <div className="carte" style={{ display: "flex", gap: "1rem", alignItems: "center", marginBottom: "1rem" }}>
-            <Avatar prenom={p.prenom} nom={p.nom} photo={p.photo} taille={72} />
+            <Avatar prenom={p.prenom} nom={p.nom} photo={p.photo_mini ?? p.photo} taille={72} />
             <div style={{ display: "grid", gap: "0.5rem", flex: 1 }}>
               <label className="btn btn-sec" style={{ cursor: "pointer" }}>
                 {photo.envoyer.isPending ? "Envoi..." : "Changer la photo"}
-                <input type="file" accept="image/jpeg,image/png,image/webp" onChange={choisirPhoto} style={{ display: "none" }} />
+                <input type="file" accept={TYPES_IMAGE.join(",")} onChange={choisirPhoto} style={{ display: "none" }} />
               </label>
               {p.photo && <Bouton secondaire chargement={photo.retirer.isPending} onClick={() => photo.retirer.mutate()}>Retirer la photo</Bouton>}
             </div>

@@ -6,7 +6,7 @@ import { useProfil } from "../api/hooks";
 import useSentinelle from "../hooks/useSentinelle";
 import Avatar from "../components/Avatar";
 import PublicationCard from "../components/PublicationCard";
-import { Chargement } from "../components/ui";
+import { SqCartes } from "../components/Squelettes";
 
 export default function Fil() {
   const { data: profil } = useProfil();
@@ -21,7 +21,7 @@ export default function Fil() {
       <h1 style={{ marginTop: 0 }}>Fil</h1>
 
       <Link to="/publier" className="carte ecrire">
-        <Avatar prenom={profil?.prenom} nom={profil?.nom} photo={profil?.photo} taille={44} />
+        <Avatar prenom={profil?.prenom} nom={profil?.nom} photo={profil?.photo_mini ?? profil?.photo} taille={44} />
         <span style={{ flex: 1 }}>
           <strong>Écrire une publication</strong>
           <span className="doux" style={{ display: "block", fontSize: "0.85rem" }}>Partagez des nouvelles avec votre école</span>
@@ -49,7 +49,7 @@ export default function Fil() {
         </section>
       )}
 
-      {fil.isPending ? <Chargement /> : fil.isError ? (
+      {fil.isPending ? <SqCartes /> : fil.isError ? (
         <p role="alert" className="erreur">Impossible de charger le fil. Réessayez.</p>
       ) : items.length === 0 ? (
         <p className="doux">Aucune publication pour le moment. Soyez le premier à partager des nouvelles.</p>
@@ -57,7 +57,7 @@ export default function Fil() {
         <>
           {items.map((p) => <PublicationCard key={p.id} p={p} />)}
           <div ref={sentinelle} style={{ height: 1 }} />
-          {fil.isFetchingNextPage && <Chargement />}
+          {fil.isFetchingNextPage && <SqCartes n={1} />}
         </>
       )}
     </div>

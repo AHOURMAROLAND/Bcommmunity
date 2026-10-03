@@ -7,12 +7,13 @@ import { useAuth } from "../auth/AuthContext";
 import { ilYa } from "../utils/date";
 import { LIBELLES_SITUATION, resumeSituation } from "../utils/situation";
 import Banniere from "../components/Banniere";
-import { Bouton, Chargement } from "../components/ui";
+import { Bouton } from "../components/ui";
+import { SqListe, SqProfil } from "../components/Squelettes";
 import { MesAmis } from "./Amis";
 
 function MesPublications() {
   const q = useMesPublications();
-  if (q.isPending) return <Chargement />;
+  if (q.isPending) return <SqListe n={3} />;
   const items = q.data?.pages.flatMap((p) => p.results) ?? [];
   if (!items.length) return <p className="doux">Vous n'avez rien publié. <Link className="lien" to="/publier">Écrire une publication</Link></p>;
   return (
@@ -21,7 +22,7 @@ function MesPublications() {
         {items.map((p) => (
           <li key={p.id}>
             <Link to={p.statut === "brouillon" ? `/publier/${p.id}` : `/publications/${p.id}`} className="ligne-pub">
-              {p.image ? <img src={p.image} alt="" width="56" height="56" loading="lazy" /> : <span className="vignette" aria-hidden="true" />}
+              {p.image ? <img src={p.image.mini ?? p.image.src} alt="" width="56" height="56" loading="lazy" decoding="async" /> : <span className="vignette" aria-hidden="true" />}
               <span style={{ flex: 1, minWidth: 0 }}>
                 <strong>{p.titre}</strong>
                 <span className="doux" style={{ display: "block", fontSize: "0.82rem" }}>{ilYa(p.cree_le)}</span>
@@ -42,7 +43,7 @@ export default function MonProfil() {
   const { data } = useProfil();
   const [onglet, setOnglet] = useState("publications");
   const [menu, setMenu] = useState(false);
-  if (!data) return <Chargement />;
+  if (!data) return <SqProfil />;
 
   const resume = resumeSituation(data.situation);
   const type = data.situation?.type;

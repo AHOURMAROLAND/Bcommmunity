@@ -1,5 +1,7 @@
-import { Home, MessageCircle, User, UserCheck, Users } from "lucide-react";
+import { Suspense } from "react";
 import { NavLink, Outlet } from "react-router-dom";
+import { Home, MessageCircle, User, UserCheck, Users } from "lucide-react";
+import { SqRoute } from "./Squelettes";
 import { useCompteurs } from "../api/amis";
 
 const ONGLETS = [
@@ -15,7 +17,7 @@ export default function Coque() {
   const nb = data?.demandes_recues ?? 0;
   return (
     <div className="coque">
-      <main className="contenu"><Outlet /></main>
+      <main className="contenu"><Suspense fallback={<SqRoute />}><Outlet /></Suspense></main>
       <nav className="nav-bas" aria-label="Navigation principale">
         {ONGLETS.map(({ to, label, Icone }) => (
           <NavLink key={to} to={to} end={to === "/profil"}

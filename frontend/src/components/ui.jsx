@@ -1,4 +1,6 @@
 import { useId } from "react";
+import { SqPage } from "./Squelettes";
+import { LoadingIndicator } from "./application/loading-indicator/loading-indicator";
 
 export function Champ({ label, erreur, ...props }) {
   const id = useId();
@@ -26,13 +28,18 @@ export function Selecteur({ label, erreur, children, ...props }) {
 export function Bouton({ chargement, secondaire, children, ...props }) {
   return (
     <button className={`btn${secondaire ? " btn-sec" : ""}`} disabled={chargement || props.disabled} {...props}>
-      {chargement ? "Veuillez patienter..." : children}
+      {chargement ? (
+        <span style={{ display: "inline-flex", alignItems: "center", gap: "0.45rem", justifyContent: "center" }}>
+          <LoadingIndicator type="dot-circle" size="sm" />
+          <span>Veuillez patienter...</span>
+        </span>
+      ) : children}
     </button>
   );
 }
 
 export function Chargement() {
-  return <p role="status" className="doux" style={{ padding: "2rem", textAlign: "center" }}>Chargement...</p>;
+  return <SqPage />;
 }
 
 export function Marque({ sous }) {

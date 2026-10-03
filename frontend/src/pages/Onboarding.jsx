@@ -5,7 +5,8 @@ import {
   useAjouterScolarite, useMajProfil, useMajSituation, useProfil,
   useReferentiels, useRetirerScolarite,
 } from "../api/hooks";
-import { Bouton, Champ, Chargement, Marque, Selecteur } from "../components/ui";
+import { Bouton, Champ, Marque, Selecteur } from "../components/ui";
+import { SqCentree } from "../components/Squelettes";
 import { erreursChamps, tousMessages } from "../api/erreurs";
 
 const ANNEE_MAX = new Date().getFullYear() + 1;
@@ -20,7 +21,7 @@ export default function Onboarding() {
   const maj = useMajProfil();
   const navigate = useNavigate();
 
-  if (profil.isPending) return <Chargement />;
+  if (profil.isPending) return <SqCentree />;
   if (profil.data?.onboarding_termine) return <Navigate to="/fil" replace />;
 
   async function terminer(extra = {}) {

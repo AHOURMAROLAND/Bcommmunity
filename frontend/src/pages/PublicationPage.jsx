@@ -6,7 +6,8 @@ import { tousMessages } from "../api/erreurs";
 import { ilYa } from "../utils/date";
 import Avatar from "../components/Avatar";
 import PublicationCard from "../components/PublicationCard";
-import { Bouton, Chargement } from "../components/ui";
+import { Bouton } from "../components/ui";
+import { SqListe, SqPublication } from "../components/Squelettes";
 
 export default function PublicationPage() {
   const { id } = useParams();
@@ -22,7 +23,7 @@ export default function PublicationPage() {
 
   useEffect(() => { if (state?.focus && pub.data) zone.current?.focus(); }, [state, pub.data]);
 
-  if (pub.isPending) return <Chargement />;
+  if (pub.isPending) return <SqPublication />;
   if (pub.isError) {
     return (
       <div>
@@ -61,7 +62,7 @@ export default function PublicationPage() {
             </div>
           </form>
         )}
-        {coms.isPending ? <Chargement /> : liste.length === 0 ? (
+        {coms.isPending ? <SqListe n={2} /> : liste.length === 0 ? (
           <p className="doux">Aucun commentaire pour le moment.</p>
         ) : (
           <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>

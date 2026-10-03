@@ -6,7 +6,8 @@ import { useReferentiels } from "../api/hooks";
 import useDebounce from "../hooks/useDebounce";
 import Avatar from "../components/Avatar";
 import BoutonRelation from "../components/BoutonRelation";
-import { Bouton, Champ, Chargement, Selecteur } from "../components/ui";
+import { Bouton, Champ, Selecteur } from "../components/ui";
+import { SqGrilleMembres } from "../components/Squelettes";
 
 export const LIBELLES_SITUATION = { emploi: "Emploi", etudes: "Études", recherche: "En recherche" };
 const VIDE = { q: "", promo: "", statut: "", cycle: "", situation: "", domaine: "", etablissement: "" };
@@ -83,7 +84,7 @@ export default function Annuaire() {
         </div>
       )}
 
-      {res.isPending ? <Chargement /> : res.isError ? (
+      {res.isPending ? <SqGrilleMembres /> : res.isError ? (
         <p role="alert" className="erreur">Impossible de charger l'annuaire. Réessayez.</p>
       ) : cartes.length === 0 ? (
         <p className="doux">Aucun résultat. Essayez d'élargir votre recherche.</p>

@@ -2,10 +2,11 @@ import { useState } from "react";
 import { useAmis, useAnnulerDemande, useDemandes, useRetirerAmi, useSuggestions } from "../api/amis";
 import BoutonRelation from "../components/BoutonRelation";
 import LigneMembre from "../components/LigneMembre";
-import { Bouton, Chargement } from "../components/ui";
+import { Bouton } from "../components/ui";
+import { SqListe } from "../components/Squelettes";
 
 function Liste({ requete, vide, rendu }) {
-  if (requete.isPending) return <Chargement />;
+  if (requete.isPending) return <SqListe n={4} />;
   const items = requete.data?.pages.flatMap((p) => p.results) ?? [];
   if (!items.length) return <p className="doux">{vide}</p>;
   return (

@@ -2,7 +2,7 @@ import { lazy, Suspense } from "react";
 import { Navigate, Outlet, Route, Routes } from "react-router-dom";
 import { useAuth } from "./auth/AuthContext";
 import { useProfil } from "./api/hooks";
-import { Chargement } from "./components/ui";
+import { SqCentree, SqRoute } from "./components/Squelettes";
 import Coque from "./components/Coque";
 
 const Connexion = lazy(() => import("./pages/Connexion"));
@@ -23,20 +23,20 @@ const Bientot = lazy(() => import("./pages/Bientot"));
 
 function Invite({ children }) {
   const { utilisateur, chargement } = useAuth();
-  if (chargement) return <Chargement />;
+  if (chargement) return <SqCentree />;
   return utilisateur ? <Navigate to="/fil" replace /> : children;
 }
 
 function Connecte({ children }) {
   const { utilisateur, chargement } = useAuth();
-  if (chargement) return <Chargement />;
+  if (chargement) return <SqRoute />;
   return utilisateur ? children : <Navigate to="/connexion" replace />;
 }
 
 function Portail({ children }) {
   const { utilisateur } = useAuth();
   const profil = useProfil(!!utilisateur);
-  if (profil.isPending) return <Chargement />;
+  if (profil.isPending) return <SqRoute />;
   if (profil.data && !profil.data.onboarding_termine) return <Navigate to="/onboarding" replace />;
   return children;
 }
@@ -47,7 +47,7 @@ function Plein() {
 
 export default function App() {
   return (
-    <Suspense fallback={<Chargement />}>
+    <Suspense fallback={<SqRoute />}>
       <Routes>
         <Route path="/connexion" element={<Invite><Connexion /></Invite>} />
         <Route path="/inscription" element={<Invite><Inscription /></Invite>} />

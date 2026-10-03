@@ -1,12 +1,15 @@
 from django.core.cache import cache
+from django.core.files.storage import default_storage
 from django.db import IntegrityError, transaction
 from django.shortcuts import get_object_or_404
 from rest_framework import generics, viewsets
 from rest_framework.exceptions import NotFound, ValidationError
+from rest_framework.parsers import MultiPartParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from amis.services import carte, ids_bloques, profils_actifs, relations
+from config.imagerie import ImageInvalide, nettoyer_image
 from scolarite.models import Cycle, Scolarite
 
 from .models import Domaine, Profil, SituationActuelle
@@ -125,3 +128,33 @@ class ProfilPublicView(APIView):
         else:
             data["parcours"] = None
         return Response(data)
+
+
+class PhotoProfilView(APIView):
+    parser_classes = [MultiPartParser]
+    throttle_scope = "photo"
+
+    def post(self, request):
+        fichier = request.FILES.get("image")
+        if not fichier:
+            raise ValidationError({"image": "Choisissez une image."})
+        try:
+            propre = nettoyer_image(fichier, cote_max=640, carre=True)
+        except ImageInvalide as e:
+            raise ValidationError({"image": str(e)})
+        profil = profil_de(request.user)
+        ancien = profil.photo.name if profil.photo else None
+        profil.photo.save(propre.name, propre, save=True)
+        if ancien:
+            default_storage.delete(ancien)
+        return Response({"photo": profil.photo.url})
+
+    def delete(self, request):
+        profil = profil_de(request.user)
+        if profil.photo:
+            nom = profil.photo.name
+            profil.photo = None
+            profil.save(update_fields=["photo"])
+            default_storage.delete(nom)
+        return Response(status=204)
+

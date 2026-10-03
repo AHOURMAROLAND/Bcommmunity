@@ -109,6 +109,7 @@ def carte(p, rel, communes=None):
     u = p.user
     relation, demande_id = rel.de(u.pk)
     data = {"id": u.pk, "prenom": u.prenom, "nom": u.nom, "statut": u.statut,
+            "photo": p.photo.url if p.photo else None,
             "annee_sortie": p.annee_sortie, "ville": p.ville,
             "relation": relation, "demande_id": demande_id,
             "situation": resume_situation(p, u.pk in rel.amis)}

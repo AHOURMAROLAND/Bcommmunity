@@ -53,16 +53,15 @@ class User(AbstractBaseUser, PermissionsMixin):
         return f"{self.prenom} {self.nom} <{self.email}>"
 
     def blocage(self):
-        """Retourne (code, fin) avec code dans ok, non_valide, suspendu, banni."""
+        """Retourne (code, fin, motif) avec code dans ok, non_valide, suspendu, banni."""
         if not self.valide:
-            return ("non_valide", None)
-        maintenant = timezone.now()
+            return ("non_valide", None, "")
         s = (self.suspensions.filter(active=True)
-             .filter(Q(definitive=True) | Q(fin__gt=maintenant))
+             .filter(Q(definitive=True) | Q(fin__gt=timezone.now()))
              .order_by("-definitive", "-fin").first())
         if s:
-            return ("banni", None) if s.definitive else ("suspendu", s.fin)
-        return ("ok", None)
+            return ("banni", None, s.motif) if s.definitive else ("suspendu", s.fin, s.motif)
+        return ("ok", None, "")
 
 
 class Suspension(models.Model):

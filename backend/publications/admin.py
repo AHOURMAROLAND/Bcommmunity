@@ -1,43 +1,33 @@
 from django.contrib import admin
 
-from .models import Commentaire, Like, Publication
-
-
-@admin.action(description="Masquer les publications sélectionnées")
-def masquer_publications(modeladmin, request, queryset):
-    queryset.update(est_masque=True)
-
-
-@admin.action(description="Rendre visibles les publications sélectionnées")
-def demasquer_publications(modeladmin, request, queryset):
-    queryset.update(est_masque=False)
+from .models import Commentaire, Publication
 
 
 @admin.register(Publication)
 class PublicationAdmin(admin.ModelAdmin):
-    list_display = ("titre", "auteur", "statut", "est_masque", "apercu_public", "cree_le")
-    list_filter = ("statut", "est_masque", "apercu_public", "cree_le")
-    search_fields = ("titre", "contenu", "auteur__nom", "auteur__prenom", "auteur__email")
-    actions = [masquer_publications, demasquer_publications]
+    list_display = ("titre", "auteur", "statut", "masquee", "publie_le", "nb_likes", "nb_commentaires")
+    list_filter = ("statut", "masquee")
+    search_fields = ("titre", "auteur__email", "auteur__nom")
+    readonly_fields = ("nb_likes", "nb_commentaires", "cree_le", "publie_le")
     raw_id_fields = ("auteur",)
-    readonly_fields = ("cree_le", "modifie_le")
+    actions = ["masquer", "reafficher"]
 
+    @admin.action(description="Masquer les publications")
+    def masquer(self, request, queryset):
+        self.message_user(request, f"{queryset.update(masquee=True)} publication(s) masquée(s).")
 
-@admin.register(Like)
-class LikeAdmin(admin.ModelAdmin):
-    list_display = ("publication", "user", "cree_le")
-    search_fields = ("user__nom", "user__prenom", "publication__titre")
-    raw_id_fields = ("publication", "user")
-    readonly_fields = ("cree_le",)
+    @admin.action(description="Réafficher les publications")
+    def reafficher(self, request, queryset):
+        self.message_user(request, f"{queryset.update(masquee=False)} publication(s) réaffichée(s).")
 
 
 @admin.register(Commentaire)
 class CommentaireAdmin(admin.ModelAdmin):
-    list_display = ("publication", "auteur", "texte_court", "cree_le")
-    search_fields = ("texte", "auteur__nom", "auteur__prenom", "publication__titre")
-    raw_id_fields = ("publication", "auteur")
-    readonly_fields = ("cree_le", "modifie_le")
+    list_display = ("texte", "auteur", "publication", "masque", "cree_le")
+    list_filter = ("masque",)
+    raw_id_fields = ("auteur", "publication")
+    actions = ["masquer"]
 
-    @admin.display(description="Commentaire")
-    def texte_court(self, obj):
-        return (obj.texte[:60] + "...") if len(obj.texte) > 60 else obj.texte
+    @admin.action(description="Masquer les commentaires")
+    def masquer(self, request, queryset):
+        queryset.update(masque=True)

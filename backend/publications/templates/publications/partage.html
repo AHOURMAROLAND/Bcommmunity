@@ -1,260 +1,42 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="fr">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>{{ pub.titre }} - Bakhita Community</title>
-  
-  <!-- Balises Open Graph / WhatsApp / Facebook -->
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>{% if ouvert %}{{ titre }} - {% endif %}Bakhita Community</title>
   <meta property="og:site_name" content="Bakhita Community">
   <meta property="og:type" content="article">
-  <meta property="og:title" content="{{ pub.titre }}">
-  {% if pub.apercu_public %}
-  <meta property="og:description" content="{{ contenu_apercu }}">
-  {% else %}
-  <meta property="og:description" content="Publication réservée aux membres de Bakhita Community.">
-  {% endif %}
-  {% if og_image %}
-  <meta property="og:image" content="{{ og_image }}">
-  {% endif %}
-  <meta property="og:url" content="{{ og_url }}">
-
-  <!-- Balises Twitter Card -->
-  <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="{{ pub.titre }}">
-  {% if pub.apercu_public %}
-  <meta name="twitter:description" content="{{ contenu_apercu }}">
-  {% else %}
-  <meta name="twitter:description" content="Publication réservée aux membres de Bakhita Community.">
-  {% endif %}
-  {% if og_image %}
-  <meta name="twitter:image" content="{{ og_image }}">
-  {% endif %}
-
-  <!-- Styles épurés charte bleu marine et blanc -->
+  <meta property="og:url" content="{{ url }}">
+  <meta property="og:title" content="{% if ouvert %}{{ titre }}{% else %}Bakhita Community{% endif %}">
+  <meta property="og:description" content="{% if ouvert %}{{ description }}{% else %}Le réseau des élèves et anciens élèves de l'école.{% endif %}">
+  {% if ouvert and image %}<meta property="og:image" content="{{ image }}">{% endif %}
+  <meta name="twitter:card" content="{% if ouvert and image %}summary_large_image{% else %}summary{% endif %}">
   <style>
-    :root {
-      --bg: #0b1329;
-      --carte: #141f3d;
-      --texte: #f0f4fc;
-      --texte-secondaire: #94a3b8;
-      --primaire: #2563eb;
-      --primaire-hover: #1d4ed8;
-      --bordure: rgba(255, 255, 255, 0.08);
-    }
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-    }
-    body {
-      background-color: var(--bg);
-      color: var(--texte);
-      min-height: 100vh;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      padding: 1.5rem;
-    }
-    .conteneur {
-      max-width: 580px;
-      width: 100%;
-      background: var(--carte);
-      border: 1px solid var(--bordure);
-      border-radius: 1.25rem;
-      overflow: hidden;
-      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
-    }
-    .entete {
-      padding: 1.25rem 1.5rem;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      border-bottom: 1px solid var(--bordure);
-    }
-    .logo {
-      font-size: 1.15rem;
-      font-weight: 700;
-      letter-spacing: -0.02em;
-    }
-    .logo span {
-      font-weight: 500;
-      color: var(--texte-secondaire);
-    }
-    .badge {
-      display: inline-block;
-      font-size: 0.75rem;
-      padding: 0.25rem 0.65rem;
-      border-radius: 9999px;
-      background: rgba(37, 99, 235, 0.15);
-      color: #60a5fa;
-      font-weight: 600;
-    }
-    .corps {
-      padding: 1.5rem;
-    }
-    .auteur-ligne {
-      display: flex;
-      align-items: center;
-      gap: 0.75rem;
-      margin-bottom: 1.25rem;
-    }
-    .avatar {
-      width: 44px;
-      height: 44px;
-      border-radius: 50%;
-      background: #1e293b;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-weight: 700;
-      font-size: 0.95rem;
-      color: #93c5fd;
-      border: 1px solid rgba(255, 255, 255, 0.1);
-    }
-    .auteur-nom {
-      font-size: 0.95rem;
-      font-weight: 600;
-    }
-    .auteur-promo {
-      font-size: 0.8rem;
-      color: var(--texte-secondaire);
-    }
-    .titre {
-      font-size: 1.35rem;
-      font-weight: 700;
-      line-height: 1.3;
-      margin-bottom: 1rem;
-      color: #ffffff;
-    }
-    .illustration {
-      width: 100%;
-      max-height: 320px;
-      object-fit: cover;
-      border-radius: 0.85rem;
-      margin-bottom: 1.25rem;
-      border: 1px solid var(--bordure);
-    }
-    .texte {
-      font-size: 0.95rem;
-      line-height: 1.6;
-      color: #cbd5e1;
-      position: relative;
-    }
-    .fondu {
-      position: relative;
-    }
-    .fondu::after {
-      content: "";
-      position: absolute;
-      bottom: 0;
-      left: 0;
-      right: 0;
-      height: 70px;
-      background: linear-gradient(transparent, var(--carte));
-      pointer-events: none;
-    }
-    .reserve {
-      padding: 2rem 1rem;
-      text-align: center;
-    }
-    .reserve-titre {
-      font-size: 1.15rem;
-      font-weight: 700;
-      margin-bottom: 0.5rem;
-    }
-    .reserve-description {
-      font-size: 0.9rem;
-      color: var(--texte-secondaire);
-      line-height: 1.5;
-    }
-    .actions {
-      padding: 1.5rem;
-      background: rgba(0, 0, 0, 0.15);
-      border-top: 1px solid var(--bordure);
-      display: flex;
-      flex-direction: column;
-      gap: 0.75rem;
-    }
-    .btn {
-      display: block;
-      width: 100%;
-      text-align: center;
-      padding: 0.85rem 1rem;
-      border-radius: 0.75rem;
-      font-weight: 600;
-      font-size: 0.95rem;
-      text-decoration: none;
-      transition: background-color 0.15s ease;
-    }
-    .btn-primaire {
-      background: var(--primaire);
-      color: #ffffff;
-    }
-    .btn-primaire:hover {
-      background: var(--primaire-hover);
-    }
-    .btn-secondaire {
-      background: transparent;
-      color: var(--texte-secondaire);
-      border: 1px solid var(--bordure);
-    }
-    .btn-secondaire:hover {
-      color: #ffffff;
-      border-color: rgba(255, 255, 255, 0.2);
-    }
+    :root { --bg:#fff; --texte:#0b1f4b; --doux:#5b6785; }
+    @media (prefers-color-scheme: dark) { :root { --bg:#0b1730; --texte:#fff; --doux:#a9b6d6; } }
+    body { margin:0; background:var(--bg); color:var(--texte); font-family: Quicksand, system-ui, sans-serif; }
+    main { max-width:32rem; margin:0 auto; padding:2rem 1rem; }
+    img { max-width:100%; border-radius:1rem; }
+    .btn { display:block; text-align:center; padding:.8rem 1rem; border-radius:.75rem; background:var(--texte);
+           color:var(--bg); text-decoration:none; font-weight:700; margin-top:.75rem; }
+    .doux { color:var(--doux); }
   </style>
 </head>
 <body>
-  <div class="conteneur">
-    <div class="entete">
-      <div class="logo">Bakhita <span>Community</span></div>
-      <span class="badge">Publication</span>
-    </div>
-
-    <div class="corps">
-      <div class="auteur-ligne">
-        <div class="avatar">
-          {{ pub.auteur.prenom|slice:":1" }}{{ pub.auteur.nom|slice:":1" }}
-        </div>
-        <div>
-          <div class="auteur-nom">{{ pub.auteur.prenom }} {{ pub.auteur.nom }}</div>
-          <div class="auteur-promo">
-            {% if pub.auteur.profil.annee_sortie %}Promo {{ pub.auteur.profil.annee_sortie }}{% else %}Membre{% endif %}
-          </div>
-        </div>
-      </div>
-
-      <h1 class="titre">{{ pub.titre }}</h1>
-
-      {% if pub.image %}
-      <img src="{{ pub.image.url }}" alt="{{ pub.titre }}" class="illustration">
-      {% endif %}
-
-      {% if pub.apercu_public %}
-      <div class="texte fondu">
-        {{ contenu_apercu|linebreaksbr }}
-      </div>
-      {% else %}
-      <div class="reserve">
-        <div class="reserve-titre">Contenu réservé aux membres</div>
-        <p class="reserve-description">
-          L'auteur a restreint la visibilité de cet article aux membres de la communauté.
-        </p>
-      </div>
-      {% endif %}
-    </div>
-
-    <div class="actions">
-      <a href="{{ app_pub_url }}" class="btn btn-primaire">
-        Ouvrir dans l'application
-      </a>
-      <a href="{{ frontend_url }}/connexion" class="btn btn-secondaire">
-        Se connecter
-      </a>
-    </div>
-  </div>
+<main>
+  <p class="doux"><strong>Bakhita</strong> Community</p>
+  {% if ouvert %}
+    <h1>{{ titre }}</h1>
+    {% if image %}<img src="{{ image }}" alt="">{% endif %}
+    <p>{{ description }}</p>
+    <a class="btn" href="{{ lien_app }}">Se connecter pour lire la suite</a>
+  {% else %}
+    <h1>Publication réservée aux membres</h1>
+    <p class="doux">Connectez-vous pour retrouver les publications de votre école.</p>
+    <a class="btn" href="/connexion">Se connecter</a>
+  {% endif %}
+  <a class="btn" href="/inscription">Créer un compte</a>
+</main>
 </body>
 </html>

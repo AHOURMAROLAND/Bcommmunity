@@ -7,9 +7,9 @@ TTL_BLOCAGE = 15  # secondes : délai maximal avant qu'une suspension prenne eff
 
 def verifier_acces(user):
     """Lève 403 avec un code exploitable par le front si l'accès est bloqué."""
-    code, fin = cache.get_or_set(f"blocage:{user.pk}", user.blocage, TTL_BLOCAGE)
+    code, fin, motif = cache.get_or_set(f"blocage:{user.pk}", user.blocage, TTL_BLOCAGE)
     if code != "ok":
-        raise PermissionDenied({"code": code, "fin": fin.isoformat() if fin else None})
+        raise PermissionDenied({"code": code, "fin": fin.isoformat() if fin else None, "motif": motif})
 
 
 class ReseauJWTAuthentication(JWTAuthentication):

@@ -1,215 +1,204 @@
 from django.conf import settings
-from django.db.models import Count, Exists, OuterRef
-from django.http import Http404
-from django.shortcuts import get_object_or_404, render
-from django.views import View
-from rest_framework import generics, status
-from rest_framework.exceptions import PermissionDenied
-from rest_framework.permissions import IsAuthenticated
+from django.db import transaction
+from django.db.models import Exists, F, OuterRef, Q
+from django.shortcuts import render
+from django.utils import timezone
+from rest_framework import generics
+from rest_framework.exceptions import NotFound
+from rest_framework.pagination import CursorPagination
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from amis.services import ids_bloques
+from comptes.models import Suspension
 
 from .models import Commentaire, Like, Publication
-from .permissions import IsAuteurOuLectureSeule
 from .serializers import (
     CommentaireSerializer,
-    PublicationCreateUpdateSerializer,
+    PublicationDetailSerializer,
+    PublicationEcritureSerializer,
     PublicationSerializer,
+    TexteSerializer,
 )
 
 
-def _queryset_publications_base(user):
-    """Queryset de base avec annotations et exclusion des utilisateurs bloqués."""
-    bloques = ids_bloques(user) if user.is_authenticated else set()
-    qs = (
-        Publication.objects.filter(est_masque=False)
-        .exclude(auteur_id__in=bloques)
-        .select_related("auteur", "auteur__profil", "auteur__profil__situation")
-        .annotate(
-            nb_likes_annote=Count("likes", distinct=True),
-            nb_commentaires_annote=Count("commentaires", distinct=True),
-        )
-    )
-    if user.is_authenticated:
-        qs = qs.annotate(
-            a_aime_annote=Exists(Like.objects.filter(publication=OuterRef("pk"), user=user))
-        )
-    return qs
+class PaginationFil(CursorPagination):
+    page_size = 10
+    ordering = "-publie_le"
 
 
-class PublicationListCreateView(generics.ListCreateAPIView):
-    permission_classes = [IsAuthenticated]
+class PaginationMes(CursorPagination):
+    page_size = 20
+    ordering = "-cree_le"
 
-    def get_serializer_class(self):
+
+class PaginationCommentaires(CursorPagination):
+    page_size = 20
+    ordering = "cree_le"
+
+
+def avec_likes(qs, user):
+    return qs.select_related("auteur__profil").annotate(
+        a_aime=Exists(Like.objects.filter(publication=OuterRef("pk"), user=user)))
+
+
+def visibles(user):
+    suspendus = (Suspension.objects.filter(user=OuterRef("auteur_id"), active=True)
+                 .filter(Q(definitive=True) | Q(fin__gt=timezone.now())))
+    qs = (Publication.objects
+          .filter(statut="publie", masquee=False, auteur__valide=True, auteur__is_active=True)
+          .exclude(auteur_id__in=ids_bloques(user)).filter(~Exists(suspendus)))
+    return avec_likes(qs, user)
+
+
+def publication_accessible(user, pk):
+    """Les siennes (tous statuts) ou les publications visibles par tous."""
+    pub = (avec_likes(Publication.objects.filter(auteur=user), user).filter(pk=pk).first()
+           or visibles(user).filter(pk=pk).first())
+    if pub is None:
+        raise NotFound()
+    return pub
+
+
+def detail(pub, request):
+    return PublicationDetailSerializer(pub, context={"request": request}).data
+
+
+class FilView(generics.ListCreateAPIView):
+    pagination_class = PaginationFil
+    serializer_class = PublicationSerializer
+
+    def get_throttles(self):
         if self.request.method == "POST":
-            return PublicationCreateUpdateSerializer
-        return PublicationSerializer
+            self.throttle_scope = "publier"
+        return super().get_throttles()
 
     def get_queryset(self):
-        user = self.request.user
-        qs = _queryset_publications_base(user)
-
-        auteur_param = self.request.query_params.get("auteur")
-        statut_param = self.request.query_params.get("statut")
-
-        if auteur_param == "me":
-            qs = qs.filter(auteur=user)
-            if statut_param in ("publie", "brouillon"):
-                qs = qs.filter(statut=statut_param)
-        elif auteur_param:
-            try:
-                auteur_id = int(auteur_param)
-                qs = qs.filter(auteur_id=auteur_id, statut=Publication.Statut.PUBLIE)
-            except ValueError:
-                return qs.none()
-        else:
-            # Fil d'actualité général : uniquement les publications publiées
-            qs = qs.filter(statut=Publication.Statut.PUBLIE)
-
-        return qs.order_by("-cree_le")
+        qs = visibles(self.request.user)
+        auteur = self.request.query_params.get("auteur", "")
+        return qs.filter(auteur_id=int(auteur)) if auteur.isdigit() else qs
 
     def create(self, request, *args, **kwargs):
-        serializer = self.get_serializer(data=request.data, context={"request": request})
-        serializer.is_valid(raise_exception=True)
-        instance = serializer.save()
-        # Réponse détaillée
-        detail_serializer = PublicationSerializer(instance, context={"request": request})
-        return Response(detail_serializer.data, status=status.HTTP_201_CREATED)
+        ser = PublicationEcritureSerializer(data=request.data)
+        ser.is_valid(raise_exception=True)
+        pub = ser.creer(request.user)
+        return Response(detail(publication_accessible(request.user, pub.pk), request), status=201)
 
 
-class PublicationDetailView(generics.RetrieveUpdateDestroyAPIView):
-    permission_classes = [IsAuthenticated, IsAuteurOuLectureSeule]
-
-    def get_serializer_class(self):
-        if self.request.method in ("PATCH", "PUT"):
-            return PublicationCreateUpdateSerializer
-        return PublicationSerializer
+class MesPublicationsView(generics.ListAPIView):
+    serializer_class = PublicationSerializer
+    pagination_class = PaginationMes
 
     def get_queryset(self):
-        user = self.request.user
-        qs = _queryset_publications_base(user)
-        return qs
-
-    def get_object(self):
-        obj = super().get_object()
-        # Un brouillon ne peut être vu que par son propre auteur
-        if obj.statut == Publication.Statut.BROUILLON and obj.auteur != self.request.user:
-            raise PermissionDenied("Cette publication n'est pas encore publiée.")
-        return obj
-
-    def update(self, request, *args, **kwargs):
-        partial = kwargs.pop("partial", True)
-        instance = self.get_object()
-        serializer = self.get_serializer(instance, data=request.data, partial=partial,
-                                         context={"request": request})
-        serializer.is_valid(raise_exception=True)
-        updated_instance = serializer.save()
-        detail_serializer = PublicationSerializer(updated_instance, context={"request": request})
-        return Response(detail_serializer.data)
+        qs = avec_likes(Publication.objects.filter(auteur=self.request.user), self.request.user)
+        statut = self.request.query_params.get("statut")
+        return qs.filter(statut=statut) if statut in ("brouillon", "publie") else qs
 
 
-class LikeToggleView(APIView):
-    permission_classes = [IsAuthenticated]
+class PublicationDetailView(APIView):
+    def get_throttles(self):
+        if self.request.method == "PATCH":
+            self.throttle_scope = "publier"
+        return super().get_throttles()
+
+    def get(self, request, pk):
+        return Response(detail(publication_accessible(request.user, pk), request))
+
+    def patch(self, request, pk):
+        pub = Publication.objects.filter(auteur=request.user, pk=pk).first()
+        if pub is None:
+            raise NotFound()
+        ser = PublicationEcritureSerializer(data=request.data, partial=True)
+        ser.is_valid(raise_exception=True)
+        ser.modifier(pub)
+        return Response(detail(publication_accessible(request.user, pk), request))
+
+    def delete(self, request, pk):
+        n, _ = Publication.objects.filter(auteur=request.user, pk=pk).delete()
+        if not n:
+            raise NotFound()
+        return Response(status=204)
+
+
+class LikeView(APIView):
+    throttle_scope = "like"
 
     def post(self, request, pk):
-        user = request.user
-        bloques = ids_bloques(user)
-        try:
-            pub = Publication.objects.exclude(auteur_id__in=bloques).get(pk=pk, est_masque=False)
-        except Publication.DoesNotExist:
-            raise Http404("Publication introuvable.")
+        pub = publication_accessible(request.user, pk)
+        if pub.statut != "publie" or pub.masquee:
+            raise NotFound()
+        with transaction.atomic():
+            _, cree = Like.objects.get_or_create(publication_id=pub.pk, user=request.user)
+            if cree:
+                Publication.objects.filter(pk=pub.pk).update(nb_likes=F("nb_likes") + 1)
+        return Response(status=201 if cree else 200)
 
-        if pub.statut == Publication.Statut.BROUILLON and pub.auteur != user:
-            raise PermissionDenied("Impossible de liker un brouillon.")
-
-        like, cree = Like.objects.get_or_create(publication=pub, user=user)
-        if not cree:
-            like.delete()
-            aime = False
-        else:
-            aime = True
-
-        nb_likes = pub.likes.count()
-        return Response({"aime": aime, "nb_likes": nb_likes})
+    def delete(self, request, pk):
+        with transaction.atomic():
+            n, _ = Like.objects.filter(publication_id=pk, user=request.user).delete()
+            if n:
+                Publication.objects.filter(pk=pk).update(nb_likes=F("nb_likes") - 1)
+        return Response(status=204)
 
 
-class CommentaireListCreateView(generics.ListCreateAPIView):
-    permission_classes = [IsAuthenticated]
+class CommentairesView(generics.ListCreateAPIView):
     serializer_class = CommentaireSerializer
+    pagination_class = PaginationCommentaires
 
-    def get_publication(self):
-        user = self.request.user
-        bloques = ids_bloques(user)
-        pub_id = self.kwargs["pk"]
-        try:
-            pub = Publication.objects.exclude(auteur_id__in=bloques).get(pk=pub_id, est_masque=False)
-        except Publication.DoesNotExist:
-            raise Http404("Publication introuvable.")
-
-        if pub.statut == Publication.Statut.BROUILLON and pub.auteur != user:
-            raise PermissionDenied("Impossible d'accéder aux commentaires d'un brouillon.")
-        return pub
+    def get_throttles(self):
+        if self.request.method == "POST":
+            self.throttle_scope = "commenter"
+        return super().get_throttles()
 
     def get_queryset(self):
-        pub = self.get_publication()
-        bloques = ids_bloques(self.request.user)
-        return (
-            Commentaire.objects.filter(publication=pub)
-            .exclude(auteur_id__in=bloques)
-            .select_related("auteur", "auteur__profil", "auteur__profil__situation")
-            .order_by("cree_le")
-        )
+        publication_accessible(self.request.user, self.kwargs["pk"])
+        return (Commentaire.objects.filter(publication_id=self.kwargs["pk"], masque=False)
+                .exclude(auteur_id__in=ids_bloques(self.request.user)).select_related("auteur__profil"))
 
-    def perform_create(self, serializer):
-        pub = self.get_publication()
-        serializer.save(publication=pub, auteur=self.request.user)
-
-
-class CommentaireDetailView(generics.RetrieveUpdateDestroyAPIView):
-    permission_classes = [IsAuthenticated, IsAuteurOuLectureSeule]
-    serializer_class = CommentaireSerializer
-
-    def get_queryset(self):
-        user = self.request.user
-        bloques = ids_bloques(user)
-        return (
-            Commentaire.objects.filter(publication__est_masque=False)
-            .exclude(auteur_id__in=bloques)
-            .exclude(publication__auteur_id__in=bloques)
-            .select_related("auteur", "auteur__profil", "auteur__profil__situation")
-        )
+    def create(self, request, *args, **kwargs):
+        pub = publication_accessible(request.user, kwargs["pk"])
+        if pub.statut != "publie" or pub.masquee:
+            raise NotFound()
+        ser = TexteSerializer(data=request.data)
+        ser.is_valid(raise_exception=True)
+        with transaction.atomic():
+            c = Commentaire.objects.create(publication_id=pub.pk, auteur=request.user,
+                                           texte=ser.validated_data["texte"])
+            Publication.objects.filter(pk=pub.pk).update(nb_commentaires=F("nb_commentaires") + 1)
+        return Response(CommentaireSerializer(c, context={"request": request}).data, status=201)
 
 
-class PartageOpenGraphView(View):
-    """
-    Page publique /p/{id} générée côté serveur avec les balises Open Graph
-    pour les robots de partage (WhatsApp, Facebook, Twitter, iMessage, etc.).
-    """
+class CommentaireDetailView(APIView):
+    def patch(self, request, pk):
+        c = (Commentaire.objects.filter(pk=pk, auteur=request.user, masque=False)
+             .select_related("auteur__profil").first())
+        if c is None:
+            raise NotFound()
+        ser = TexteSerializer(data=request.data)
+        ser.is_valid(raise_exception=True)
+        c.texte = ser.validated_data["texte"]
+        c.save(update_fields=["texte"])
+        return Response(CommentaireSerializer(c, context={"request": request}).data)
 
-    def get(self, request, id):
-        pub = get_object_or_404(
-            Publication.objects.select_related("auteur", "auteur__profil"),
-            pk=id,
-            statut=Publication.Statut.PUBLIE,
-            est_masque=False,
-        )
+    def delete(self, request, pk):
+        with transaction.atomic():
+            c = Commentaire.objects.select_for_update().filter(pk=pk, auteur=request.user).first()
+            if c is None:
+                raise NotFound()
+            Publication.objects.filter(pk=c.publication_id).update(nb_commentaires=F("nb_commentaires") - 1)
+            c.delete()
+        return Response(status=204)
 
-        og_image = request.build_absolute_uri(pub.image.url) if pub.image else ""
-        og_url = request.build_absolute_uri()
-        frontend_url = settings.FRONTEND_URL.rstrip("/")
-        app_pub_url = f"{frontend_url}/fil#pub-{pub.id}"
 
-        # Aperçu tronqué pour les non-connectés
-        contenu_apercu = pub.contenu[:280] + ("..." if len(pub.contenu) > 280 else "")
-
-        contexte = {
-            "pub": pub,
-            "og_image": og_image,
-            "og_url": og_url,
-            "frontend_url": frontend_url,
-            "app_pub_url": app_pub_url,
-            "contenu_apercu": contenu_apercu,
-        }
-        return render(request, "publications/partage.html", contexte)
+def partage(request, pk):
+    """Page légère avec balises Open Graph pour les aperçus WhatsApp. Inconnue, masquée ou non
+    publique : même page générique, donc aucune fuite sur l'existence de la publication."""
+    pub = Publication.objects.filter(pk=pk, statut="publie", masquee=False, apercu_public=True,
+                                     auteur__valide=True, auteur__is_active=True).first()
+    ctx = {"ouvert": pub is not None, "url": f"{settings.SITE_URL}/p/{pk}", "lien_app": f"/publications/{pk}"}
+    if pub:
+        ctx.update(titre=pub.titre, description=pub.extrait[:160],
+                   image=f"{settings.SITE_URL}{pub.image.url}" if pub.image else None)
+    rep = render(request, "publications/partage.html", ctx)
+    rep["Cache-Control"] = "public, max-age=300" if pub else "no-store"
+    return rep

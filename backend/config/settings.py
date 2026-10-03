@@ -95,8 +95,9 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
-MEDIA_URL = "media/"
+MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
+SITE_URL = env("SITE_URL", "http://localhost:5173")
 STORAGES = {
     "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
     "staticfiles": {"BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage"},
@@ -107,7 +108,7 @@ X_FRAME_OPTIONS = "DENY"
 SECURE_REFERRER_POLICY = "same-origin"
 SECURE_CONTENT_TYPE_NOSNIFF = True
 DATA_UPLOAD_MAX_MEMORY_SIZE = 5_242_880
-FILE_UPLOAD_MAX_MEMORY_SIZE = 5_242_880
+FILE_UPLOAD_MAX_MEMORY_SIZE = 5 * 1024 * 1024
 SESSION_COOKIE_HTTPONLY = True
 if not DEBUG:
     SECURE_SSL_REDIRECT = True
@@ -157,6 +158,7 @@ REST_FRAMEWORK = {
         "anon": "60/min", "user": "240/min",
         "inscription": "5/hour", "connexion": "10/min",
         "reset": "5/hour", "google": "20/min", "demande_ami": "30/hour",
+        "publier": "20/hour", "commenter": "60/hour", "like": "120/min", "photo": "10/hour",
     },
 }
 

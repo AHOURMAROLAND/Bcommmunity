@@ -20,6 +20,9 @@ services:
       REDIS_URL: redis://redis:6379/0
     depends_on:
       db: { condition: service_healthy }
+    volumes: [media:/app/media]
     ports: ["8000:8000"]
 volumes:
   pgdata:
+  media:
+

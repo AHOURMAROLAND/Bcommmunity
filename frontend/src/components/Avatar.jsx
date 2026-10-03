@@ -1,4 +1,4 @@
-export default function Avatar({ prenom, nom, taille = 56 }) {
+export function Avatar({ prenom, nom, taille = 56 }) {
   const initiales = `${prenom?.[0] ?? ""}${nom?.[0] ?? ""}`.toUpperCase();
   return (
     <div aria-hidden="true" style={{
@@ -9,3 +9,6 @@ export default function Avatar({ prenom, nom, taille = 56 }) {
     </div>
   );
 }
+
+export default Avatar;
+

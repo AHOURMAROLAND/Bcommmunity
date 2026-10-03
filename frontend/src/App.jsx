@@ -14,6 +14,7 @@ const Onboarding = lazy(() => import("./pages/Onboarding"));
 const Annuaire = lazy(() => import("./pages/Annuaire"));
 const ProfilPublic = lazy(() => import("./pages/ProfilPublic"));
 const Amis = lazy(() => import("./pages/Amis"));
+const Fil = lazy(() => import("./pages/Fil"));
 const MonProfil = lazy(() => import("./pages/MonProfil"));
 const Bientot = lazy(() => import("./pages/Bientot"));
 
@@ -49,7 +50,7 @@ export default function App() {
         <Route path="/onboarding" element={<Connecte><Onboarding /></Connecte>} />
 
         <Route element={<Connecte><Portail><Coque /></Portail></Connecte>}>
-          <Route path="/fil" element={<Bientot titre="Fil" jalon="M3" />} />
+          <Route path="/fil" element={<Fil />} />
           <Route path="/annuaire" element={<Annuaire />} />
           <Route path="/amis" element={<Amis />} />
           <Route path="/messages" element={<Bientot titre="Messages" jalon="M4" />} />

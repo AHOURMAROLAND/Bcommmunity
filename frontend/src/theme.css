@@ -261,5 +261,222 @@ h1, h2, h3, .titre { font-weight: 700; }
 .visionneuse img { max-width: 100vw; max-height: 100vh; object-fit: contain; }
 .visionneuse button { position: absolute; top: calc(0.75rem + env(safe-area-inset-top)); right: 0.75rem; }
 
+/* Adaptation Desktop & Barre Latérale */
+.barre-laterale {
+  display: none;
+}
+
+@media (min-width: 768px) {
+  .nav-bas {
+    display: none !important;
+  }
+
+  .coque {
+    display: flex;
+    justify-content: center;
+    min-height: 100vh;
+    max-width: 82rem;
+    margin: 0 auto;
+    position: relative;
+  }
+
+  .barre-laterale {
+    display: flex;
+    flex-direction: column;
+    width: 17.5rem;
+    flex-shrink: 0;
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    padding: 2rem 1.25rem 1.5rem;
+    border-right: 1px solid var(--bordure);
+    box-sizing: border-box;
+    background: var(--bg);
+    overflow-y: auto;
+  }
+
+  .sidebar-marque {
+    display: flex;
+    flex-direction: column;
+    text-decoration: none;
+    color: var(--texte);
+    margin-bottom: 2.2rem;
+    padding: 0 0.5rem;
+  }
+
+  .titre-bakhita {
+    font-size: 1.85rem;
+    font-weight: 700;
+    line-height: 1.1;
+    letter-spacing: -0.02em;
+  }
+
+  .titre-community {
+    font-size: 1.15rem;
+    font-weight: 500;
+    color: var(--texte-doux);
+  }
+
+  .sidebar-nav {
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+    flex: 1;
+  }
+
+  .sidebar-lien {
+    display: flex;
+    align-items: center;
+    gap: 0.85rem;
+    padding: 0.75rem 1rem;
+    border-radius: 0.85rem;
+    color: var(--texte);
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 1rem;
+    transition: background 0.15s ease, color 0.15s ease;
+    position: relative;
+  }
+
+  .sidebar-lien:hover {
+    background: var(--carte);
+  }
+
+  .sidebar-lien.active {
+    background: var(--primaire);
+    color: var(--sur-primaire);
+    font-weight: 700;
+  }
+
+  .sidebar-lien.active svg {
+    stroke-width: 2.5;
+  }
+
+  .badge-nb-sidebar {
+    margin-left: auto;
+    min-width: 1.25rem;
+    height: 1.25rem;
+    padding: 0 0.35rem;
+    border-radius: 999px;
+    background: var(--danger);
+    color: #fff;
+    font-size: 0.75rem;
+    display: grid;
+    place-items: center;
+    font-weight: 700;
+  }
+
+  .sidebar-action {
+    margin: 1.5rem 0;
+  }
+
+  .btn-publier-sidebar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    width: 100%;
+    padding: 0.85rem 1rem;
+    border-radius: 0.85rem;
+    background: var(--accent);
+    color: #fff;
+    text-decoration: none;
+    font-weight: 700;
+    font-size: 1rem;
+    box-shadow: 0 4px 14px rgba(11, 31, 75, 0.18);
+    transition: transform 0.15s ease, opacity 0.15s ease;
+    box-sizing: border-box;
+  }
+
+  .btn-publier-sidebar:hover {
+    transform: translateY(-1px);
+    opacity: 0.95;
+  }
+
+  .sidebar-pied {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-top: 1rem;
+    border-top: 1px solid var(--bordure);
+    gap: 0.5rem;
+    margin-top: auto;
+  }
+
+  .sidebar-utilisateur {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    text-decoration: none;
+    color: inherit;
+    min-width: 0;
+    flex: 1;
+    padding: 0.4rem;
+    border-radius: 0.75rem;
+    transition: background 0.15s ease;
+  }
+
+  .sidebar-utilisateur:hover {
+    background: var(--carte);
+  }
+
+  .sidebar-utilisateur-infos {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    font-size: 0.85rem;
+    line-height: 1.25;
+  }
+
+  .sidebar-utilisateur-infos strong {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .btn-deconnexion-sidebar {
+    color: var(--texte-doux);
+    padding: 0.5rem;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    border: 1px solid var(--bordure);
+    background: transparent;
+    cursor: pointer;
+    transition: color 0.15s ease, border-color 0.15s ease;
+  }
+
+  .btn-deconnexion-sidebar:hover {
+    color: var(--danger);
+    border-color: var(--danger);
+  }
+
+  /* Espace contenu desktop */
+  .contenu {
+    flex: 1;
+    max-width: 58rem;
+    margin: 0;
+    padding: 2.25rem 2.5rem 4rem;
+    box-sizing: border-box;
+    min-width: 0;
+  }
+
+  .grille {
+    grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr));
+    gap: 1rem;
+  }
+
+  .carte-pub {
+    padding: 1.35rem;
+    border-radius: 1.15rem;
+    margin-bottom: 1.35rem;
+  }
+
+  .titre-pub {
+    font-size: 1.35rem;
+  }
+}
+
+
 
 

@@ -61,7 +61,7 @@ export default function MonProfil() {
       <h2 style={{ margin: "0.75rem 0 0", fontSize: "1.5rem" }}>{data.prenom} {data.nom}</h2>
       <p className="doux" style={{ margin: 0 }}>{data.statut === "ancien" ? "Ancien élève" : "Élève"}{data.annee_sortie ? ` · promo ${data.annee_sortie}` : ""}</p>
       {resume && <p style={{ margin: "0.2rem 0 0.75rem" }}>{resume}</p>}
-      <Link to="/profil/modifier" className="btn btn-sec" style={{ margin: "0.5rem 0 1rem" }}><Pencil size={16} /> Modifier le profil</Link>
+      <Link to="/profil/modifier" className="btn" style={{ margin: "0.5rem 0 1rem", background: "transparent", color: "var(--accent)", borderColor: "var(--accent)" }}><Pencil size={16} /> Modifier le profil</Link>
 
       {data.statut === "ancien" && (
         <section className="carte" aria-label="Situation actuelle" style={{ marginBottom: "1rem" }}>

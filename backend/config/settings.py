@@ -1,4 +1,5 @@
 import os
+import sys
 from datetime import timedelta
 from pathlib import Path
 
@@ -20,6 +21,8 @@ ALLOWED_HOSTS = [h for h in env("ALLOWED_HOSTS", "localhost,127.0.0.1").split(",
 ADMIN_URL = env("ADMIN_URL", "admin/")
 
 INSTALLED_APPS = [
+    # Daphne doit etre en premiere position pour les WebSockets ASGI
+    "daphne",
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
@@ -30,11 +33,13 @@ INSTALLED_APPS = [
     "rest_framework_simplejwt.token_blacklist",
     "corsheaders",
     "django_filters",
+    "channels",
     "comptes",
     "profils",
     "scolarite",
     "amis",
     "publications",
+    "discussions",
 ]
 
 MIDDLEWARE = [
@@ -50,6 +55,7 @@ MIDDLEWARE = [
 ]
 
 ROOT_URLCONF = "config.urls"
+ASGI_APPLICATION = "config.asgi.application"
 WSGI_APPLICATION = "config.wsgi.application"
 
 TEMPLATES = [{
@@ -63,10 +69,27 @@ TEMPLATES = [{
     ]},
 }]
 
+# --- Base de donnees (Neon PostgreSQL en production, SQLite en dev) ---
 DATABASES = {"default": dj_database_url.parse(
     env("DATABASE_URL", "sqlite:///db.sqlite3" if DEBUG else None, requis=not DEBUG),
     conn_max_age=60, conn_health_checks=True)}
 DATABASES["default"]["ATOMIC_REQUESTS"] = True
+# Obligatoire avec le pooler PgBouncer de Neon (mode transaction)
+DATABASES["default"]["DISABLE_SERVER_SIDE_CURSORS"] = True
+DATABASES["default"].setdefault("OPTIONS", {})["connect_timeout"] = 15
+
+# --- Django Channels + Redis ---
+if "pytest" in sys.modules:
+    CHANNEL_LAYERS = {"default": {"BACKEND": "channels.layers.InMemoryChannelLayer"}}
+else:
+    CHANNEL_LAYERS = {"default": {
+        "BACKEND": "channels_redis.core.RedisChannelLayer",
+        "CONFIG": {
+            "hosts": [env("REDIS_URL", "redis://redis:6379/0")],
+            "capacity": 1500,
+            "expiry": 10,
+        },
+    }}
 
 CACHES = {"default": {
     "BACKEND": "django_redis.cache.RedisCache" if env("REDIS_URL") else "django.core.cache.backends.locmem.LocMemCache",
@@ -95,15 +118,43 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
-MEDIA_URL = "/media/"
-MEDIA_ROOT = BASE_DIR / "media"
 SITE_URL = env("SITE_URL", "http://localhost:5173")
-STORAGES = {
-    "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
-    "staticfiles": {"BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage"},
-}
 
-# Sécurité
+# --- Stockage des media : Cloudflare R2 en production, disque local en dev ---
+R2_BUCKET = env("R2_BUCKET", "")
+if R2_BUCKET:
+    R2_DOMAINE = env("R2_PUBLIC_DOMAIN", requis=True)
+    STORAGES = {
+        "default": {
+            "BACKEND": "storages.backends.s3.S3Storage",
+            "OPTIONS": {
+                "bucket_name": R2_BUCKET,
+                "endpoint_url": f"https://{env('R2_ACCOUNT_ID', requis=True)}.r2.cloudflarestorage.com",
+                "access_key": env("R2_ACCESS_KEY_ID", requis=True),
+                "secret_key": env("R2_SECRET_ACCESS_KEY", requis=True),
+                "region_name": "auto",
+                "signature_version": "s3v4",
+                "custom_domain": R2_DOMAINE,
+                "querystring_auth": False,
+                "file_overwrite": False,
+                "default_acl": None,
+                # Les noms de fichiers sont des UUID : cache immutable d'un an
+                "object_parameters": {"CacheControl": "public, max-age=31536000, immutable"},
+            },
+        },
+        "staticfiles": {"BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage"},
+    }
+    MEDIA_URL = f"https://{R2_DOMAINE}/"
+    MEDIA_ROOT = BASE_DIR / "media"
+else:
+    MEDIA_URL = "/media/"
+    MEDIA_ROOT = BASE_DIR / "media"
+    STORAGES = {
+        "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
+        "staticfiles": {"BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage"},
+    }
+
+# Securite
 X_FRAME_OPTIONS = "DENY"
 SECURE_REFERRER_POLICY = "same-origin"
 SECURE_CONTENT_TYPE_NOSNIFF = True
@@ -127,7 +178,7 @@ REFRESH_COOKIE_SAMESITE = env("REFRESH_COOKIE_SAMESITE", "Lax")
 # Google & Email
 GOOGLE_CLIENT_ID = env("GOOGLE_CLIENT_ID", "")
 FRONTEND_URL = env("FRONTEND_URL", "http://localhost:5173")
-PASSWORD_RESET_TIMEOUT = 3600  # le lien de réinitialisation expire après 1 heure
+PASSWORD_RESET_TIMEOUT = 3600
 
 EMAIL_BACKEND = env("EMAIL_BACKEND", "django.core.mail.backends.console.EmailBackend" if DEBUG
                     else "django.core.mail.backends.smtp.EmailBackend")
@@ -159,6 +210,7 @@ REST_FRAMEWORK = {
         "inscription": "5/hour", "connexion": "10/min",
         "reset": "5/hour", "google": "20/min", "demande_ami": "30/hour",
         "publier": "20/hour", "commenter": "60/hour", "like": "120/min", "photo": "10/hour",
+        "invitation": "20/hour", "message": "120/min",
     },
 }
 

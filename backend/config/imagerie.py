@@ -8,7 +8,7 @@ TAILLE_MAX_OCTETS = 12 * 1024 * 1024
 PIXELS_MAX = 50_000_000
 COTE_MIN = 200
 FORMATS = {"JPEG", "PNG", "WEBP"}
-RATIO_MIN, RATIO_MAX = 0.6, 2.2
+RATIO_MIN, RATIO_MAX = 0.49, 2.05
 Image.MAX_IMAGE_PIXELS = PIXELS_MAX
 
 # (clé, côté maximal en pixels, qualité WebP)
@@ -75,7 +75,7 @@ def preparer_image(fichier, tailles=TAILLES_PUBLICATION, verifier_ratio=True):
     """Retourne les variantes (grande, moyenne, mini) et les dimensions de l'image principale."""
     img = _ouvrir(fichier)
     if verifier_ratio and not RATIO_MIN <= img.width / img.height <= RATIO_MAX:
-        raise ImageInvalide("Format non pris en charge. Recadrez l'image en 16:9, 4:3, 1:1 ou 4:5.")
+        raise ImageInvalide("Format non pris en charge (de 9:16 a 16:9).")
     cote = max(img.size)
     res = {}
     for i, (cle, cote_max, qualite) in enumerate(tailles):

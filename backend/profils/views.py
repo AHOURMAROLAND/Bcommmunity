@@ -10,6 +10,7 @@ from rest_framework.views import APIView
 
 from amis.services import carte, ids_bloques, profils_actifs, relations
 from config.imagerie import ImageInvalide, preparer_avatar
+from discussions.services import etat_discussion
 from scolarite.models import Cycle, Scolarite
 
 from .models import Domaine, Profil, SituationActuelle
@@ -109,6 +110,7 @@ class ProfilPublicView(APIView):
         data = carte(profil, rel)
         data["photo_grande"] = profil.photo.url if profil.photo else None
         data["restreint"] = restreint
+        data["discussion"] = etat_discussion(moi, user_id, profil, rel)
         if restreint:
             data["photo"] = None
             data["situation"] = None

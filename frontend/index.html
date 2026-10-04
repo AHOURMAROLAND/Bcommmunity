@@ -2,10 +2,38 @@
 <html lang="fr">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="Bakhita Community - Le réseau social des élèves et anciens élèves" />
+    <meta name="description" content="Bakhita Community - Le reseau social des eleves et anciens eleves" />
     <title>Bakhita Community</title>
+
+    <!-- Favicon SVG (moderne, suit le theme clair/sombre) -->
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+
+    <!-- Favicon PNG de secours pour navigateurs anciens -->
+    <link rel="alternate icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
+    <link rel="alternate icon" type="image/png" sizes="16x16" href="/favicon-16.png" />
+
+    <!-- Apple touch icon (iPhone / iPad) -->
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+
+    <!-- PWA manifest -->
+    <link rel="manifest" href="/manifest.webmanifest" />
+
+    <!-- Theme color (barre de statut mobile) -->
+    <meta name="theme-color" content="#0B1F4B" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#0B1730" media="(prefers-color-scheme: dark)" />
+
+    <!-- Apple PWA -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Bakhita" />
+
+    <!-- Open Graph par defaut (remplace par le backend pour /p/{id}) -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Bakhita Community" />
+    <meta property="og:title" content="Bakhita Community" />
+    <meta property="og:description" content="Le reseau social des eleves et anciens eleves de l'ecole Bakhita." />
+    <meta property="og:image" content="/og-image.png" />
   </head>
   <body>
     <div id="root"></div>

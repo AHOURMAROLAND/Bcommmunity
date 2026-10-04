@@ -3,17 +3,25 @@
 :root {
   --bg: #ffffff; --carte: #f3f5fa; --texte: #0b1f4b; --texte-doux: #5b6785;
   --bordure: #dde3ef; --primaire: #0b1f4b; --sur-primaire: #ffffff;
-  --accent: #4f7fe0; --danger: #e5484d; --en-ligne: #2bb673;
+  /* accent orange doré (conforme aux maquettes) */
+  --accent: #f5a623; --sur-accent: #0b1f4b;
+  /* accent secondaire teal — badges "en commun", liens info */
+  --accent-sec: #2ec4b6; --sur-accent-sec: #ffffff;
+  --danger: #e5484d; --en-ligne: #2bb673;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     --bg: #0b1730; --carte: #13244a; --texte: #ffffff; --texte-doux: #a9b6d6;
     --bordure: #25396b; --primaire: #ffffff; --sur-primaire: #0b1f4b;
+    --accent: #f5a623; --sur-accent: #0b1f4b;
+    --accent-sec: #2ec4b6; --sur-accent-sec: #ffffff;
   }
 }
 :root[data-theme="dark"] {
   --bg: #0b1730; --carte: #13244a; --texte: #ffffff; --texte-doux: #a9b6d6;
   --bordure: #25396b; --primaire: #ffffff; --sur-primaire: #0b1f4b;
+  --accent: #f5a623; --sur-accent: #0b1f4b;
+  --accent-sec: #2ec4b6; --sur-accent-sec: #ffffff;
 }
 
 html, body, #root { height: 100%; }
@@ -87,7 +95,7 @@ h1, h2, h3, .titre { font-weight: 700; }
 .ligne-membre { display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem 0; border-bottom: 1px solid var(--bordure); }
 .ligne-membre .infos { flex: 1; min-width: 0; }
 .ligne-membre .actions { width: 9.5rem; flex-shrink: 0; }
-.badge-commun { display: inline-block; padding: 0.1rem 0.6rem; border-radius: 999px; background: var(--accent); color: #fff; font-size: 0.78rem; margin-top: 0.25rem; }
+.badge-commun { display: inline-block; padding: 0.1rem 0.6rem; border-radius: 999px; background: var(--accent-sec); color: var(--sur-accent-sec); font-size: 0.78rem; margin-top: 0.25rem; }
 .frise { list-style: none; margin: 0 0 1rem; padding: 0; }
 .frise li { position: relative; padding-left: 2.2rem; padding-bottom: 1.2rem; }
 .frise li::before { content: ""; position: absolute; left: 0.35rem; top: 0.3rem; width: 0.9rem; height: 0.9rem; border-radius: 50%; background: var(--accent); }
@@ -241,8 +249,74 @@ h1, h2, h3, .titre { font-weight: 700; }
 .ligne-pub img, .vignette { width: 56px; height: 56px; border-radius: 0.6rem; object-fit: cover; background: var(--bordure); flex-shrink: 0; }
 .pastille-attention { background: var(--accent); color: #fff; }
 
-.sq {
-  background: linear-gradient(90deg, var(--bordure) 25%,
+/* --- ChargementLong : voile et indicateur en ligne --- */
+.voile { position: fixed; inset: 0; z-index: 90; display: grid; place-items: center; background: color-mix(in srgb, var(--bg) 72%, transparent); backdrop-filter: blur(2px); pointer-events: all; }
+.voile-boite { padding: 1.5rem 2rem; border-radius: 1rem; background: var(--carte); border: 1px solid var(--bordure); display: flex; flex-direction: column; align-items: center; gap: 0.5rem; }
+.en-ligne { display: flex; justify-content: center; padding: 0.5rem; }
+
+/* --- Annuaire : carte photo-hero (maquette 4) --- */
+.carte-membre-photo {
+  display: flex;
+  flex-direction: column;
+  border-radius: 1.25rem;
+  overflow: hidden;
+  background: var(--carte);
+  border: 1px solid var(--bordure);
+  height: 100%;
+  box-sizing: border-box;
+}
+.carte-membre-photo-img {
+  position: relative;
+  height: 180px;
+  overflow: hidden;
+  background: var(--bordure);
+  flex-shrink: 0;
+}
+.carte-membre-photo-img img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.carte-membre-photo-overlay {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 2.5rem 0.75rem 0.6rem;
+  background: linear-gradient(to top, rgba(0,0,0,0.72) 0%, transparent 100%);
+  color: #fff;
+}
+.carte-membre-photo-overlay h2 {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.carte-membre-photo-overlay .doux {
+  color: rgba(255,255,255,0.8);
+  font-size: 0.78rem;
+}
+.carte-membre-photo-body {
+  padding: 0.6rem 0.75rem 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.carte-membre-photo-body .pastille {
+  align-self: flex-start;
+  background: var(--accent-sec);
+  color: var(--sur-accent-sec);
+}
+
+/* puce pleine (bouton confirmer/terminer) */
+.puce-plein {
+  background: var(--primaire);
+  color: var(--sur-primaire);
+  border-color: var(--primaire);
+}
     color-mix(in srgb, var(--bordure) 50%, var(--bg)) 50%, var(--bordure) 75%);
   background-size: 300% 100%;
   animation: sq-onde 1.5s ease-in-out infinite;
@@ -261,23 +335,107 @@ h1, h2, h3, .titre { font-weight: 700; }
 .visionneuse img { max-width: 100vw; max-height: 100vh; object-fit: contain; }
 .visionneuse button { position: absolute; top: calc(0.75rem + env(safe-area-inset-top)); right: 0.75rem; }
 
-/* Adaptation Desktop & Barre Latérale */
+/* =====================================================================
+   EDITEUR D'IMAGE COMPLET
+   ===================================================================== */
+.editeur { position: fixed; inset: 0; z-index: 55; display: flex; flex-direction: column; background: var(--bg); padding-top: env(safe-area-inset-top); }
+.editeur-tete { display: flex; align-items: center; justify-content: space-between; padding: 0.6rem 0.75rem; border-bottom: 1px solid var(--bordure); flex-shrink: 0; }
+.editeur-scene { flex: 1; min-height: 0; display: grid; place-items: center; background: #111; touch-action: none; user-select: none; overflow: hidden; }
+.cadre { position: relative; box-shadow: 0 0 0 1px rgba(255,255,255,0.15); }
+.cadre canvas { display: block; }
+
+/* Grille des tiers */
+.tiers { position: absolute; inset: 0; pointer-events: none; }
+.tiers::before, .tiers::after { content: ""; position: absolute; }
+.tiers::before { left: 0; right: 0; top: 33.33%; height: 33.34%; border-top: 1px solid rgba(255,255,255,.6); border-bottom: 1px solid rgba(255,255,255,.6); }
+.tiers::after { top: 0; bottom: 0; left: 33.33%; width: 33.34%; border-left: 1px solid rgba(255,255,255,.6); border-right: 1px solid rgba(255,255,255,.6); }
+
+/* Poignees de coin (format libre) */
+.poignee { position: absolute; width: 28px; height: 28px; border-radius: 50%; background: #fff; border: 2px solid var(--primaire); touch-action: none; cursor: nwse-resize; }
+.poignee.hg { left: -14px; top: -14px; } .poignee.hd { right: -14px; top: -14px; cursor: nesw-resize; }
+.poignee.bg { left: -14px; bottom: -14px; cursor: nesw-resize; } .poignee.bd { right: -14px; bottom: -14px; }
+
+/* Panneau de controles */
+.editeur-panneau { padding: 0.75rem 1rem; max-height: 38vh; overflow-y: auto; border-top: 1px solid var(--bordure); display: grid; gap: 0.6rem; flex-shrink: 0; }
+
+/* Onglets du bas */
+.editeur-onglets { display: grid; grid-template-columns: repeat(4, 1fr); border-top: 1px solid var(--bordure); padding-bottom: env(safe-area-inset-bottom); flex-shrink: 0; }
+.editeur-onglets button { display: flex; flex-direction: column; align-items: center; gap: 0.2rem; padding: 0.6rem 0; background: none; border: 0; color: var(--texte-doux); font: inherit; font-size: 0.75rem; cursor: pointer; }
+.editeur-onglets button[aria-selected="true"] { color: var(--accent); font-weight: 700; }
+
+/* Curseur de reglage */
+.curseur label { display: flex; justify-content: space-between; font-weight: 600; font-size: 0.9rem; margin-bottom: 0.25rem; }
+.curseur output { font-weight: 500; color: var(--texte-doux); }
+.curseur input[type="range"] { width: 100%; accent-color: var(--accent); }
+
+/* Vignettes filtres */
+.vignettes { display: flex; gap: 0.6rem; overflow-x: auto; padding-bottom: 0.4rem; scrollbar-width: none; }
+.vignettes::-webkit-scrollbar { display: none; }
+.vignette-filtre { flex: 0 0 auto; width: 72px; background: none; border: 0; color: inherit; font: inherit; font-size: 0.75rem; text-align: center; cursor: pointer; }
+.vignette-filtre img { width: 72px; height: 72px; object-fit: cover; border-radius: 0.6rem; border: 2px solid transparent; display: block; }
+.vignette-filtre[aria-pressed="true"] img { border-color: var(--accent); }
+
+/* Pastilles couleur */
+.pastille-couleur { width: 1.8rem; height: 1.8rem; border-radius: 50%; border: 2px solid var(--bordure); cursor: pointer; padding: 0; transition: outline 0.1s; }
+.pastille-couleur[aria-pressed="true"] { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* Grille stickers */
+.grille-stickers { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.5rem; }
+.grille-stickers button { aspect-ratio: 1; display: grid; place-items: center; border-radius: 0.75rem; border: 1px solid var(--bordure); background: var(--carte); color: var(--texte); cursor: pointer; transition: background 0.15s; }
+.grille-stickers button:hover { background: var(--bordure); }
+
+/* Adaptation desktop : editeur max 480px centre */
+@media (min-width: 768px) {
+  .editeur { max-width: 480px; left: 50%; transform: translateX(-50%); border-left: 1px solid var(--bordure); border-right: 1px solid var(--bordure); }
+}
+
+/* =====================================================================
+   ADAPTATION DESKTOP & BARRE LATERALE
+   ===================================================================== */
 .barre-laterale {
   display: none;
 }
+
+/* --- Corrections débordements texte (sprint 1) --- */
+.titre-pub {
+  overflow-wrap: break-word;
+  word-break: break-word;
+  hyphens: auto;
+}
+.extrait {
+  overflow-wrap: break-word;
+  word-break: break-word;
+  margin: 0 0 0.75rem;
+}
+.contenu-riche {
+  overflow-wrap: break-word;
+  word-break: break-word;
+  min-width: 0;
+}
+/* Tous les flex children portant du texte */
+.carte-pub { min-width: 0; }
+.ligne-pub .infos { min-width: 0; }
+.sidebar-utilisateur-infos { min-width: 0; }
 
 @media (min-width: 768px) {
   .nav-bas {
     display: none !important;
   }
 
+  /* --- Correction sidebar : grid centré (sprint 1) --- */
   .coque {
-    display: flex;
-    justify-content: center;
+    display: grid;
+    grid-template-columns: 17.5rem minmax(0, 42rem);
     min-height: 100vh;
-    max-width: 82rem;
+    max-width: 72rem;
     margin: 0 auto;
-    position: relative;
+  }
+
+  /* Sur très grand écran : troisième colonne vide pour centrer le contenu */
+  @media (min-width: 1200px) {
+    .coque {
+      grid-template-columns: 17.5rem minmax(0, 42rem) 1fr;
+    }
   }
 
   .barre-laterale {
@@ -379,11 +537,11 @@ h1, h2, h3, .titre { font-weight: 700; }
     padding: 0.85rem 1rem;
     border-radius: 0.85rem;
     background: var(--accent);
-    color: #fff;
+    color: var(--sur-accent, #fff);
     text-decoration: none;
     font-weight: 700;
     font-size: 1rem;
-    box-shadow: 0 4px 14px rgba(11, 31, 75, 0.18);
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
     transition: transform 0.15s ease, opacity 0.15s ease;
     box-sizing: border-box;
   }
@@ -453,12 +611,12 @@ h1, h2, h3, .titre { font-weight: 700; }
 
   /* Espace contenu desktop */
   .contenu {
-    flex: 1;
-    max-width: 58rem;
-    margin: 0;
-    padding: 2.25rem 2.5rem 4rem;
+    max-width: 42rem;
+    width: 100%;
+    padding: 2.25rem 2rem 4rem;
     box-sizing: border-box;
     min-width: 0;
+    margin: 0;
   }
 
   .grille {

@@ -1,5 +1,5 @@
-import { Link } from "react-router-dom";
-import { Plus } from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
+import { Bell, Plus, Search } from "lucide-react";
 import { useFil } from "../api/publications";
 import { useSuggestions } from "../api/amis";
 import { useProfil } from "../api/hooks";
@@ -10,6 +10,7 @@ import { SqCartes } from "../components/Squelettes";
 
 export default function Fil() {
   const { data: profil } = useProfil();
+  const navigate = useNavigate();
   const fil = useFil();
   const sugg = useSuggestions();
   const items = fil.data?.pages.flatMap((p) => p.results) ?? [];
@@ -18,7 +19,17 @@ export default function Fil() {
 
   return (
     <div>
-      <h1 style={{ marginTop: 0 }}>Fil</h1>
+      <div className="fil-entete">
+        <h1 style={{ margin: 0 }}>Fil</h1>
+        <div style={{ display: "flex", gap: "0.5rem" }}>
+          <button className="bouton-icone" aria-label="Notifications" onClick={() => navigate("/notifications")}>
+            <Bell size={20} />
+          </button>
+          <button className="bouton-icone" aria-label="Rechercher" onClick={() => navigate("/annuaire")}>
+            <Search size={20} />
+          </button>
+        </div>
+      </div>
 
       <Link to="/publier" className="carte ecrire">
         <Avatar prenom={profil?.prenom} nom={profil?.nom} photo={profil?.photo_mini ?? profil?.photo} taille={44} />

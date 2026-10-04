@@ -13,8 +13,16 @@ gunicorn
 pillow
 pytest
 pytest-django
+pytest-asyncio
 ruff
 google-auth
 requests
 cachecontrol
 nh3
+# WebSockets temps reel (jalon M4)
+daphne
+channels
+channels-redis
+# Cloudflare R2 / S3 (stockage media)
+django-storages[s3]
+boto3

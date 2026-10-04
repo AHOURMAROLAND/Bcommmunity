@@ -4,7 +4,6 @@ import { Search, SlidersHorizontal, X } from "lucide-react";
 import { useAnnuaire } from "../api/amis";
 import { useReferentiels } from "../api/hooks";
 import useDebounce from "../hooks/useDebounce";
-import Avatar from "../components/Avatar";
 import BoutonRelation from "../components/BoutonRelation";
 import { Bouton, Champ, Selecteur } from "../components/ui";
 import { SqGrilleMembres } from "../components/Squelettes";
@@ -93,19 +92,31 @@ export default function Annuaire() {
           <ul className="grille" style={{ listStyle: "none", padding: 0, margin: 0 }}>
             {cartes.map((c) => (
               <li key={c.id}>
-                <article className="carte-membre">
-                  <Link to={`/profil/${c.id}`} className="carte-lien">
-                    <Avatar prenom={c.prenom} nom={c.nom} photo={c.photo} taille={72} />
-                    <h2>{c.prenom} {c.nom}</h2>
-                    <span className="doux" style={{ fontSize: "0.85rem" }}>
-                      {c.situation?.texte || (c.statut === "ancien" ? "Ancien élève" : "Élève")}
-                    </span>
-                    <span style={{ display: "flex", gap: "0.3rem", flexWrap: "wrap", justifyContent: "center" }}>
+                <article className="carte-membre-photo">
+                  {/* Photo hero avec overlay nom/métier */}
+                  <Link to={`/profil/${c.id}`} className="carte-membre-photo-img" style={{ display: "block", textDecoration: "none" }}>
+                    {c.photo ? (
+                      <img src={c.photo} alt={`${c.prenom} ${c.nom}`} loading="lazy" decoding="async" />
+                    ) : (
+                      <div style={{ width: "100%", height: "100%", display: "grid", placeItems: "center", background: "var(--primaire)", color: "var(--sur-primaire)", fontSize: "2.5rem", fontWeight: 700 }}>
+                        {(c.prenom?.[0] ?? "").toUpperCase()}
+                      </div>
+                    )}
+                    <div className="carte-membre-photo-overlay">
+                      <h2>{c.prenom} {c.nom}</h2>
+                      <span className="doux">
+                        {c.situation?.texte || (c.statut === "ancien" ? "Ancien élève" : "Élève")}
+                      </span>
+                    </div>
+                  </Link>
+                  {/* Corps : badge promo + bouton relation */}
+                  <div className="carte-membre-photo-body">
+                    <div style={{ display: "flex", gap: "0.3rem", flexWrap: "wrap" }}>
                       {c.annee_sortie && <span className="pastille">Promo {c.annee_sortie}</span>}
                       {c.situation && <span className="pastille">{LIBELLES_SITUATION[c.situation.type]}</span>}
-                    </span>
-                  </Link>
-                  <BoutonRelation c={c} />
+                    </div>
+                    <BoutonRelation c={c} />
+                  </div>
                 </article>
               </li>
             ))}

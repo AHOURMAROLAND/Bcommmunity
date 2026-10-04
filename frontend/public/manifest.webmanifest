@@ -1,0 +1,49 @@
+{
+  "name": "Bakhita Community",
+  "short_name": "Bakhita",
+  "description": "Le reseau social des eleves et anciens eleves de l'ecole Bakhita.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#FFFFFF",
+  "theme_color": "#0B1F4B",
+  "lang": "fr",
+  "orientation": "portrait-primary",
+  "categories": ["social", "education"],
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-dark.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ],
+  "screenshots": [],
+  "shortcuts": [
+    {
+      "name": "Fil d'actualite",
+      "short_name": "Fil",
+      "description": "Voir les dernieres publications",
+      "url": "/fil",
+      "icons": [{ "src": "/favicon.svg", "sizes": "any" }]
+    },
+    {
+      "name": "Messages",
+      "short_name": "Messages",
+      "description": "Vos conversations",
+      "url": "/messages",
+      "icons": [{ "src": "/favicon.svg", "sizes": "any" }]
+    }
+  ]
+}

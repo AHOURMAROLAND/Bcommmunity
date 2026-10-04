@@ -198,8 +198,13 @@ def partage(request, pk):
     ctx = {"ouvert": pub is not None, "url": f"{settings.SITE_URL}/p/{pk}", "lien_app": f"/publications/{pk}"}
     if pub:
         img = (pub.image_m or pub.image) if pub.image else None
-        ctx.update(titre=pub.titre, description=pub.extrait[:160],
-                   image=f"{settings.SITE_URL}{img.url}" if img else None)
+        if img:
+            url_img = img.url
+            # Avec R2, l'URL est deja absolue (https://cdn...)
+            image_abs = url_img if url_img.startswith("http") else f"{settings.SITE_URL}{url_img}"
+        else:
+            image_abs = None
+        ctx.update(titre=pub.titre, description=pub.extrait[:160], image=image_abs)
     rep = render(request, "publications/partage.html", ctx)
     rep["Cache-Control"] = "public, max-age=300" if pub else "no-store"
     return rep

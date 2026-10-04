@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!--
+    Icone Bakhita Community - variante fond sombre
+    Fond : bleu marine #0B1F4B
+    Icone : blanc #FFFFFF
+  -->
+
+  <!-- Fond bleu marine arrondi -->
+  <rect width="512" height="512" rx="112" fill="#0B1F4B"/>
+
+  <!-- Toque : plateau (losange) -->
+  <polygon fill="#FFFFFF" points="256,46 108,106 256,158 404,106"/>
+  <!-- Toque : calotte -->
+  <path fill="#FFFFFF" d="M192,110 L192,162 Q192,200 256,200 Q320,200 320,162 L320,110 Z"/>
+  <!-- Toque : cordon + gland -->
+  <path fill="none" stroke="#FFFFFF" stroke-width="10" stroke-linecap="round"
+        d="M404,106 L404,168"/>
+  <circle fill="#FFFFFF" cx="404" cy="178" r="14"/>
+
+  <!-- B avec coeur : fond sombre donc icone blanche -->
+  <path fill="#FFFFFF" fill-rule="evenodd" d="
+    M 146,208
+    L 146,470
+    Q 146,482 158,482
+    L 268,482
+    Q 358,482 358,418
+    Q 358,376 316,358
+    Q 354,340 354,298
+    Q 354,234 268,226
+    Q 262,226 210,226
+    L 210,208
+    Z
+
+    M 210,244
+    L 262,244
+    Q 332,244 332,298
+    Q 332,350 262,350
+    L 210,350
+    Z
+
+    M 210,368
+    L 264,368
+    Q 320,368 334,398
+    Q 346,424 328,446
+    Q 310,466 278,468
+    L 210,468
+    Z
+  "/>
+
+  <!-- Separation panses -->
+  <rect fill="#0B1F4B" x="210" y="346" width="148" height="24" rx="6"/>
+</svg>

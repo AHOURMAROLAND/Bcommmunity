@@ -3,6 +3,7 @@ import { Navigate, useNavigate, useParams } from "react-router-dom";
 import {
   ChevronLeft,
   ChevronRight,
+  Flag,
   GraduationCap,
   MessageCircle,
   MoreHorizontal,
@@ -15,6 +16,7 @@ import { useAccepterInvitation, useAnnulerInvitation, useRefuserInvitation } fro
 import { useFil } from "../api/publications";
 import { useAuth } from "../auth/AuthContext";
 import InvitationModale from "../components/InvitationModale";
+import ModaleSignalement from "../components/ModaleSignalement";
 import PublicationCard from "../components/PublicationCard";
 import { Bouton } from "../components/ui";
 import { SqCartes, SqProfil } from "../components/Squelettes";
@@ -35,7 +37,6 @@ function PublicationsDe({ id }) {
     </div>
   );
 }
-
 export default function ProfilPublic() {
   const { id } = useParams();
   const { utilisateur } = useAuth();
@@ -47,6 +48,7 @@ export default function ProfilPublic() {
   const [menu, setMenu] = useState(false);
   const [tout, setTout] = useState(false);
   const [modaleInvitation, setModaleInvitation] = useState(false);
+  const [signalement, setSignalement] = useState(false);
 
   const accepterDisc = useAccepterInvitation();
   const refuserDisc = useRefuserInvitation();
@@ -118,6 +120,14 @@ export default function ProfilPublic() {
                 )}
                 <button type="button" className="menu-item danger" onClick={bloquerCompte}>
                   Bloquer cet utilisateur
+                </button>
+                <button
+                  type="button"
+                  className="menu-item"
+                  onClick={() => { setMenu(false); setSignalement(true); }}
+                >
+                  <Flag size={14} style={{ marginRight: "0.4rem" }} />
+                  Signaler cet utilisateur
                 </button>
               </div>
             )}
@@ -321,6 +331,9 @@ export default function ProfilPublic() {
           </>
         )}
       </div>
+      {signalement && d && (
+        <ModaleSignalement type="utilisateur" id={d.id} onClose={() => setSignalement(false)} />
+      )}
     </div>
   );
 }

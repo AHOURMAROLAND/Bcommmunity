@@ -6,7 +6,7 @@ from django.core.mail import send_mail
 from django.utils.encoding import force_bytes
 from django.utils.http import urlsafe_base64_encode
 from google.auth.exceptions import GoogleAuthError
-from rest_framework import generics, status
+from rest_framework import generics, serializers, status
 from rest_framework.exceptions import AuthenticationFailed, PermissionDenied
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
@@ -203,3 +203,21 @@ class MoiView(generics.RetrieveAPIView):
 
     def get_object(self):
         return self.request.user
+
+
+class ChangerMotDePasseSerializer(serializers.Serializer):
+    actuel = serializers.CharField(required=True)
+    nouveau = serializers.CharField(min_length=8, required=True)
+
+
+class ChangerMotDePasseView(APIView):
+    def post(self, request):
+        ser = ChangerMotDePasseSerializer(data=request.data)
+        ser.is_valid(raise_exception=True)
+        user = request.user
+        if not user.check_password(ser.validated_data["actuel"]):
+            return Response({"detail": "Le mot de passe actuel est incorrect."}, status=400)
+        user.set_password(ser.validated_data["nouveau"])
+        user.save(update_fields=["password"])
+        return Response({"detail": "Mot de passe modifié avec succès."})
+

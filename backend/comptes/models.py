@@ -79,3 +79,14 @@ class Suspension(models.Model):
         constraints = [models.CheckConstraint(
             condition=Q(definitive=True) | Q(fin__isnull=False),
             name="suspension_fin_ou_definitive")]
+
+
+from django.core.cache import cache
+from django.db.models.signals import post_delete, post_save
+from django.dispatch import receiver
+
+
+@receiver([post_save, post_delete], sender=Suspension)
+def _vider_cache_acces(sender, instance, **kwargs):
+    cache.delete(f"blocage:{instance.user_id}")
+

@@ -8,6 +8,7 @@ from django.core.cache import cache
 from django.utils import timezone
 
 from profils.models import Profil
+from . import moderation
 from .models import Suspension, User
 
 
@@ -62,13 +63,11 @@ class ProfilInline(admin.StackedInline):
 
 
 def _suspendre(modeladmin, request, queryset, jours):
-    fin = timezone.now() + timedelta(days=jours)
-    Suspension.objects.bulk_create([
-        Suspension(user=u, motif="Décision de l'administrateur", fin=fin, cree_par=request.user)
-        for u in queryset.exclude(pk=request.user.pk)])
-    for u in queryset:
-        cache.delete(f"blocage:{u.pk}")
-    modeladmin.message_user(request, f"{queryset.count()} compte(s) suspendu(s) {jours} jour(s).")
+    n = 0
+    for u in queryset.exclude(pk=request.user.pk).exclude(is_staff=True):
+        moderation.suspendre(u, "Décision de l'administrateur", request.user, jours=jours)
+        n += 1
+    modeladmin.message_user(request, f"{n} compte(s) suspendu(s) {jours} jour(s).")
 
 
 @admin.register(User)
@@ -115,12 +114,46 @@ class UserAdmin(BaseUserAdmin):
 
     @admin.action(description="Bannir définitivement")
     def bannir(self, request, queryset):
-        Suspension.objects.bulk_create([
-            Suspension(user=u, motif="Bannissement", definitive=True, cree_par=request.user)
-            for u in queryset.exclude(pk=request.user.pk)])
-        self.message_user(request, "Comptes bannis.")
+        n = 0
+        for u in queryset.exclude(pk=request.user.pk).exclude(is_staff=True):
+            moderation.suspendre(u, "Bannissement", request.user, definitive=True)
+            n += 1
+        self.message_user(request, f"{n} compte(s) banni(s).")
 
     @admin.action(description="Lever toutes les suspensions")
     def lever_suspensions(self, request, queryset):
-        Suspension.objects.filter(user__in=queryset, active=True).update(active=False)
-        self.message_user(request, "Suspensions levées.")
+        n = moderation.lever(queryset.values_list("pk", flat=True))
+        self.message_user(request, f"{n} suspension(s) levée(s).")
+
+
+@admin.register(Suspension)
+class SuspensionAdmin(admin.ModelAdmin):
+    list_display = ("user", "motif", "debut", "fin", "definitive", "etat")
+    list_filter = ("active", "definitive")
+    search_fields = ("user__email", "user__nom", "motif")
+    raw_id_fields = ("user",)
+    readonly_fields = ("debut", "cree_par")
+    actions = ["lever", "prolonger_7j"]
+
+    @admin.display(description="État")
+    def etat(self, s):
+        ok = s.active and (s.definitive or (s.fin and s.fin > timezone.now()))
+        return "En cours" if ok else "Terminée"
+
+    def save_model(self, request, obj, form, change):
+        obj.cree_par = obj.cree_par or request.user
+        super().save_model(request, obj, form, change)
+        if not change:
+            moderation.appliquer_effets(obj)
+
+    @admin.action(description="Lever les suspensions sélectionnées")
+    def lever(self, request, queryset):
+        n = moderation.lever(set(queryset.values_list("user_id", flat=True)))
+        self.message_user(request, f"{n} suspension(s) levée(s).")
+
+    @admin.action(description="Prolonger de 7 jours")
+    def prolonger_7j(self, request, queryset):
+        for s in queryset.filter(definitive=False):
+            s.fin = max(s.fin or timezone.now(), timezone.now()) + timedelta(days=7)
+            s.active = True
+            s.save(update_fields=["fin", "active"])

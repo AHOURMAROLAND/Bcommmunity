@@ -98,7 +98,9 @@ def pousser(paires):
     if not charges:
         return
 
-    abonnements = list(PushAbonnement.objects.filter(user_id__in=charges, actif=True))
+    from amis.services import profils_actifs
+    autorises = set(profils_actifs().filter(user_id__in=list(charges)).values_list("user_id", flat=True))
+    abonnements = list(PushAbonnement.objects.filter(user_id__in=autorises, actif=True))
     travaux = [(a, c) for a in abonnements for c in charges[a.user_id]]
     if not travaux:
         return

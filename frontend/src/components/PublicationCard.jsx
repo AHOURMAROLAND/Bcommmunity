@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Heart, MessageCircle, MoreHorizontal, Send, Share2, Trash2 } from "lucide-react";
+import { Flag, Heart, MessageCircle, MoreHorizontal, Send, Share2, Trash2 } from "lucide-react";
 import { api } from "../api/client";
 import {
   useAjouterCommentaire,
@@ -13,6 +13,7 @@ import { partager } from "../utils/partager";
 import Avatar from "./Avatar";
 import HtmlSur from "./HtmlSur";
 import ImageHD, { ImageZoom } from "./ImageHD";
+import ModaleSignalement from "./ModaleSignalement";
 
 export default function PublicationCard({ p, detail = false }) {
   const navigate = useNavigate();
@@ -23,6 +24,7 @@ export default function PublicationCard({ p, detail = false }) {
   const [occupe, setOccupe] = useState(false);
   const [menu, setMenu] = useState(false);
   const [info, setInfo] = useState("");
+  const [signalement, setSignalement] = useState(false);
   const [commentairesOuverts, setCommentairesOuverts] = useState(false);
   const [nouveauCommentaire, setNouveauCommentaire] = useState("");
 
@@ -94,26 +96,37 @@ export default function PublicationCard({ p, detail = false }) {
             {ilYa(p.publie_le ?? p.cree_le)}
           </div>
         </div>
-        {p.est_auteur && (
-          <div style={{ position: "relative" }}>
-            <button
-              className="puce-options"
-              aria-label="Options de la publication"
-              aria-expanded={menu}
-              onClick={() => setMenu((v) => !v)}
-            >
-              <MoreHorizontal size={20} />
-            </button>
-            {menu && (
-              <div className="menu-contextuel">
-                <Link className="menu-item" to={`/publier/${p.id}`}>Modifier</Link>
-                <button className="menu-item danger" onClick={effacer} disabled={supprimer.isPending}>
-                  Supprimer
+        <div style={{ position: "relative" }}>
+          <button
+            className="puce-options"
+            aria-label="Options de la publication"
+            aria-expanded={menu}
+            onClick={() => setMenu((v) => !v)}
+          >
+            <MoreHorizontal size={20} />
+          </button>
+          {menu && (
+            <div className="menu-contextuel">
+              {p.est_auteur ? (
+                <>
+                  <Link className="menu-item" to={`/publier/${p.id}`}>Modifier</Link>
+                  <button className="menu-item danger" onClick={effacer} disabled={supprimer.isPending}>
+                    Supprimer
+                  </button>
+                </>
+              ) : (
+                <button
+                  type="button"
+                  className="menu-item"
+                  onClick={() => { setMenu(false); setSignalement(true); }}
+                >
+                  <Flag size={14} style={{ marginRight: "0.4rem" }} />
+                  Signaler
                 </button>
-              </div>
-            )}
-          </div>
-        )}
+              )}
+            </div>
+          )}
+        </div>
       </header>
 
       {detail ? (
@@ -127,6 +140,7 @@ export default function PublicationCard({ p, detail = false }) {
       )}
 
       {detail ? <HtmlSur html={p.contenu} /> : <p className="extrait">{p.extrait || p.contenu}</p>}
+      {p.masquee && <span className="badge-masque" title="Masquée par la modération">⚠️ Masquée</span>}
 
       {p.image && (
         <div style={{ margin: "0.6rem 0" }}>
@@ -237,6 +251,7 @@ export default function PublicationCard({ p, detail = false }) {
           )}
         </div>
       )}
+      {signalement && <ModaleSignalement type="publication" id={p.id} onClose={() => setSignalement(false)} />}
     </article>
   );
 }

@@ -41,6 +41,7 @@ INSTALLED_APPS = [
     "publications",
     "discussions",
     "notifications",
+    "signalements",
 ]
 
 MIDDLEWARE = [
@@ -190,6 +191,8 @@ EMAIL_HOST_USER = env("EMAIL_HOST_USER", "")
 EMAIL_HOST_PASSWORD = env("EMAIL_HOST_PASSWORD", "")
 EMAIL_USE_TLS = True
 DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", "Bakhita Community <no-reply@bakhita.example>")
+ADMIN_EMAIL = env("ADMIN_EMAIL", "")  # reçoit une alerte à chaque signalement
+SEUIL_MASQUAGE_AUTO = int(env("SEUIL_MASQUAGE_AUTO", "3"))
 
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": ["comptes.auth.ReseauJWTAuthentication"],
@@ -214,6 +217,7 @@ REST_FRAMEWORK = {
         "publier": "20/hour", "commenter": "60/hour", "like": "120/min", "photo": "10/hour",
         "invitation": "20/hour", "message": "120/min",
         "push": "20/hour",
+        "signalement": "10/hour",
     },
 }
 
@@ -248,6 +252,10 @@ CELERY_BEAT_SCHEDULE = {
     "nettoyage": {
         "task": "notifications.taches.nettoyer",
         "schedule": crontab(hour=3, minute=30),
+    },
+    "suspensions": {
+        "task": "comptes.taches.lever_suspensions_expirees",
+        "schedule": crontab(minute="*/5"),
     },
 }
 

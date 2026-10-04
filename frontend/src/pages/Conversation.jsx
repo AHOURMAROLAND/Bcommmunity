@@ -1,12 +1,13 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, Check, CheckCheck, Send } from "lucide-react";
+import { ArrowLeft, Check, CheckCheck, Flag, MoreHorizontal, Send } from "lucide-react";
 import { api } from "../api/client";
 import { useConversation, useMessages } from "../api/discussions";
 import { useAuth } from "../auth/AuthContext";
 import { majMessage, useTempsReel } from "../temps-reel/TempsReel";
 import Avatar from "../components/Avatar";
+import ModaleSignalement from "../components/ModaleSignalement";
 import { Bouton } from "../components/ui";
 import { Sq } from "../components/Squelettes";
 
@@ -24,6 +25,8 @@ export default function Conversation() {
 
   const [texte, setTexte] = useState("");
   const [ecrit, setEcrit] = useState(false);
+  const [menuConv, setMenuConv] = useState(false);
+  const [signalement, setSignalement] = useState(false);
 
   const fil = useRef(null);
   const hauteurAvant = useRef(0);
@@ -147,6 +150,30 @@ export default function Conversation() {
         ) : (
           <Sq w="10rem" h="1.2rem" />
         )}
+        {autre && (
+          <div style={{ position: "relative" }}>
+            <button
+              className="puce"
+              aria-label="Options de la conversation"
+              aria-expanded={menuConv}
+              onClick={() => setMenuConv((v) => !v)}
+            >
+              <MoreHorizontal size={18} />
+            </button>
+            {menuConv && (
+              <div className="menu-contextuel" style={{ position: "absolute", right: 0, top: "2.6rem", width: "14rem" }}>
+                <button
+                  type="button"
+                  className="menu-item"
+                  onClick={() => { setMenuConv(false); setSignalement(true); }}
+                >
+                  <Flag size={14} style={{ marginRight: "0.4rem" }} />
+                  Signaler cette conversation
+                </button>
+              </div>
+            )}
+          </div>
+        )}
       </header>
 
       <div className="chat-fil" ref={fil} role="log" aria-live="polite" aria-label="Messages">
@@ -216,6 +243,13 @@ export default function Conversation() {
             <Send size={20} />
           </button>
         </form>
+      )}
+      {signalement && conv.data && (
+        <ModaleSignalement
+          type="conversation"
+          id={Number(id)}
+          onClose={() => setSignalement(false)}
+        />
       )}
     </div>
   );

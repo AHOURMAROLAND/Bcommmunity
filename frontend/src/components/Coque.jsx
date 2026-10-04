@@ -1,9 +1,10 @@
 import { Suspense } from "react";
 import { Link, NavLink, Outlet } from "react-router-dom";
-import { Home, LogOut, MessageCircle, Plus, User, UserCheck, Users } from "lucide-react";
+import { Bell, Home, LogOut, MessageCircle, Plus, User, UserCheck, Users } from "lucide-react";
 import { ChargementEnLigne } from "@/components/ChargementLong";
 import { useCompteurs } from "../api/amis";
 import { useCompteursDisc } from "../api/discussions";
+import { useCompteurNotifs } from "../api/notifications";
 import { useProfil } from "../api/hooks";
 import { useAuth } from "../auth/AuthContext";
 import { useTempsReel } from "../temps-reel/TempsReel";
@@ -18,22 +19,33 @@ const ONGLETS = [
   { to: "/profil",   label: "Profil",   Icone: User },
 ];
 
+const ONGLETS_DESKTOP = [
+  { to: "/fil",           label: "Fil",           Icone: Home },
+  { to: "/annuaire",      label: "Annuaire",      Icone: Users },
+  { to: "/amis",          label: "Amis",          Icone: UserCheck },
+  { to: "/messages",      label: "Messages",      Icone: MessageCircle },
+  { to: "/notifications", label: "Notifications", Icone: Bell },
+  { to: "/profil",        label: "Profil",        Icone: User },
+];
+
 export default function Coque() {
   const { utilisateur, deconnexion } = useAuth();
   const { data: profil } = useProfil(!!utilisateur);
   const { data: compteursAmis } = useCompteurs();
   const { data: compteursDisc } = useCompteursDisc();
+  const { data: compteursNotifs } = useCompteurNotifs();
   const { etat: etatWs } = useTempsReel();
 
   const nbAmis     = compteursAmis?.demandes_recues ?? 0;
   const nbMessages = (compteursDisc?.invitations ?? 0) + (compteursDisc?.non_lus ?? 0);
+  const nbNotifs   = compteursNotifs?.non_lues ?? 0;
 
   const prenom = profil?.prenom ?? utilisateur?.prenom;
   const nom    = profil?.nom    ?? utilisateur?.nom;
   const photo  = profil?.photo_mini ?? profil?.photo;
   const statut = profil?.statut ?? utilisateur?.statut;
 
-  const badge = { Amis: nbAmis, Messages: nbMessages };
+  const badge = { Amis: nbAmis, Messages: nbMessages, Notifications: nbNotifs };
 
   return (
     <div className="coque">
@@ -56,7 +68,7 @@ export default function Coque() {
         </Link>
 
         <nav className="sidebar-nav">
-          {ONGLETS.map(({ to, label, Icone }) => (
+          {ONGLETS_DESKTOP.map(({ to, label, Icone }) => (
             <NavLink
               key={to} to={to} end={to === "/profil"}
               className={({ isActive }) => `sidebar-lien${isActive ? " active" : ""}`}

@@ -172,4 +172,6 @@ class HubConsumer(AsyncJsonWebsocketConsumer):
 
     # Handler appele par channel_layer.group_send
     async def evenement(self, event):
+        if event["data"].get("type") == "compte.suspendu":
+            return await self.close(code=4403)
         await self.send_json(event["data"])

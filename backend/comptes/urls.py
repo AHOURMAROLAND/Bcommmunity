@@ -11,4 +11,5 @@ urlpatterns = [
     path("auth/rafraichir/", views.RafraichirView.as_view()),
     path("auth/deconnexion/", views.DeconnexionView.as_view()),
     path("auth/moi/", views.MoiView.as_view()),
+    path("auth/mot-de-passe/", views.ChangerMotDePasseView.as_view()),
 ]

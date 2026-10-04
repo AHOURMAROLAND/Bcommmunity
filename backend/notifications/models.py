@@ -15,6 +15,7 @@ class Notification(models.Model):
         INVITATION        = "invitation"
         INVITATION_ACCEPTEE = "invitation_acceptee"
         RESUME            = "resume"
+        AVERTISSEMENT     = "avertissement"
 
     destinataire = models.ForeignKey(U, related_name="notifications", on_delete=models.CASCADE)
     acteur       = models.ForeignKey(U, null=True, blank=True, related_name="+", on_delete=models.SET_NULL)

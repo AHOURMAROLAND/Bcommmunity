@@ -28,7 +28,7 @@ PREF = {
 # Types qui declenchent un push
 PUSH = {
     "publication", "commentaire", "demande_ami", "ami_accepte",
-    "invitation", "invitation_acceptee", "resume",
+    "invitation", "invitation_acceptee", "resume", "avertissement",
 }
 
 TITRES = {
@@ -40,6 +40,7 @@ TITRES = {
     "invitation_acceptee": "Invitation acceptee",
     "resume":              "Resume du jour",
     "like":                "Nouveau j'aime",
+    "avertissement":       "Avertissement",
 }
 
 
@@ -140,6 +141,8 @@ def texte(n):
         return f"{a} vous invite a discuter"
     if t == "invitation_acceptee":
         return f"{a} a accepte de discuter avec vous"
+    if t == "avertissement":
+        return "L'administrateur vous a envoyé un avertissement. Consultez votre e-mail."
     # resume
     return ("1 nouvelle publication aujourd'hui"
             if n.nb == 1 else f"{n.nb} nouvelles publications aujourd'hui")

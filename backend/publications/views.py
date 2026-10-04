@@ -167,7 +167,10 @@ class CommentairesView(generics.ListCreateAPIView):
     def get_queryset(self):
         publication_accessible(self.request.user, self.kwargs["pk"])
         return (Commentaire.objects.filter(publication_id=self.kwargs["pk"], masque=False)
-                .exclude(auteur_id__in=ids_bloques(self.request.user)).select_related("auteur__profil"))
+                .exclude(auteur_id__in=ids_bloques(self.request.user))
+                .exclude(auteur_id__in=Suspension.objects.filter(active=True)
+                         .filter(Q(definitive=True) | Q(fin__gt=timezone.now())).values("user_id"))
+                .select_related("auteur__profil"))
 
     def create(self, request, *args, **kwargs):
         pub = publication_accessible(request.user, kwargs["pk"])

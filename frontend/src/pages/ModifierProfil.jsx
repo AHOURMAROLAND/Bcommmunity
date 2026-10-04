@@ -9,6 +9,7 @@ import Avatar from "../components/Avatar";
 import RecadrageImage from "../components/RecadrageImage";
 import { Bouton, Champ, Selecteur } from "../components/ui";
 import { SqFormulaire } from "../components/Squelettes";
+import ChargementLong from "@/components/ChargementLong";
 import { Etape2, Etape3 } from "./Onboarding";
 
 const VISIBILITES = [["tous", "Tout le monde"], ["amis", "Mes amis"], ["personne", "Personne"]];
@@ -78,6 +79,7 @@ export default function ModifierProfil() {
       {!section && (
         <>
           <h1 style={{ marginTop: 0 }}>Modifier le profil</h1>
+          <ChargementLong actif={photo.envoyer.isPending || maj.isPending} label="Enregistrement..." />
           <div className="carte" style={{ display: "flex", gap: "1rem", alignItems: "center", marginBottom: "1rem" }}>
             <Avatar prenom={p.prenom} nom={p.nom} photo={p.photo_mini ?? p.photo} taille={72} />
             <div style={{ display: "grid", gap: "0.5rem", flex: 1 }}>

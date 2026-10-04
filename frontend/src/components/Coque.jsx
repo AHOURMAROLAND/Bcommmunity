@@ -1,53 +1,71 @@
 import { Suspense } from "react";
 import { Link, NavLink, Outlet } from "react-router-dom";
 import { Home, LogOut, MessageCircle, Plus, User, UserCheck, Users } from "lucide-react";
-import { SqRoute } from "./Squelettes";
+import { ChargementEnLigne } from "@/components/ChargementLong";
 import { useCompteurs } from "../api/amis";
+import { useCompteursDisc } from "../api/discussions";
 import { useProfil } from "../api/hooks";
 import { useAuth } from "../auth/AuthContext";
+import { useTempsReel } from "../temps-reel/TempsReel";
 import Avatar from "./Avatar";
+import { SqRoute } from "./Squelettes";
 
 const ONGLETS = [
-  { to: "/fil", label: "Fil", Icone: Home },
+  { to: "/fil",      label: "Fil",      Icone: Home },
   { to: "/annuaire", label: "Annuaire", Icone: Users },
-  { to: "/amis", label: "Amis", Icone: UserCheck },
+  { to: "/amis",     label: "Amis",     Icone: UserCheck },
   { to: "/messages", label: "Messages", Icone: MessageCircle },
-  { to: "/profil", label: "Profil", Icone: User },
+  { to: "/profil",   label: "Profil",   Icone: User },
 ];
 
 export default function Coque() {
   const { utilisateur, deconnexion } = useAuth();
   const { data: profil } = useProfil(!!utilisateur);
-  const { data: compteurs } = useCompteurs();
-  const nb = compteurs?.demandes_recues ?? 0;
+  const { data: compteursAmis } = useCompteurs();
+  const { data: compteursDisc } = useCompteursDisc();
+  const { etat: etatWs } = useTempsReel();
+
+  const nbAmis     = compteursAmis?.demandes_recues ?? 0;
+  const nbMessages = (compteursDisc?.invitations ?? 0) + (compteursDisc?.non_lus ?? 0);
 
   const prenom = profil?.prenom ?? utilisateur?.prenom;
-  const nom = profil?.nom ?? utilisateur?.nom;
-  const photo = profil?.photo_mini ?? profil?.photo;
+  const nom    = profil?.nom    ?? utilisateur?.nom;
+  const photo  = profil?.photo_mini ?? profil?.photo;
   const statut = profil?.statut ?? utilisateur?.statut;
+
+  const badge = { Amis: nbAmis, Messages: nbMessages };
 
   return (
     <div className="coque">
-      {/* Barre latérale dédiée Desktop */}
+      {/* ======= Barre laterale Desktop ======= */}
       <aside className="barre-laterale" aria-label="Navigation principale">
         <Link to="/fil" className="sidebar-marque">
-          <span className="titre-bakhita">Bakhita</span>
-          <span className="titre-community">Community</span>
+          <picture>
+            <source srcSet="/icon-dark.jpg" media="(prefers-color-scheme: dark)" />
+            <img
+              src="/icon-light.jpg"
+              alt="Bakhita Community"
+              width="40" height="40"
+              style={{ borderRadius: "0.6rem", flexShrink: 0 }}
+            />
+          </picture>
+          <span style={{ display: "flex", flexDirection: "column" }}>
+            <span className="titre-bakhita">Bakhita</span>
+            <span className="titre-community">Community</span>
+          </span>
         </Link>
 
         <nav className="sidebar-nav">
           {ONGLETS.map(({ to, label, Icone }) => (
             <NavLink
-              key={to}
-              to={to}
-              end={to === "/profil"}
+              key={to} to={to} end={to === "/profil"}
               className={({ isActive }) => `sidebar-lien${isActive ? " active" : ""}`}
             >
               <Icone size={22} aria-hidden="true" />
               <span className="sidebar-label">{label}</span>
-              {label === "Amis" && nb > 0 && (
-                <span className="badge-nb-sidebar" aria-label={`${nb} demandes`}>
-                  {nb}
+              {badge[label] > 0 && (
+                <span className="badge-nb-sidebar" aria-label={`${badge[label]} nouveaux`}>
+                  {badge[label] > 99 ? "99+" : badge[label]}
                 </span>
               )}
             </NavLink>
@@ -61,19 +79,22 @@ export default function Coque() {
           </Link>
         </div>
 
+        {/* Indicateur de reconnexion WS */}
+        <ChargementEnLigne actif={etatWs === "connexion"} delai={3000} label="Reconnexion..." />
+
         <div className="sidebar-pied">
           <Link to="/profil" className="sidebar-utilisateur" title="Voir mon profil">
             <Avatar prenom={prenom} nom={nom} photo={photo} taille={40} />
             <div className="sidebar-utilisateur-infos">
               <strong>{prenom} {nom}</strong>
-              <span className="doux">{statut === "ancien" ? "Ancien élève" : "Élève"}</span>
+              <span className="doux">{statut === "ancien" ? "Ancien eleve" : "Eleve"}</span>
             </div>
           </Link>
           <button
             type="button"
             className="puce btn-deconnexion-sidebar"
-            aria-label="Se déconnecter"
-            title="Se déconnecter"
+            aria-label="Se deconnecter"
+            title="Se deconnecter"
             onClick={deconnexion}
           >
             <LogOut size={18} />
@@ -81,29 +102,29 @@ export default function Coque() {
         </div>
       </aside>
 
-      {/* Contenu principal adapté */}
+      {/* ======= Contenu principal ======= */}
       <main className="contenu">
         <Suspense fallback={<SqRoute />}>
           <Outlet />
         </Suspense>
       </main>
 
-      {/* Barre de navigation inférieure (Mobile uniquement) */}
+      {/* ======= Navigation inferieure Mobile ======= */}
       <nav className="nav-bas" aria-label="Navigation mobile">
         {ONGLETS.map(({ to, label, Icone }) => (
           <NavLink
-            key={to}
-            to={to}
-            end={to === "/profil"}
+            key={to} to={to} end={to === "/profil"}
             className={({ isActive }) => `onglet${isActive ? " active" : ""}`}
           >
-            <Icone size={22} aria-hidden="true" />
+            <span style={{ position: "relative", display: "inline-flex" }}>
+              <Icone size={22} aria-hidden="true" />
+              {badge[label] > 0 && (
+                <span className="badge-nb" aria-label={`${badge[label]} nouveaux`}>
+                  {badge[label] > 99 ? "99+" : badge[label]}
+                </span>
+              )}
+            </span>
             <span>{label}</span>
-            {label === "Amis" && nb > 0 && (
-              <span className="badge-nb" aria-label={`${nb} demandes`}>
-                {nb}
-              </span>
-            )}
           </NavLink>
         ))}
       </nav>

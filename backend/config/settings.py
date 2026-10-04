@@ -40,6 +40,7 @@ INSTALLED_APPS = [
     "amis",
     "publications",
     "discussions",
+    "notifications",
 ]
 
 MIDDLEWARE = [
@@ -75,8 +76,9 @@ DATABASES = {"default": dj_database_url.parse(
     conn_max_age=60, conn_health_checks=True)}
 DATABASES["default"]["ATOMIC_REQUESTS"] = True
 # Obligatoire avec le pooler PgBouncer de Neon (mode transaction)
-DATABASES["default"]["DISABLE_SERVER_SIDE_CURSORS"] = True
-DATABASES["default"].setdefault("OPTIONS", {})["connect_timeout"] = 15
+if "postgresql" in DATABASES["default"].get("ENGINE", ""):
+    DATABASES["default"]["DISABLE_SERVER_SIDE_CURSORS"] = True
+    DATABASES["default"].setdefault("OPTIONS", {})["connect_timeout"] = 15
 
 # --- Django Channels + Redis ---
 if "pytest" in sys.modules:
@@ -211,6 +213,7 @@ REST_FRAMEWORK = {
         "reset": "5/hour", "google": "20/min", "demande_ami": "30/hour",
         "publier": "20/hour", "commenter": "60/hour", "like": "120/min", "photo": "10/hour",
         "invitation": "20/hour", "message": "120/min",
+        "push": "20/hour",
     },
 }
 
@@ -228,3 +231,28 @@ LOGGING = {
     "handlers": {"console": {"class": "logging.StreamHandler"}},
     "root": {"handlers": ["console"], "level": "INFO"},
 }
+
+# ---- Celery ----
+from celery.schedules import crontab  # noqa: E402
+
+CELERY_BROKER_URL = env("CELERY_BROKER_URL", "redis://redis:6379/1")
+CELERY_TASK_ALWAYS_EAGER = env("CELERY_EAGER", "0") == "1" or "pytest" in sys.modules
+CELERY_TASK_SOFT_TIME_LIMIT = 120
+CELERY_TASK_TIME_LIMIT = 150
+CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
+CELERY_BEAT_SCHEDULE = {
+    "resume-quotidien": {
+        "task": "notifications.taches.resume_quotidien",
+        "schedule": crontab(hour=int(env("RESUME_HEURE_UTC", "17")), minute=0),
+    },
+    "nettoyage": {
+        "task": "notifications.taches.nettoyer",
+        "schedule": crontab(hour=3, minute=30),
+    },
+}
+
+# ---- Push (VAPID + FCM) ----
+VAPID_PUBLIC_KEY    = env("VAPID_PUBLIC_KEY", "")
+VAPID_PRIVATE_KEY   = env("VAPID_PRIVATE_KEY", "")
+VAPID_ADMIN_EMAIL   = env("VAPID_ADMIN_EMAIL", "admin@bakhita.example")
+FCM_SERVICE_ACCOUNT_JSON = env("FCM_SERVICE_ACCOUNT_JSON", "")

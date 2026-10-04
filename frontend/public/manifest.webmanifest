@@ -11,39 +11,32 @@
   "categories": ["social", "education"],
   "icons": [
     {
-      "src": "/favicon.svg",
-      "sizes": "any",
-      "type": "image/svg+xml",
+      "src": "/icon-light.jpg",
+      "sizes": "512x512",
+      "type": "image/jpeg",
       "purpose": "any"
     },
     {
-      "src": "/icon-dark.svg",
-      "sizes": "any",
-      "type": "image/svg+xml",
+      "src": "/icon-dark.jpg",
+      "sizes": "512x512",
+      "type": "image/jpeg",
       "purpose": "maskable"
-    },
-    {
-      "src": "/apple-touch-icon.png",
-      "sizes": "180x180",
-      "type": "image/png",
-      "purpose": "any"
     }
   ],
-  "screenshots": [],
   "shortcuts": [
     {
       "name": "Fil d'actualite",
       "short_name": "Fil",
       "description": "Voir les dernieres publications",
       "url": "/fil",
-      "icons": [{ "src": "/favicon.svg", "sizes": "any" }]
+      "icons": [{ "src": "/icon-light.jpg", "sizes": "512x512" }]
     },
     {
       "name": "Messages",
       "short_name": "Messages",
       "description": "Vos conversations",
       "url": "/messages",
-      "icons": [{ "src": "/favicon.svg", "sizes": "any" }]
+      "icons": [{ "src": "/icon-light.jpg", "sizes": "512x512" }]
     }
   ]
 }

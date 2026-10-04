@@ -8,6 +8,7 @@ import {
 import { Bouton, Champ, Marque, Selecteur } from "../components/ui";
 import { SqCentree } from "../components/Squelettes";
 import { erreursChamps, tousMessages } from "../api/erreurs";
+import ChargementLong from "@/components/ChargementLong";
 
 const ANNEE_MAX = new Date().getFullYear() + 1;
 const num = (v) => (v === "" || v == null ? null : Number(v));
@@ -33,6 +34,7 @@ export default function Onboarding() {
     <main className="page"><div className="boite">
       <Marque />
       <p className="doux" style={{ textAlign: "center" }}>Étape {etape} sur {total}</p>
+      <ChargementLong actif={maj.isPending} label="Enregistrement..." />
       <div className="carte">
         {etape === 1 && <Etape1 profil={profil.data} onSuivant={() => setEtape(2)} />}
         {etape === 2 && (
@@ -70,6 +72,119 @@ function Etape1({ profil, onSuivant }) {
       {erreur && <p role="alert" className="erreur" style={{ marginBottom: "1rem" }}>{erreur}</p>}
       <Bouton type="submit" chargement={maj.isPending}>Suivant</Bouton>
     </form>
+  );
+}
+
+import { Calendar, Check } from "lucide-react";
+
+function SelecteurCalendrierScolaire({ debut, fin, onChanger }) {
+  const anneeCourante = new Date().getFullYear();
+  const annees = [];
+  for (let a = anneeCourante; a >= 1970; a--) {
+    annees.push({ debut: a, fin: a + 1, label: `${a} – ${a + 1}` });
+  }
+
+  const selectionActuelle = debut && fin ? `${debut}-${fin}` : "";
+  const [personnalise, setPersonnalise] = useState(false);
+  const raccourcis = annees.slice(0, 4);
+
+  return (
+    <div style={{ marginBottom: "1rem" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.4rem" }}>
+        <label style={{ display: "flex", alignItems: "center", gap: "0.4rem", fontWeight: 600, fontSize: "0.9rem" }}>
+          <Calendar size={16} style={{ color: "var(--accent)" }} />
+          Année scolaire
+        </label>
+        <button
+          type="button"
+          className="lien"
+          style={{ fontSize: "0.78rem", background: "none", border: 0, cursor: "pointer" }}
+          onClick={() => setPersonnalise((v) => !v)}
+        >
+          {personnalise ? "Sélection calendrier" : "Plusieurs années ?"}
+        </button>
+      </div>
+
+      {!personnalise ? (
+        <>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: "0.4rem", marginBottom: "0.6rem" }}>
+            {raccourcis.map((r) => {
+              const actif = debut === String(r.debut) && fin === String(r.fin);
+              return (
+                <button
+                  key={r.label}
+                  type="button"
+                  onClick={() => onChanger(String(r.debut), String(r.fin))}
+                  style={{
+                    padding: "0.35rem 0.65rem",
+                    borderRadius: "999px",
+                    border: `1px solid ${actif ? "var(--accent)" : "var(--bordure)"}`,
+                    background: actif ? "var(--accent)" : "var(--carte)",
+                    color: actif ? "#000" : "var(--texte)",
+                    fontWeight: actif ? 700 : 500,
+                    fontSize: "0.8rem",
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "0.25rem",
+                    transition: "all 0.15s ease",
+                  }}
+                >
+                  {actif && <Check size={13} />}
+                  {r.label}
+                </button>
+              );
+            })}
+          </div>
+
+          <select
+            className="champ"
+            value={selectionActuelle}
+            onChange={(e) => {
+              const val = e.target.value;
+              if (!val) {
+                onChanger("", "");
+              } else {
+                const [d, f] = val.split("-");
+                onChanger(d, f);
+              }
+            }}
+          >
+            <option value="">Choisir une année scolaire...</option>
+            {annees.map((a) => (
+              <option key={`${a.debut}-${a.fin}`} value={`${a.debut}-${a.fin}`}>
+                {a.label}
+              </option>
+            ))}
+          </select>
+        </>
+      ) : (
+        <div style={{ display: "flex", gap: "0.75rem" }}>
+          <div style={{ flex: 1 }}>
+            <Champ
+              label="Année de début"
+              type="number"
+              inputMode="numeric"
+              min={1950}
+              max={ANNEE_MAX}
+              value={debut}
+              onChange={(e) => onChanger(e.target.value, fin)}
+            />
+          </div>
+          <div style={{ flex: 1 }}>
+            <Champ
+              label="Année de fin"
+              type="number"
+              inputMode="numeric"
+              min={1950}
+              max={ANNEE_MAX}
+              value={fin}
+              onChange={(e) => onChanger(debut, e.target.value)}
+            />
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -133,10 +248,7 @@ export function Etape2({ profil, onSuivant, onRetour, dernier }) {
           <option value="">Choisir...</option>
           {classes.map((c) => <option key={c.id} value={c.id}>{`${c.nom} ${c.filiere}`.trim()}</option>)}
         </Selecteur>
-        <div style={{ display: "flex", gap: "0.75rem" }}>
-          <div style={{ flex: 1 }}><Champ label="Année de début" type="number" inputMode="numeric" min={1950} max={ANNEE_MAX} value={debut} onChange={(e) => setDebut(e.target.value)} /></div>
-          <div style={{ flex: 1 }}><Champ label="Année de fin" type="number" inputMode="numeric" min={1950} max={ANNEE_MAX} value={fin} onChange={(e) => setFin(e.target.value)} /></div>
-        </div>
+        <SelecteurCalendrierScolaire debut={debut} fin={fin} onChanger={(d, f) => { setDebut(d); setFin(f); }} />
         {erreur && <p role="alert" className="erreur" style={{ marginBottom: "1rem" }}>{erreur}</p>}
         <Bouton type="submit" secondaire chargement={ajouter.isPending}>Ajouter cette classe</Bouton>
       </form>

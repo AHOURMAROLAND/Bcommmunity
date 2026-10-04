@@ -9,22 +9,47 @@ class Command(BaseCommand):
     help = "Charge les référentiels de base (cycles, classes, domaines)."
 
     def handle(self, *args, **options):
-        donnees = {
-            "Maternelle": ["Petite section", "Moyenne section", "Grande section"],
-            "Primaire": ["CP", "CE1", "CE2", "CM1", "CM2"],
-            "Collège": ["6e", "5e", "4e", "3e"],
-        }
-        for ordre, (nom, classes) in enumerate(donnees.items()):
-            cycle, _ = Cycle.objects.get_or_create(nom=nom, defaults={"ordre": ordre})
-            for i, c in enumerate(classes):
-                Classe.objects.get_or_create(cycle=cycle, nom=c, filiere="", defaults={"ordre": i})
-
-        for ordre, (nom, filiere) in enumerate(
-            [("Lycée moderne", "Moderne"), ("Lycée technique", "Technique")], start=3
-        ):
-            cycle, _ = Cycle.objects.get_or_create(nom=nom, defaults={"ordre": ordre})
-            for i, c in enumerate(["2nde", "1ère", "Terminale"]):
-                Classe.objects.get_or_create(cycle=cycle, nom=c, filiere=filiere, defaults={"ordre": i})
+        cycles_data = [
+            ("Maternelle", 1, [
+                ("Petite Section", "", 1),
+                ("Moyenne Section", "", 2),
+                ("Grande Section", "", 3),
+            ]),
+            ("Primaire", 2, [
+                ("CP1", "", 1),
+                ("CP2", "", 2),
+                ("CE1", "", 3),
+                ("CE2", "", 4),
+                ("CM1", "", 5),
+                ("CM2", "", 6),
+            ]),
+            ("Collège", 3, [
+                ("6ème", "", 1),
+                ("5ème", "", 2),
+                ("4ème", "", 3),
+                ("3ème", "", 4),
+            ]),
+            ("Lycée", 4, [
+                ("2nde", "Générale", 1),
+                ("2nde A", "Littéraire", 2),
+                ("2nde C", "Scientifique", 3),
+                ("1ère A", "Littéraire", 4),
+                ("1ère C", "Scientifique", 5),
+                ("1ère D", "Scientifique", 6),
+                ("Terminale A", "Littéraire", 7),
+                ("Terminale C", "Scientifique", 8),
+                ("Terminale D", "Scientifique", 9),
+            ]),
+        ]
+        for nom_cycle, ordre_cycle, classes in cycles_data:
+            cycle, _ = Cycle.objects.get_or_create(nom=nom_cycle, defaults={"ordre": ordre_cycle})
+            if cycle.ordre != ordre_cycle:
+                cycle.ordre = ordre_cycle
+                cycle.save(update_fields=["ordre"])
+            for nom_c, filiere_c, ordre_c in classes:
+                Classe.objects.get_or_create(
+                    cycle=cycle, nom=nom_c, filiere=filiere_c, defaults={"ordre": ordre_c}
+                )
 
         domaines = [
             "Santé et médecine",

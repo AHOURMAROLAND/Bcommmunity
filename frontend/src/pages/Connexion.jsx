@@ -4,6 +4,7 @@ import { useAuth } from "../auth/AuthContext";
 import { Bouton, Champ, Marque } from "../components/ui";
 import { tousMessages } from "../api/erreurs";
 import AccesGoogle from "../components/AccesGoogle";
+import ChargementLong from "@/components/ChargementLong";
 
 export default function Connexion() {
   const { connexion } = useAuth();
@@ -36,6 +37,7 @@ export default function Connexion() {
     <main className="page">
       <div className="boite">
         <Marque sous="Retrouvez vos camarades et votre école." />
+        <ChargementLong actif={envoi} label="Connexion en cours..." />
         <div className="carte">
           <h1 style={{ marginTop: 0, fontSize: "1.3rem" }}>Se connecter</h1>
           <AccesGoogle texte="signin_with" />

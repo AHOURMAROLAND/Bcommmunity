@@ -45,6 +45,17 @@ export function Chargement() {
 export function Marque({ sous }) {
   return (
     <header style={{ textAlign: "center", margin: "1rem 0 1.5rem" }}>
+      {/* Icone ronde : fond blanc en mode clair, fond bleu en mode sombre */}
+      <picture>
+        <source srcSet="/icon-dark.jpg" media="(prefers-color-scheme: dark)" />
+        <img
+          src="/icon-light.jpg"
+          alt="Bakhita Community"
+          width="72"
+          height="72"
+          style={{ borderRadius: "1rem", display: "block", margin: "0 auto 0.5rem" }}
+        />
+      </picture>
       <div className="titre" style={{ fontSize: "2rem", lineHeight: 1.1 }}>Bakhita</div>
       <div style={{ fontWeight: 500 }}>Community</div>
       {sous && <p className="doux" style={{ marginTop: "0.75rem" }}>{sous}</p>}

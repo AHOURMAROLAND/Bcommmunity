@@ -12,6 +12,8 @@ from rest_framework.views import APIView
 from comptes.models import User
 from scolarite.models import Scolarite
 
+from notifications.services import evenement
+
 from .models import Amitie, Blocage
 from .services import (
     carte,
@@ -133,6 +135,7 @@ class DemandesView(APIView):
                     if Amitie.objects.filter(demandeur=moi, statut="attente").count() >= MAX_ENVOYEES:
                         raise ValidationError({"detail": "Trop de demandes en attente."})
                     Amitie.objects.create(demandeur=moi, destinataire_id=cible)
+                    evenement([cible], "demande_ami", moi)
                     return Response({"detail": "Demande envoyée."}, status=201)
                 if existante.statut == "acceptee":
                     raise ValidationError({"detail": "Vous êtes déjà amis."})
@@ -140,6 +143,7 @@ class DemandesView(APIView):
                     if existante.demandeur_id == cible:  # la demande existait dans l'autre sens
                         existante.statut, existante.repondue_le = "acceptee", timezone.now()
                         existante.save(update_fields=["statut", "repondue_le"])
+                        evenement([cible], "ami_accepte", moi)
                         return Response({"detail": "Vous êtes maintenant amis."})
                     raise ValidationError({"detail": "Demande déjà envoyée."})
                 if (existante.demandeur_id == moi.pk and existante.repondue_le
@@ -148,6 +152,7 @@ class DemandesView(APIView):
                 existante.demandeur, existante.destinataire_id = moi, cible
                 existante.statut, existante.repondue_le = "attente", None
                 existante.save()
+                evenement([cible], "demande_ami", moi)
                 return Response({"detail": "Demande envoyée."}, status=201)
         except IntegrityError:
             raise ValidationError({"detail": "Demande déjà existante."})
@@ -162,6 +167,8 @@ class DemandeActionView(APIView):
         demande.statut = "acceptee" if action == "accepter" else "refusee"
         demande.repondue_le = timezone.now()
         demande.save(update_fields=["statut", "repondue_le"])
+        if action == "accepter":
+            evenement([demande.demandeur_id], "ami_accepte", request.user)
         return Response(status=204)
 
 

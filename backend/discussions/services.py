@@ -9,6 +9,8 @@ from django.utils import timezone
 from rest_framework.exceptions import NotFound, PermissionDenied, ValidationError
 
 from amis.services import ids_bloques, profils_actifs
+from notifications.services import evenement, lancer
+from notifications.taches import pousser_message
 from .models import Conversation, InvitationDiscussion, Message, Participant
 
 logger = logging.getLogger(__name__)
@@ -113,6 +115,7 @@ def inviter(moi, cible_id, message):
         try:
             inv = InvitationDiscussion.objects.create(
                 demandeur=moi, destinataire_id=cible_id, message=message)
+            evenement([cible_id], "invitation", moi)
         except IntegrityError:
             raise ValidationError({"detail": "Invitation deja envoyee."})
     transaction.on_commit(
@@ -133,6 +136,7 @@ def accepter(moi, pk):
         inv.statut = "acceptee"
         inv.repondue_le = timezone.now()
         inv.save(update_fields=["statut", "repondue_le"])
+        evenement([inv.demandeur_id], "invitation_acceptee", moi)
         conv, cree = Conversation.objects.get_or_create(paire_cle=cle(inv.demandeur_id, moi.pk))
         if cree:
             Participant.objects.bulk_create([
@@ -199,6 +203,7 @@ def envoyer_message(user, conv_id, texte, cid=None):
         "conversation": conv_id,
         "message": serialiser_message(m, cid_propre),
     }
+    transaction.on_commit(lambda: lancer(pousser_message, m.pk))
     return data, [user.pk, *autres]
 
 

@@ -11,6 +11,8 @@ from rest_framework.views import APIView
 
 from amis.services import ids_bloques
 from comptes.models import Suspension
+from notifications.services import evenement, lancer
+from notifications.taches import annoncer_publication
 
 from .models import Commentaire, Like, Publication
 from .serializers import (
@@ -20,6 +22,11 @@ from .serializers import (
     PublicationSerializer,
     TexteSerializer,
 )
+
+
+def annoncer(pub):
+    """Lance la tache fan-out apres le commit."""
+    transaction.on_commit(lambda: lancer(annoncer_publication, pub.pk))
 
 
 class PaginationFil(CursorPagination):
@@ -82,6 +89,8 @@ class FilView(generics.ListCreateAPIView):
         ser = PublicationEcritureSerializer(data=request.data)
         ser.is_valid(raise_exception=True)
         pub = ser.creer(request.user)
+        if pub.statut == "publie":
+            annoncer(pub)
         return Response(detail(publication_accessible(request.user, pub.pk), request), status=201)
 
 
@@ -110,7 +119,10 @@ class PublicationDetailView(APIView):
             raise NotFound()
         ser = PublicationEcritureSerializer(data=request.data, partial=True)
         ser.is_valid(raise_exception=True)
+        etait_publiee = pub.statut == "publie"
         ser.modifier(pub)
+        if not etait_publiee and pub.statut == "publie":
+            annoncer(pub)
         return Response(detail(publication_accessible(request.user, pk), request))
 
     def delete(self, request, pk):
@@ -131,7 +143,9 @@ class LikeView(APIView):
             _, cree = Like.objects.get_or_create(publication_id=pub.pk, user=request.user)
             if cree:
                 Publication.objects.filter(pk=pub.pk).update(nb_likes=F("nb_likes") + 1)
-        return Response(status=201 if cree else 200)
+                evenement([pub.auteur_id], "like", request.user, pub)
+        pub.refresh_from_db(fields=["nb_likes"])
+        return Response({"a_aime": True, "nb_likes": pub.nb_likes}, status=201 if cree else 200)
 
     def delete(self, request, pk):
         with transaction.atomic():
@@ -165,6 +179,7 @@ class CommentairesView(generics.ListCreateAPIView):
             c = Commentaire.objects.create(publication_id=pub.pk, auteur=request.user,
                                            texte=ser.validated_data["texte"])
             Publication.objects.filter(pk=pub.pk).update(nb_commentaires=F("nb_commentaires") + 1)
+            evenement([pub.auteur_id], "commentaire", request.user, pub)
         return Response(CommentaireSerializer(c, context={"request": request}).data, status=201)
 
 

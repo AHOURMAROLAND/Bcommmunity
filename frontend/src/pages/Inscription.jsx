@@ -4,6 +4,7 @@ import { api } from "../api/client";
 import { Bouton, Champ, Marque, Selecteur } from "../components/ui";
 import { erreursChamps, tousMessages } from "../api/erreurs";
 import AccesGoogle from "../components/AccesGoogle";
+import ChargementLong from "@/components/ChargementLong";
 
 const VIDE = { prenom: "", nom: "", email: "", statut: "eleve", password: "", confirmation: "" };
 
@@ -69,6 +70,7 @@ export default function Inscription() {
   return (
     <main className="page"><div className="boite">
       <Marque sous="Rejoignez la communauté de votre école." />
+      <ChargementLong actif={envoi} label="Création du compte..." />
       <div className="carte" style={{ marginBottom: "1rem" }}>
         <AccesGoogle texte="signup_with" />
         <p className="doux" style={{ textAlign: "center", marginBottom: 0 }}>ou créez un compte avec votre e-mail</p>

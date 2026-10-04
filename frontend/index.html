@@ -6,20 +6,21 @@
     <meta name="description" content="Bakhita Community - Le reseau social des eleves et anciens eleves" />
     <title>Bakhita Community</title>
 
-    <!-- Favicon SVG (moderne, suit le theme clair/sombre) -->
+    <!--
+      Favicon : icone fond clair par defaut.
+      Le navigateur choisit automatiquement selon prefers-color-scheme
+      grace au SVG adaptatif ci-dessous.
+    -->
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="alternate icon" type="image/jpeg" href="/icon-light.jpg" />
 
-    <!-- Favicon PNG de secours pour navigateurs anciens -->
-    <link rel="alternate icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
-    <link rel="alternate icon" type="image/png" sizes="16x16" href="/favicon-16.png" />
-
-    <!-- Apple touch icon (iPhone / iPad) -->
-    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+    <!-- Apple touch icon : fond sombre (bleu marine, plus lisible sur iOS) -->
+    <link rel="apple-touch-icon" href="/icon-dark.jpg" />
 
     <!-- PWA manifest -->
     <link rel="manifest" href="/manifest.webmanifest" />
 
-    <!-- Theme color (barre de statut mobile) -->
+    <!-- Theme color barre de statut -->
     <meta name="theme-color" content="#0B1F4B" media="(prefers-color-scheme: light)" />
     <meta name="theme-color" content="#0B1730" media="(prefers-color-scheme: dark)" />
 
@@ -28,12 +29,12 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Bakhita" />
 
-    <!-- Open Graph par defaut (remplace par le backend pour /p/{id}) -->
+    <!-- Open Graph par defaut -->
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="Bakhita Community" />
     <meta property="og:title" content="Bakhita Community" />
     <meta property="og:description" content="Le reseau social des eleves et anciens eleves de l'ecole Bakhita." />
-    <meta property="og:image" content="/og-image.png" />
+    <meta property="og:image" content="/icon-dark.jpg" />
   </head>
   <body>
     <div id="root"></div>

@@ -43,6 +43,30 @@ export function useSupprimerPublication() {
   });
 }
 
+export function useToggleLike() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, aAime }) => {
+      return api(`/publications/${id}/like/`, { method: aAime ? "DELETE" : "POST" });
+    },
+    onSuccess: (data, { id }) => {
+      qc.setQueriesData({ queryKey: ["fil"] }, (ancien) => {
+        if (!ancien?.pages) return ancien;
+        return {
+          ...ancien,
+          pages: ancien.pages.map((page) => ({
+            ...page,
+            results: page.results.map((pub) =>
+              pub.id === id ? { ...pub, a_aime: data?.a_aime, nb_likes: data?.nb_likes } : pub
+            ),
+          })),
+        };
+      });
+      qc.invalidateQueries({ queryKey: ["publication", id] });
+    },
+  });
+}
+
 export function useAjouterCommentaire(id) {
   const qc = useQueryClient();
   return useMutation({

@@ -50,5 +50,12 @@ export async function api(chemin, options = {}, dejaRetente = false) {
     }
     throw new ApiError(r.status, data);
   }
-  return r.status === 204 ? null : r.json();
+  if (r.status === 204) return null;
+  const texte = await r.text();
+  if (!texte) return null;
+  try {
+    return JSON.parse(texte);
+  } catch {
+    return null;
+  }
 }

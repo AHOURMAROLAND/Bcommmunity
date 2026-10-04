@@ -164,6 +164,21 @@ export function SqPage() {
   );
 }
 
+export function SqCamarades({ n = 5 }) {
+  return (
+    <div className="carrousel-camarades" aria-hidden="true" style={{ marginBottom: "1rem" }}>
+      {Array.from({ length: n }, (_, i) => (
+        <div key={i} className="item-camarade" style={{ alignItems: "center" }}>
+          <div className="anneau-dore-camarade">
+            <Rond t={60} />
+          </div>
+          <Sq w="52px" h="0.75rem" style={{ marginTop: "0.35rem" }} />
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export function SqCentree() {
   return <main className="page"><div className="boite"><SqFormulaire champs={2} /></div></main>;
 }

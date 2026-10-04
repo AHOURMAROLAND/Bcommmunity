@@ -2,6 +2,7 @@ import asyncio
 import time
 from collections import deque
 
+from asgiref.sync import sync_to_async
 from channels.db import database_sync_to_async
 from channels.generic.websocket import AsyncJsonWebsocketConsumer
 from django.core.cache import cache
@@ -10,7 +11,11 @@ from rest_framework_simplejwt.exceptions import TokenError
 from rest_framework_simplejwt.tokens import AccessToken
 
 from comptes.models import User
+from notifications.presence import marquer_present, retirer_presence
 from .services import autres_de, envoyer_message, marquer_lu
+
+presence = sync_to_async(marquer_present)
+absence  = sync_to_async(retirer_presence)
 
 
 @database_sync_to_async
@@ -68,6 +73,7 @@ class HubConsumer(AsyncJsonWebsocketConsumer):
     async def disconnect(self, code):
         self.delai.cancel()
         if self.user:
+            await absence(self.user.pk, self.channel_name)
             await self.channel_layer.group_discard(
                 f"user_{self.user.pk}", self.channel_name)
 
@@ -112,11 +118,13 @@ class HubConsumer(AsyncJsonWebsocketConsumer):
             self.user = user
             self.delai.cancel()
             await self.channel_layer.group_add(f"user_{user.pk}", self.channel_name)
+            await presence(self.user.pk, self.channel_name)
             return await self.send_json({"type": "auth.ok"})
 
         if t == "ping":
             if not await acces_ok(self.user):
                 return await self.close(code=4403)
+            await presence(self.user.pk, self.channel_name)
             return await self.send_json({"type": "pong"})
         if t == "message.send":
             return await self._envoyer(c)

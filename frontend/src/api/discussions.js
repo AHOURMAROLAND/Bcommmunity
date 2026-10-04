@@ -21,6 +21,8 @@ export const useConversations = () =>
     initialPageParam: 1,
     getNextPageParam: suite,
     queryFn: ({ pageParam }) => api(`/conversations/?page=${pageParam}`),
+    // Fallback si WS déconnecté ; le WS invalide ce cache à la reconnexion.
+    refetchInterval: 30_000,
   });
 
 // ---- Compteurs (badge nav) ----
@@ -28,7 +30,7 @@ export const useCompteursDisc = () =>
   useQuery({
     queryKey: ["compteurs-disc"],
     queryFn: () => api("/discussions/compteurs/"),
-    refetchInterval: 90_000,
+    refetchInterval: 30_000,
   });
 
 // ---- Detail d'une conversation ----
@@ -38,6 +40,9 @@ export const useConversation = (id) =>
     queryFn: () => api(`/conversations/${id}/`),
     retry: false,
     enabled: !!id,
+    // Pas de polling : le WS envoie message.lu et invalide ce cache.
+    // Fallback doux uniquement si la page reste ouverte sans WS.
+    refetchInterval: 30_000,
   });
 
 // ---- Messages (curseur) ----
@@ -50,6 +55,9 @@ export const useMessages = (id) =>
     getNextPageParam: (d) => curseur(d.next),
     queryFn: ({ pageParam }) =>
       api(`/conversations/${id}/messages/${pageParam ? `?cursor=${pageParam}` : ""}`),
+    // Pas de polling : le WS pousse les nouveaux messages via majMessage().
+    // Fallback doux uniquement si WS absent.
+    refetchInterval: 30_000,
   });
 
 // ---- Mutations ----

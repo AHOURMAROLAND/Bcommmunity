@@ -1,0 +1,7 @@
+{
+  "task_id": "task-lot-ab",
+  "task_description": "LOT A: OTP email via Brevo (EnvoyerOTPView, VerifierOTPView, OTPEmail model, VerifierOTP.jsx page, signup redirect). LOT B: Enriched messages — extend Message model (type/fichier/vocal/en_reponse_a), add ReactionMessage, extend serialiser_message, add upload/reaction views, WS broadcast, enrich Conversation.jsx bubbles (image/fichier/vocal/reply/reactions/date separator) and input bar (📎 file, 🎤 voice recorder, reply banner).",
+  "status": "pending",
+  "feature_order": ["FEAT-001", "FEAT-002"],
+  "blocked_reason": null
+}

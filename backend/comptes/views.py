@@ -1,8 +1,11 @@
 import logging
+import secrets
+from datetime import timedelta
 
 from django.conf import settings
+from django.contrib.auth.hashers import check_password, make_password
 from django.contrib.auth.tokens import default_token_generator
-from django.core.mail import send_mail
+from django.utils import timezone
 from django.utils.encoding import force_bytes
 from django.utils.http import urlsafe_base64_encode
 from google.auth.exceptions import GoogleAuthError
@@ -16,9 +19,10 @@ from rest_framework_simplejwt.serializers import TokenRefreshSerializer
 from rest_framework_simplejwt.token_blacklist.models import BlacklistedToken, OutstandingToken
 from rest_framework_simplejwt.tokens import RefreshToken
 
+from . import brevo
 from . import google as google_service
 from .auth import verifier_acces
-from .models import User
+from .models import OTPEmail, User
 from .serializers import (
     ConnexionSerializer,
     GoogleSerializer,
@@ -131,12 +135,7 @@ def envoyer_lien_reinitialisation(user):
     token = default_token_generator.make_token(user)
     lien = f"{settings.FRONTEND_URL}/reinitialiser?uid={uid}&token={token}"
     try:
-        send_mail(
-            "Réinitialisation de votre mot de passe - Bakhita Community",
-            f"Bonjour {user.prenom},\n\nPour choisir un nouveau mot de passe, ouvrez ce lien "
-            f"(valable 1 heure) :\n{lien}\n\nSi vous n'êtes pas à l'origine de cette demande, "
-            "ignorez ce message.",
-            settings.DEFAULT_FROM_EMAIL, [user.email])
+        brevo.envoyer_reinitialisation(user.email, user.prenom, lien)
     except Exception:
         logger.exception("Échec d'envoi de l'e-mail de réinitialisation")
 
@@ -171,7 +170,7 @@ class ReinitialisationView(PublicView):
 
 
 class RafraichirView(PublicView):
-    throttle_scope = "connexion"
+    throttle_scope = "rafraichir"
 
     def post(self, request):
         nat = natif(request)
@@ -230,6 +229,57 @@ class SupprimerCompteView(APIView):
         rep = Response(status=status.HTTP_204_NO_CONTENT)
         rep.delete_cookie(COOKIE, path=CHEMIN_COOKIE)
         return rep
+
+
+class MoiView(generics.RetrieveAPIView):
+    serializer_class = UtilisateurSerializer
+
+    def get_object(self):
+        return self.request.user
+
+
+class EnvoyerOTPView(PublicView):
+    throttle_scope = "otp_envoyer"
+
+    def post(self, request):
+        email = str(request.data.get("email") or "").strip().lower()
+        user = User.objects.filter(email__iexact=email, is_active=True).first()
+        if user:
+            # Expire all pending (non-used, non-expired) OTPs for this user
+            OTPEmail.objects.filter(
+                user=user, utilise=False, expire_le__gt=timezone.now()
+            ).update(utilise=True)
+            # Generate a 6-digit code, store hashed
+            plain_code = str(secrets.randbelow(1_000_000)).zfill(6)
+            OTPEmail.objects.create(
+                user=user,
+                code=make_password(plain_code),
+                expire_le=timezone.now() + timedelta(minutes=10),
+            )
+            brevo.envoyer_otp(user.email, user.prenom, plain_code)
+        # Always return 200 — no user enumeration
+        return Response({"detail": "Si un compte existe pour cette adresse, un code vient d'être envoyé."})
+
+
+class VerifierOTPView(PublicView):
+    throttle_scope = "otp_verifier"
+
+    def post(self, request):
+        email = str(request.data.get("email") or "").strip().lower()
+        code = str(request.data.get("code") or "").strip()
+        user = User.objects.filter(email__iexact=email, is_active=True).first()
+        if user:
+            otp = (OTPEmail.objects.filter(
+                user=user, utilise=False, expire_le__gt=timezone.now()
+            ).order_by("-expire_le").first())
+            if otp and check_password(code, otp.code):
+                otp.utilise = True
+                otp.save(update_fields=["utilise"])
+                user.email_verifie = True
+                user.save(update_fields=["email_verifie"])
+                verifier_acces(user)
+                return reponse_connexion(user)
+        return Response({"detail": "Code invalide ou expiré."}, status=status.HTTP_400_BAD_REQUEST)
 
 
 class MoiView(generics.RetrieveAPIView):

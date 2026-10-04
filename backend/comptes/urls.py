@@ -13,4 +13,6 @@ urlpatterns = [
     path("auth/moi/", views.MoiView.as_view()),
     path("auth/compte/", views.SupprimerCompteView.as_view()),
     path("auth/mot-de-passe/", views.ChangerMotDePasseView.as_view()),
+    path("auth/otp/envoyer/", views.EnvoyerOTPView.as_view()),
+    path("auth/otp/verifier/", views.VerifierOTPView.as_view()),
 ]

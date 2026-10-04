@@ -1,4 +1,5 @@
 from django.contrib.auth.base_user import AbstractBaseUser, BaseUserManager
+from django.contrib.auth.hashers import check_password, make_password  # noqa: F401 — re-exported for OTPEmail usage
 from django.contrib.auth.models import PermissionsMixin
 from django.core.cache import cache
 from django.db import models
@@ -87,5 +88,20 @@ class Suspension(models.Model):
 @receiver([post_save, post_delete], sender=Suspension)
 def _vider_cache_acces(sender, instance, **kwargs):
     cache.delete(f"blocage:{instance.user_id}")
+
+
+class OTPEmail(models.Model):
+    """One-time password sent by email for account verification."""
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="otps")
+    # Stores a hashed value — never the raw code
+    code = models.CharField(max_length=128)
+    expire_le = models.DateTimeField()
+    utilise = models.BooleanField(default=False)
+
+    class Meta:
+        indexes = [models.Index(fields=["user", "utilise", "expire_le"])]
+
+    def __str__(self):
+        return f"OTP {self.user_id} — expire {self.expire_le} — utilisé {self.utilise}"
 
 

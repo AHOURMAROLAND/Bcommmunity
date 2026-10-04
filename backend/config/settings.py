@@ -96,24 +96,41 @@ DATABASES["default"]["ATOMIC_REQUESTS"] = True
 if "postgresql" in DATABASES["default"].get("ENGINE", ""):
     DATABASES["default"]["DISABLE_SERVER_SIDE_CURSORS"] = True
     DATABASES["default"].setdefault("OPTIONS", {})["connect_timeout"] = 15
+elif "sqlite" in DATABASES["default"].get("ENGINE", ""):
+    DATABASES["default"].setdefault("OPTIONS", {})["timeout"] = 30
+
+
+# --- Configuration SQLite WAL pour éviter les blocages concurrents ---
+from django.db.backends.signals import connection_created  # noqa: E402
+from django.dispatch import receiver  # noqa: E402
+
+
+@receiver(connection_created)
+def _configurer_sqlite_wal(sender, connection, **kwargs):
+    if connection.vendor == "sqlite":
+        with connection.cursor() as cursor:
+            cursor.execute("PRAGMA journal_mode=WAL;")
+            cursor.execute("PRAGMA synchronous=NORMAL;")
+            cursor.execute("PRAGMA busy_timeout=30000;")
 
 # --- Django Channels + Redis ---
-if "pytest" in sys.modules:
+REDIS_URL = env("REDIS_URL", "").strip()
+if "pytest" in sys.modules or not REDIS_URL:
     CHANNEL_LAYERS = {"default": {"BACKEND": "channels.layers.InMemoryChannelLayer"}}
 else:
     CHANNEL_LAYERS = {"default": {
         "BACKEND": "channels_redis.core.RedisChannelLayer",
         "CONFIG": {
-            "hosts": [env("REDIS_URL", "redis://redis:6379/0")],
+            "hosts": [REDIS_URL],
             "capacity": 1500,
             "expiry": 10,
         },
     }}
 
 CACHES = {"default": {
-    "BACKEND": "django_redis.cache.RedisCache" if env("REDIS_URL") else "django.core.cache.backends.locmem.LocMemCache",
-    "LOCATION": env("REDIS_URL", "bakhita-cache"),
-    "OPTIONS": {"CLIENT_CLASS": "django_redis.client.DefaultClient"} if env("REDIS_URL") else {},
+    "BACKEND": "django_redis.cache.RedisCache" if REDIS_URL else "django.core.cache.backends.locmem.LocMemCache",
+    "LOCATION": REDIS_URL if REDIS_URL else "bakhita-cache",
+    "OPTIONS": {"CLIENT_CLASS": "django_redis.client.DefaultClient"} if REDIS_URL else {},
     "KEY_PREFIX": "bakhita",
 }}
 
@@ -210,6 +227,18 @@ DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", "Bakhita Community <no-reply@bakh
 ADMIN_EMAIL = env("ADMIN_EMAIL", "")  # reçoit une alerte à chaque signalement
 SEUIL_MASQUAGE_AUTO = int(env("SEUIL_MASQUAGE_AUTO", "3"))
 
+# --- Brevo SMTP (actif uniquement si BREVO_SMTP_LOGIN est défini) ---
+BREVO_SMTP_LOGIN = env("BREVO_SMTP_LOGIN", "")
+BREVO_SMTP_PASSWORD = env("BREVO_SMTP_PASSWORD", "")
+BREVO_API_KEY = env("BREVO_API_KEY", "")
+if BREVO_SMTP_LOGIN:
+    EMAIL_HOST = "smtp-relay.brevo.com"
+    EMAIL_PORT = 587
+    EMAIL_HOST_USER = BREVO_SMTP_LOGIN
+    EMAIL_HOST_PASSWORD = BREVO_SMTP_PASSWORD
+    EMAIL_USE_TLS = True
+    EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": ["comptes.auth.ReseauJWTAuthentication"],
     "DEFAULT_PERMISSION_CLASSES": ["rest_framework.permissions.IsAuthenticated"],
@@ -228,12 +257,14 @@ REST_FRAMEWORK = {
     ],
     "DEFAULT_THROTTLE_RATES": {
         "anon": "60/min", "user": "240/min",
-        "inscription": "5/hour", "connexion": "10/min",
+        "inscription": "5/hour", "connexion": "60/min", "rafraichir": "180/min",
         "reset": "5/hour", "google": "20/min", "demande_ami": "30/hour",
         "publier": "20/hour", "commenter": "60/hour", "like": "120/min", "photo": "10/hour",
         "invitation": "20/hour", "message": "120/min",
         "push": "20/hour",
         "signalement": "10/hour",
+        "otp_envoyer": "3/hour",
+        "otp_verifier": "10/hour",
     },
 }
 

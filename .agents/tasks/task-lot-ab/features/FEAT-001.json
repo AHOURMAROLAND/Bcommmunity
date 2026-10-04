@@ -1,0 +1,36 @@
+{
+  "id": "FEAT-001",
+  "type": "feat",
+  "description": "LOT A — OTP email via Brevo + signup redirect. Adds OTPEmail model, Brevo SMTP wrapper, EnvoyerOTPView/VerifierOTPView, OTP routes, settings/env Brevo config, VerifierOTP.jsx frontend page, and signup-flow redirect to /verifier-email. Google-only auth on Connexion/Inscription pages is already implemented (AccesGoogle component used, no Facebook/Apple present — nothing to remove). Existing email/password + Google auth must remain fully working.",
+  "status": "pending",
+  "steps": [
+    "1. Create backend/comptes/brevo.py. Import smtplib, email.mime, django.conf.settings, logging. Define send_smtp(to, subject, html) — reads BREVO_SMTP_LOGIN/BREVO_SMTP_PASSWORD from settings; if missing, falls back to django.core.mail.send_mail to the console backend. Define envoyer_otp(email, prenom, code) — HTML email template with 6-digit code, subject 'Votre code de vérification — Bakhita Community'. Define envoyer_reinitialisation(email, prenom, lien) — HTML email replacing the existing send_mail call in OubliView.",
+    "2. Add OTPEmail model to backend/comptes/models.py. Fields: user (FK User CASCADE, related_name='otps'), code (CharField max_length=128 — stores hashed value), expire_le (DateTimeField), utilise (BooleanField default=False). Meta: indexes=[Index(fields=['user','utilise','expire_le'])]. Import make_password/check_password from django.contrib.auth.hashers (do not store raw codes).",
+    "3. Generate migration: cd backend && .venv\\Scripts\\python.exe manage.py makemigrations comptes. This produces backend/comptes/migrations/0003_otpemail.py. Verify it references only SQLite-safe features.",
+    "4. Add EnvoyerOTPView and VerifierOTPView to backend/comptes/views.py. EnvoyerOTPView (POST /api/auth/otp/envoyer/): permission AllowAny, throttle_scope='otp_envoyer'. Look up user by email (is_active=True). Generate secrets.randbelow(1000000) zero-padded to 6 digits. Expire existing unused OTPs for this user. Create OTPEmail with code=make_password(plain_code), expire_le=now+10min. Call brevo.envoyer_otp(user.email, user.prenom, plain_code). Return 200 regardless (no info leak). VerifierOTPView (POST /api/auth/otp/verifier/): permission AllowAny, throttle_scope='otp_verifier'. Accept {email, code}. Find user. Find latest non-expired, non-used OTP. check_password(code, otp.code). On success: otp.utilise=True, user.email_verifie=True, save. Return JWT tokens via reponse_connexion(user).",
+    "5. Add OTP throttle scopes to backend/config/settings.py REST_FRAMEWORK DEFAULT_THROTTLE_RATES: 'otp_envoyer': '3/hour', 'otp_verifier': '10/hour'. Add Brevo SMTP settings block: if env('BREVO_SMTP_LOGIN'): set EMAIL_HOST='smtp-relay.brevo.com', EMAIL_PORT=587, EMAIL_HOST_USER=env('BREVO_SMTP_LOGIN'), EMAIL_HOST_PASSWORD=env('BREVO_SMTP_PASSWORD',''), EMAIL_USE_TLS=True, EMAIL_BACKEND='django.core.mail.backends.smtp.EmailBackend'. This block goes after the existing EMAIL_BACKEND line and only activates when the env var is present — in dev without it, the existing console backend remains active.",
+    "6. Add OTP routes to backend/comptes/urls.py: path('auth/otp/envoyer/', views.EnvoyerOTPView.as_view()), path('auth/otp/verifier/', views.VerifierOTPView.as_view()).",
+    "7. Modify envoyer_lien_reinitialisation() in backend/comptes/views.py to call brevo.envoyer_reinitialisation(user.email, user.prenom, lien) instead of send_mail. Keep the existing try/except and logger.exception fallback.",
+    "8. Add Brevo env vars to .env (repo root). Append three lines: BREVO_SMTP_LOGIN= / BREVO_SMTP_PASSWORD= / BREVO_API_KEY= (blank values so dev falls through to console backend).",
+    "9. Create frontend/src/pages/VerifierOTP.jsx. Receives ?email= query param (encoded). Shows 6 individual digit inputs (auto-focus next on input, auto-submit on last digit). 'Renvoyer le code' button disabled for 60s cooldown using useState+useEffect. On verify: POST /api/auth/otp/verifier/ with {email, code}. On 200: store tokens via AuthContext and navigate('/fil'). On 400: show error. On 429: show rate-limit message.",
+    "10. Modify frontend/src/pages/Inscription.jsx: in the success handler (after 'Compte créé'), instead of showing the static success card, navigate to /verifier-email?email=<encoded> so the user is redirected to VerifierOTP. Keep the existing fallback card only if no email available.",
+    "11. Add route to frontend/src/App.jsx: const VerifierOTP = lazy(() => import('./pages/VerifierOTP')). Add <Route path='/verifier-email' element={<Invite><VerifierOTP /></Invite>} /> in the public routes section (alongside /connexion, /inscription)."
+  ],
+  "acceptance_criteria": [
+    "cd backend && .venv\\Scripts\\python.exe manage.py check returns 0 issues",
+    "cd backend && .venv\\Scripts\\python.exe manage.py migrate runs cleanly and OTPEmail table is created",
+    "cd backend && .venv\\Scripts\\pytest.exe — all existing tests pass (no regressions)",
+    "POST /api/auth/otp/envoyer/ with valid email returns 200 and logs OTP to console (dev, no BREVO_SMTP_LOGIN set)",
+    "POST /api/auth/otp/verifier/ with correct code returns 200 with JWT access token",
+    "POST /api/auth/mot-de-passe-oublie/ still works (no regression in OubliView)",
+    "Frontend /verifier-email renders 6-digit inputs; Inscription page redirects there after successful registration"
+  ],
+  "verification": [
+    "cd backend && .venv\\Scripts\\python.exe manage.py check",
+    "cd backend && .venv\\Scripts\\python.exe manage.py migrate",
+    "cd backend && .venv\\Scripts\\pytest.exe",
+    "cd frontend && npm run build"
+  ],
+  "blocked_reason": null,
+  "findings": ""
+}

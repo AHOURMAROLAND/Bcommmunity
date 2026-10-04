@@ -14,6 +14,16 @@ import { Sq } from "../components/Squelettes";
 const heure = (iso) =>
   new Date(iso).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
 
+/** Ferme les notifications push OS liées à cette conversation (tag "conv-<id>"). */
+function fermerPushConversation(convId) {
+  if (!("serviceWorker" in navigator)) return;
+  navigator.serviceWorker.ready.then((reg) => {
+    reg.getNotifications({ tag: `conv-${convId}` }).then((notifs) => {
+      notifs.forEach((n) => n.close());
+    }).catch(() => {});
+  }).catch(() => {});
+}
+
 export default function Conversation() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -41,6 +51,14 @@ export default function Conversation() {
   );
   const dernier = liste.at(-1);
 
+  const [luAutre, setLuAutre] = useState(conv.data?.dernier_lu_autre ?? 0);
+
+  useEffect(() => {
+    if (conv.data?.dernier_lu_autre) {
+      setLuAutre((prev) => Math.max(prev, conv.data.dernier_lu_autre));
+    }
+  }, [conv.data?.dernier_lu_autre]);
+
   // Abonnement aux evenements temps reel de cette conversation
   useEffect(() => abonner((d) => {
     if (String(d.conversation) !== id) return;
@@ -50,9 +68,23 @@ export default function Conversation() {
       minuterie.current = setTimeout(() => setEcrit(false), 3000);
     } else if (d.type === "message.nouveau") {
       setEcrit(false);
+    } else if (d.type === "message.lu") {
+      if (d.user !== utilisateur.id && d.jusqua) {
+        setLuAutre((prev) => Math.max(prev, Number(d.jusqua)));
+      }
     }
-  }), [abonner, id]);
+  }), [abonner, id, utilisateur.id]);
   useEffect(() => () => clearTimeout(minuterie.current), []);
+
+  // Ferme les push OS "Nouveau message" pour cette conversation dès qu'on l'ouvre
+  useEffect(() => {
+    fermerPushConversation(id);
+    const visible = () => {
+      if (document.visibilityState === "visible") fermerPushConversation(id);
+    };
+    document.addEventListener("visibilitychange", visible);
+    return () => document.removeEventListener("visibilitychange", visible);
+  }, [id]);
 
   // Marquer comme lu le dernier message de l'autre
   useEffect(() => {
@@ -129,7 +161,8 @@ export default function Conversation() {
   }
 
   const autre = conv.data?.autre;
-  const luAutre = conv.data?.dernier_lu_autre ?? 0;
+  // Ne pas redéclarer luAutre ici : le state useState en haut est mis à jour
+  // par le WS (message.lu) et par l'initialisation depuis conv.data.
 
   return (
     <div className="chat">
@@ -205,10 +238,10 @@ export default function Conversation() {
                   m.statut === "echec"
                     ? <span style={{ color: "var(--danger)", marginLeft: 4 }}> Echec</span>
                     : m.statut === "envoi"
-                    ? <span style={{ marginLeft: 4 }}> ...</span>
+                    ? <span style={{ marginLeft: 4, opacity: 0.5 }}> ...</span>
                     : vu
-                    ? <CheckCheck size={13} style={{ verticalAlign: "middle", marginLeft: 4 }} aria-label="Vu" />
-                    : <Check size={13} style={{ verticalAlign: "middle", marginLeft: 4 }} aria-label="Envoye" />
+                    ? <CheckCheck size={13} style={{ verticalAlign: "middle", marginLeft: 4, color: "var(--accent-sec, #2ec4b6)" }} aria-label="Vu" />
+                    : <Check size={13} style={{ verticalAlign: "middle", marginLeft: 4, opacity: 0.6 }} aria-label="Envoye" />
                 )}
               </div>
             </div>

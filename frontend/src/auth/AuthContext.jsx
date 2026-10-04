@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { api, rafraichir, setAccessToken } from "../api/client";
+import { desactiverPush } from "../utils/push";
 
 const AuthContext = createContext(null);
 export const useAuth = () => useContext(AuthContext);
@@ -51,6 +52,7 @@ export function AuthProvider({ children }) {
   }, [qc]);
 
   const deconnexion = useCallback(async () => {
+    await desactiverPush().catch(() => {});
     try { await api("/auth/deconnexion/", { method: "POST" }); } finally {
       setAccessToken(null);
       setUtilisateur(null);

@@ -1458,6 +1458,481 @@ h1, h2, h3, .titre { font-weight: 700; }
   color: #8b949e;
 }
 
+/* --- Notifications & Parametres (M5) --- */
+.notif {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  padding: 0.85rem 0.75rem;
+  border: 0;
+  border-bottom: 1px solid var(--bordure);
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  border-radius: 0.5rem;
+  transition: background 0.15s ease;
+}
+
+.notif:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.notif.non-lue {
+  background: rgba(245, 158, 11, 0.08);
+}
+
+.notif:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.interrupteur-ligne {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.7rem 0;
+  border-top: 1px solid var(--bordure);
+  cursor: pointer;
+}
+
+.interrupteur-ligne:first-of-type {
+  border-top: 0;
+}
+
+.interrupteur-ligne input {
+  width: 2.6rem;
+  height: 1.4rem;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.bandeau-nouvelles-fil {
+  width: 100%;
+  background: #f59e0b;
+  color: #000000;
+  font-weight: 700;
+  font-size: 0.88rem;
+  padding: 0.65rem 1rem;
+  border: 0;
+  border-radius: 0.85rem;
+  margin-bottom: 0.85rem;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
+  transition: transform 0.15s ease, opacity 0.15s ease;
+}
+
+.bandeau-nouvelles-fil:hover {
+  transform: translateY(-1px);
+  opacity: 0.95;
+}
+
+/* --- 10. Mon Profil (Design Maquette M5) --- */
+.page-mon-profil {
+  padding-bottom: 2rem;
+}
+
+.entete-mon-profil {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.15rem;
+}
+
+.titre-mon-profil {
+  font-size: 1.45rem;
+  font-weight: 800;
+  color: #ffffff;
+  margin: 0;
+  letter-spacing: -0.02em;
+}
+
+.bouton-options-profil {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: #161b22;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.bouton-options-profil:hover {
+  background: #21262d;
+}
+
+.menu-deroulant-profil {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  width: 13rem;
+  background: #161b22;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 1rem;
+  padding: 0.4rem;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+  z-index: 50;
+  animation: fadeIn 0.15s ease;
+}
+
+.item-menu-profil {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  width: 100%;
+  padding: 0.65rem 0.85rem;
+  border: 0;
+  background: transparent;
+  color: #e6edf3;
+  font-size: 0.9rem;
+  font-weight: 600;
+  border-radius: 0.65rem;
+  cursor: pointer;
+  text-decoration: none;
+  transition: background 0.12s ease;
+}
+
+.item-menu-profil:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.item-menu-danger {
+  color: #f87171;
+}
+
+.item-menu-danger:hover {
+  background: rgba(239, 68, 68, 0.1);
+}
+
+/* Carte Hero Photo */
+.carte-hero-profil {
+  position: relative;
+  width: 100%;
+  height: 250px;
+  border-radius: 1.5rem;
+  overflow: hidden;
+  background: #161b22;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+.image-hero-profil {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.placeholder-hero-profil {
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(135deg, #1e293b, #0f172a);
+  display: grid;
+  place-items: center;
+  color: #f59e0b;
+  font-size: 3rem;
+  font-weight: 800;
+}
+
+.badge-hero-bakhita {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  background: #06b6d4;
+  color: #ffffff;
+  padding: 0.35rem 0.8rem;
+  border-radius: 9999px;
+  font-weight: 700;
+  font-size: 0.78rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  box-shadow: 0 4px 12px rgba(6, 182, 212, 0.45);
+  z-index: 2;
+}
+
+.overlay-hero-profil {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 2.2rem 1.25rem 1rem;
+  background: linear-gradient(to top, rgba(11, 15, 20, 0.95) 0%, rgba(11, 15, 20, 0.6) 55%, transparent 100%);
+  z-index: 1;
+}
+
+.nom-hero-profil {
+  font-size: 1.55rem;
+  font-weight: 800;
+  color: #ffffff;
+  margin: 0;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+}
+
+.sous-titre-hero-profil {
+  font-size: 0.86rem;
+  color: #9ca3af;
+  margin: 0.3rem 0 0;
+  font-weight: 500;
+}
+
+.poste-hero-profil {
+  font-size: 0.86rem;
+  color: #d1d5db;
+  margin: 0.2rem 0 0;
+  font-weight: 500;
+}
+
+/* Bouton Modifier le profil */
+.bouton-modifier-profil-dore {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  width: 100%;
+  background: #11161f;
+  border: 1.5px solid #f59e0b;
+  border-radius: 9999px;
+  padding: 0.8rem 1.25rem;
+  color: #f59e0b;
+  font-size: 0.95rem;
+  font-weight: 700;
+  text-decoration: none;
+  margin: 1rem 0 1.25rem;
+  transition: transform 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+  box-shadow: 0 4px 14px rgba(245, 158, 11, 0.15);
+}
+
+.bouton-modifier-profil-dore:hover {
+  background: rgba(245, 158, 11, 0.1);
+  transform: translateY(-1px);
+}
+
+.icone-crayon-dore {
+  color: #f59e0b;
+}
+
+/* Carte Situation Actuelle */
+.carte-situation-profil {
+  background: #161b22;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 1.25rem;
+  padding: 1rem 1.15rem;
+  margin-bottom: 1.25rem;
+}
+
+.entete-situation-profil {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.titre-situation-profil {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #ffffff;
+  margin: 0;
+}
+
+.actions-type-situation {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.icone-briefcase-subtile {
+  color: #8b949e;
+  display: grid;
+  place-items: center;
+}
+
+.badge-type-situation {
+  background: #0d9488;
+  color: #ffffff;
+  padding: 0.2rem 0.75rem;
+  border-radius: 9999px;
+  font-weight: 700;
+  font-size: 0.76rem;
+  letter-spacing: -0.01em;
+}
+
+.corps-situation-profil {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  margin-top: 0.85rem;
+}
+
+.boite-logo-situation {
+  width: 44px;
+  height: 44px;
+  border-radius: 0.75rem;
+  background: #ffffff;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+}
+
+.texte-situation-profil {
+  color: #ffffff;
+  font-weight: 600;
+  font-size: 0.92rem;
+  flex: 1;
+  min-width: 0;
+}
+
+.bouton-modifier-situation {
+  background: #21262d;
+  color: #ffffff;
+  padding: 0.4rem 0.95rem;
+  border-radius: 9999px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  text-decoration: none;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  transition: background 0.15s ease;
+}
+
+.bouton-modifier-situation:hover {
+  background: #30363d;
+}
+
+/* Onglets Segmentés */
+.onglets-segmentes-profil {
+  display: flex;
+  width: 100%;
+  background: #161b22;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 9999px;
+  padding: 4px;
+  margin-bottom: 1.25rem;
+}
+
+.onglet-segmente {
+  flex: 1;
+  border: 0;
+  background: transparent;
+  color: #8b949e;
+  font-weight: 600;
+  font-size: 0.9rem;
+  padding: 0.6rem 0;
+  border-radius: 9999px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: inherit;
+}
+
+.onglet-segmente.actif {
+  background: #283344;
+  color: #ffffff;
+  font-weight: 700;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+}
+
+/* Liste des publications du profil */
+.liste-publications-profil {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.ligne-publication-profil {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  padding: 0.85rem 0.5rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  text-decoration: none;
+  color: inherit;
+  border-radius: 0.75rem;
+  transition: background 0.15s ease;
+}
+
+.ligne-publication-profil:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.vignette-publication-profil {
+  width: 58px;
+  height: 58px;
+  border-radius: 0.85rem;
+  object-fit: cover;
+  flex-shrink: 0;
+  background: #21262d;
+}
+
+.vignette-placeholder-profil {
+  width: 58px;
+  height: 58px;
+  border-radius: 0.85rem;
+  background: #21262d;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+
+.infos-publication-profil {
+  flex: 1;
+  min-width: 0;
+}
+
+.titre-publication-profil {
+  display: block;
+  color: #ffffff;
+  font-weight: 700;
+  font-size: 0.95rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.date-publication-profil {
+  display: block;
+  color: #8b949e;
+  font-size: 0.8rem;
+  margin-top: 3px;
+}
+
+.badge-statut-brouillon {
+  background: #78350f;
+  color: #fbbf24;
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 0.25rem 0.7rem;
+  border-radius: 9999px;
+  flex-shrink: 0;
+}
+
+.chevron-publication-profil {
+  color: #6e7681;
+  flex-shrink: 0;
+}
+
+.carte-vide-profil {
+  background: #161b22;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 1rem;
+  padding: 2rem 1rem;
+  text-align: center;
+  color: #8b949e;
+}
+
+.lien-creer-pub-profil {
+  display: inline-block;
+  margin-top: 0.75rem;
+  color: #f59e0b;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+
+
 
 
 

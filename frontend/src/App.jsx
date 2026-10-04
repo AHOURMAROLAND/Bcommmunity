@@ -22,6 +22,8 @@ const MonProfil       = lazy(() => import("./pages/MonProfil"));
 const ModifierProfil  = lazy(() => import("./pages/ModifierProfil"));
 const PublicationPage = lazy(() => import("./pages/PublicationPage"));
 const Publier         = lazy(() => import("./pages/Publier"));
+const Notifications   = lazy(() => import("./pages/Notifications"));
+const Parametres      = lazy(() => import("./pages/Parametres"));
 
 function Invite({ children }) {
   const { utilisateur, chargement } = useAuth();
@@ -87,6 +89,8 @@ export default function App() {
           <Route path="/profil"           element={<MonProfil />} />
           <Route path="/profil/modifier"  element={<ModifierProfil />} />
           <Route path="/profil/:id"       element={<ProfilPublic />} />
+          <Route path="/notifications"    element={<Notifications />} />
+          <Route path="/parametres"       element={<Parametres />} />
         </Route>
 
         <Route path="*" element={<Navigate to="/fil" replace />} />

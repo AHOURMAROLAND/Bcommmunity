@@ -1,8 +1,11 @@
 import { Link, useNavigate } from "react-router-dom";
 import { Bell, ChevronRight, Plus, Search } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useFil } from "../api/publications";
 import { useSuggestions, useAnnuaire } from "../api/amis";
 import { useProfil } from "../api/hooks";
+import { useCompteurNotifs } from "../api/notifications";
+import { useTempsReel } from "../temps-reel/TempsReel";
 import useSentinelle from "../hooks/useSentinelle";
 import Avatar from "../components/Avatar";
 import PublicationCard from "../components/PublicationCard";
@@ -11,9 +14,12 @@ import { SqCartes, SqCamarades } from "../components/Squelettes";
 export default function Fil() {
   const { data: profil } = useProfil();
   const navigate = useNavigate();
+  const qc = useQueryClient();
   const fil = useFil();
   const sugg = useSuggestions();
   const annuaire = useAnnuaire({});
+  const nbNotifs = useCompteurNotifs().data?.non_lues ?? 0;
+  const { nouvelles, effacerNouvelles } = useTempsReel() ?? { nouvelles: 0, effacerNouvelles: () => {} };
   const items = fil.data?.pages.flatMap((p) => p.results) ?? [];
 
   const cartesSugg = sugg.data?.pages[0]?.results ?? [];
@@ -31,12 +37,12 @@ export default function Fil() {
         <div className="fil-entete-actions">
           <button
             className="bouton-icone-fil"
-            aria-label="Notifications"
+            aria-label={`Notifications${nbNotifs ? `, ${nbNotifs} non lues` : ""}`}
             onClick={() => navigate("/notifications")}
           >
             <div style={{ position: "relative", display: "inline-flex" }}>
               <Bell size={20} />
-              <span className="point-notif-orange" />
+              {nbNotifs > 0 && <span className="point-notif-orange" />}
             </div>
           </button>
           <button
@@ -48,6 +54,20 @@ export default function Fil() {
           </button>
         </div>
       </div>
+
+      {nouvelles > 0 && (
+        <button
+          type="button"
+          className="bandeau-nouvelles-fil"
+          onClick={() => {
+            qc.invalidateQueries({ queryKey: ["fil"] });
+            effacerNouvelles();
+            window.scrollTo({ top: 0, behavior: "smooth" });
+          }}
+        >
+          {nouvelles} nouvelle{nouvelles > 1 ? "s" : ""} publication{nouvelles > 1 ? "s" : ""}
+        </button>
+      )}
 
       {/* Carte Écrire une publication */}
       <Link to="/publier" className="carte-composer-fil">

@@ -40,6 +40,7 @@ export function TempsReelProvider({ children }) {
   const sock = useRef(null);
   const abonnes = useRef(new Set());
   const [etat, setEtat] = useState("ferme"); // "ferme" | "connexion" | "ouvert"
+  const [nouvelles, setNouvelles] = useState(0);
 
   useEffect(() => {
     if (!utilisateur) return undefined;
@@ -62,6 +63,9 @@ export function TempsReelProvider({ children }) {
         invalider(qc, "invitations", "conversations", "compteurs-disc", "profil-public");
       } else if (d.type === "erreur" && d.cid) {
         majMessage(qc, d.conversation, { id: d.cid, cid: d.cid, statut: "echec" });
+      } else if (d.type === "notification.nouvelle") {
+        invalider(qc, "notifications", "compteur-notifs");
+        if (d.sous_type === "publication") setNouvelles((n) => n + 1);
       }
       // Notifie tous les abonnes locaux (page Conversation)
       abonnes.current.forEach((f) => f(d));
@@ -139,7 +143,9 @@ export function TempsReelProvider({ children }) {
     return () => abonnes.current.delete(f);
   }, []);
 
-  const valeur = useMemo(() => ({ etat, envoyer, abonner }), [etat, envoyer, abonner]);
+  const effacerNouvelles = useCallback(() => setNouvelles(0), []);
+  const valeur = useMemo(() => ({ etat, envoyer, abonner, nouvelles, effacerNouvelles }),
+    [etat, envoyer, abonner, nouvelles, effacerNouvelles]);
 
   return <Ctx.Provider value={valeur}>{children}</Ctx.Provider>;
 }

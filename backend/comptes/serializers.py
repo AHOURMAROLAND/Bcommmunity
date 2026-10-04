@@ -12,10 +12,15 @@ from .services import creer_compte
 
 
 class UtilisateurSerializer(serializers.ModelSerializer):
+    a_mot_de_passe = serializers.SerializerMethodField()
+
     class Meta:
         model = User
-        fields = ("id", "email", "prenom", "nom", "statut")
+        fields = ("id", "email", "prenom", "nom", "statut", "a_mot_de_passe")
         read_only_fields = fields
+
+    def get_a_mot_de_passe(self, o):
+        return o.has_usable_password()
 
 
 class InscriptionSerializer(serializers.ModelSerializer):

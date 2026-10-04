@@ -4,6 +4,8 @@ import { useAuth } from "../auth/AuthContext";
 import { tousMessages } from "../api/erreurs";
 import { Bouton } from "./ui";
 import GoogleBouton from "./GoogleBouton";
+import GoogleNatif from "./GoogleNatif";
+import { estNatif } from "../utils/plateforme";
 
 export default function AccesGoogle({ texte }) {
   const { connexionGoogle } = useAuth();
@@ -54,7 +56,7 @@ export default function AccesGoogle({ texte }) {
 
   return (
     <div>
-      <GoogleBouton texte={texte} onCredential={(c) => lancer(c)} />
+      {estNatif() ? <GoogleNatif onCredential={(c) => lancer(c)} /> : <GoogleBouton texte={texte} onCredential={(c) => lancer(c)} />}
       {erreur && <p role="alert" className="erreur" style={{ textAlign: "center" }}>{erreur}</p>}
     </div>
   );

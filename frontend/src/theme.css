@@ -2297,6 +2297,11 @@ h1, h2, h3, .titre { font-weight: 700; }
   text-decoration: none;
 }
 
+/* Bandeaux M7 (PWA & hors ligne) */
+.bandeau { position: fixed; left: 0.75rem; right: 0.75rem; bottom: calc(5.5rem + env(safe-area-inset-bottom)); max-width: 38rem; margin: 0 auto; z-index: 30; }
+.bandeau-haut { position: sticky; top: 0; z-index: 35; padding: 0.5rem 1rem; padding-top: calc(0.5rem + env(safe-area-inset-top)); text-align: center; font-size: 0.85rem; background: var(--primaire); color: var(--sur-primaire); }
+
+
 
 
 

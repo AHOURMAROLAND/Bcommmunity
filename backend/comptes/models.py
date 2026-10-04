@@ -1,7 +1,10 @@
 from django.contrib.auth.base_user import AbstractBaseUser, BaseUserManager
 from django.contrib.auth.models import PermissionsMixin
+from django.core.cache import cache
 from django.db import models
 from django.db.models import Q
+from django.db.models.signals import post_delete, post_save
+from django.dispatch import receiver
 from django.utils import timezone
 
 
@@ -81,12 +84,8 @@ class Suspension(models.Model):
             name="suspension_fin_ou_definitive")]
 
 
-from django.core.cache import cache
-from django.db.models.signals import post_delete, post_save
-from django.dispatch import receiver
-
-
 @receiver([post_save, post_delete], sender=Suspension)
 def _vider_cache_acces(sender, instance, **kwargs):
     cache.delete(f"blocage:{instance.user_id}")
+
 

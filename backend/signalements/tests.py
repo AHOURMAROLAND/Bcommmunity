@@ -14,6 +14,7 @@ from comptes.taches import lever_suspensions_expirees
 from discussions.models import Conversation, Message, Participant
 from discussions.services import cle
 from publications.models import Publication
+
 from .models import Signalement
 
 pytestmark = pytest.mark.django_db

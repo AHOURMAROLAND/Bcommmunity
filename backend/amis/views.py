@@ -10,9 +10,8 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from comptes.models import User
-from scolarite.models import Scolarite
-
 from notifications.services import evenement
+from scolarite.models import Scolarite
 
 from .models import Amitie, Blocage
 from .services import (

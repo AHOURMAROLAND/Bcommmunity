@@ -4,6 +4,7 @@ import { useAuth } from "./auth/AuthContext";
 import { useProfil } from "./api/hooks";
 import { SqCentree, SqRoute } from "./components/Squelettes";
 import Coque from "./components/Coque";
+import PontNatif from "./components/PontNatif";
 import { TempsReelProvider } from "./temps-reel/TempsReel";
 
 const Connexion       = lazy(() => import("./pages/Connexion"));
@@ -12,6 +13,7 @@ const MotDePasseOublie = lazy(() => import("./pages/MotDePasseOublie"));
 const Reinitialiser   = lazy(() => import("./pages/Reinitialiser"));
 const EnAttente       = lazy(() => import("./pages/EnAttente"));
 const Onboarding      = lazy(() => import("./pages/Onboarding"));
+const PageSuppression = lazy(() => import("./pages/PageSuppression"));
 const Fil             = lazy(() => import("./pages/Fil"));
 const Annuaire        = lazy(() => import("./pages/Annuaire"));
 const ProfilPublic    = lazy(() => import("./pages/ProfilPublic"));
@@ -51,50 +53,54 @@ function Plein() {
 
 export default function App() {
   return (
-    <Suspense fallback={<SqRoute />}>
-      <Routes>
-        {/* Pages publiques */}
-        <Route path="/connexion"         element={<Invite><Connexion /></Invite>} />
-        <Route path="/inscription"       element={<Invite><Inscription /></Invite>} />
-        <Route path="/mot-de-passe-oublie" element={<Invite><MotDePasseOublie /></Invite>} />
-        <Route path="/reinitialiser"     element={<Reinitialiser />} />
-        <Route path="/en-attente"        element={<EnAttente />} />
-        <Route path="/onboarding"        element={<Connecte><Onboarding /></Connecte>} />
+    <>
+      <PontNatif />
+      <Suspense fallback={<SqRoute />}>
+        <Routes>
+          {/* Pages publiques */}
+          <Route path="/connexion"         element={<Invite><Connexion /></Invite>} />
+          <Route path="/inscription"       element={<Invite><Inscription /></Invite>} />
+          <Route path="/mot-de-passe-oublie" element={<Invite><MotDePasseOublie /></Invite>} />
+          <Route path="/reinitialiser"     element={<Reinitialiser />} />
+          <Route path="/en-attente"        element={<EnAttente />} />
+          <Route path="/suppression-compte" element={<PageSuppression />} />
+          <Route path="/onboarding"        element={<Connecte><Onboarding /></Connecte>} />
 
-        {/* Pages connectees sans Coque (plein ecran) */}
-        <Route element={<Connecte><Portail><Plein /></Portail></Connecte>}>
-          <Route path="/publier"     element={<Publier />} />
-          <Route path="/publier/:id" element={<Publier />} />
-          {/* Conversation : plein ecran sur mobile */}
-          <Route path="/messages/:id" element={
-            <TempsReelProvider><Conversation /></TempsReelProvider>
-          } />
-        </Route>
+          {/* Pages connectees sans Coque (plein ecran) */}
+          <Route element={<Connecte><Portail><Plein /></Portail></Connecte>}>
+            <Route path="/publier"     element={<Publier />} />
+            <Route path="/publier/:id" element={<Publier />} />
+            {/* Conversation : plein ecran sur mobile */}
+            <Route path="/messages/:id" element={
+              <TempsReelProvider><Conversation /></TempsReelProvider>
+            } />
+          </Route>
 
-        {/* Pages connectees avec Coque (nav) */}
-        <Route element={
-          <Connecte>
-            <Portail>
-              <TempsReelProvider>
-                <Coque />
-              </TempsReelProvider>
-            </Portail>
-          </Connecte>
-        }>
-          <Route path="/fil"              element={<Fil />} />
-          <Route path="/publications/:id" element={<PublicationPage />} />
-          <Route path="/annuaire"         element={<Annuaire />} />
-          <Route path="/amis"             element={<Amis />} />
-          <Route path="/messages"         element={<Messages />} />
-          <Route path="/profil"           element={<MonProfil />} />
-          <Route path="/profil/modifier"  element={<ModifierProfil />} />
-          <Route path="/profil/:id"       element={<ProfilPublic />} />
-          <Route path="/notifications"    element={<Notifications />} />
-          <Route path="/parametres"       element={<Parametres />} />
-        </Route>
+          {/* Pages connectees avec Coque (nav) */}
+          <Route element={
+            <Connecte>
+              <Portail>
+                <TempsReelProvider>
+                  <Coque />
+                </TempsReelProvider>
+              </Portail>
+            </Connecte>
+          }>
+            <Route path="/fil"              element={<Fil />} />
+            <Route path="/publications/:id" element={<PublicationPage />} />
+            <Route path="/annuaire"         element={<Annuaire />} />
+            <Route path="/amis"             element={<Amis />} />
+            <Route path="/messages"         element={<Messages />} />
+            <Route path="/profil"           element={<MonProfil />} />
+            <Route path="/profil/modifier"  element={<ModifierProfil />} />
+            <Route path="/profil/:id"       element={<ProfilPublic />} />
+            <Route path="/notifications"    element={<Notifications />} />
+            <Route path="/parametres"       element={<Parametres />} />
+          </Route>
 
-        <Route path="*" element={<Navigate to="/fil" replace />} />
-      </Routes>
-    </Suspense>
+          <Route path="*" element={<Navigate to="/fil" replace />} />
+        </Routes>
+      </Suspense>
+    </>
   );
 }

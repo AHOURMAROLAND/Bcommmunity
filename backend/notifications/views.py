@@ -6,6 +6,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from amis.services import ids_bloques
+
 from .models import Notification, Preferences, PushAbonnement
 from .push import adresse_push_valide
 from .services import serialiser

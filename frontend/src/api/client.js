@@ -1,6 +1,9 @@
+import { estNatif } from "../utils/plateforme";
+
 const BASE = import.meta.env.VITE_API_URL ?? "/api";
-let accessToken = null; // en mémoire uniquement : jamais dans localStorage
-let rafraichissement = null; // une seule requête de refresh à la fois
+const CLE_REFRESH = "bk_refresh";
+let accessToken = null;
+let rafraichissement = null;
 
 export class ApiError extends Error {
   constructor(status, data) {
@@ -11,26 +14,40 @@ export class ApiError extends Error {
 }
 
 export const setAccessToken = (t) => { accessToken = t; };
+const entetes = () => (estNatif() ? { "X-Client": "natif" } : {});
+const lire = async (r) => { try { return await r.json(); } catch { return null; } };
 
-async function lire(reponse) {
-  try { return await reponse.json(); } catch { return null; }
+const stockage = async () => (await import("capacitor-secure-storage-plugin")).SecureStoragePlugin;
+export async function sauverRefresh(v) { if (estNatif() && v) await (await stockage()).set({ key: CLE_REFRESH, value: v }); }
+export async function lireRefresh() {
+  if (!estNatif()) return null;
+  try { return (await (await stockage()).get({ key: CLE_REFRESH })).value; } catch { return null; }
+}
+export async function effacerRefresh() {
+  if (!estNatif()) return;
+  try { await (await stockage()).remove({ key: CLE_REFRESH }); } catch { /* déjà absent */ }
 }
 
 export function rafraichir() {
-  rafraichissement ??= fetch(`${BASE}/auth/rafraichir/`, { method: "POST", credentials: "include" })
-    .then(async (r) => {
-      const data = await lire(r);
-      if (!r.ok) throw new ApiError(r.status, data);
-      accessToken = data.access;
-      return data.access;
-    })
-    .finally(() => { rafraichissement = null; });
+  rafraichissement ??= (async () => {
+    const natif = estNatif();
+    const r = await fetch(`${BASE}/auth/rafraichir/`, {
+      method: "POST", credentials: "include",
+      headers: { ...entetes(), ...(natif ? { "Content-Type": "application/json" } : {}) },
+      body: natif ? JSON.stringify({ refresh: await lireRefresh() }) : undefined,
+    });
+    const data = await lire(r);
+    if (!r.ok) throw new ApiError(r.status, data);
+    accessToken = data.access;
+    if (natif && data.refresh) await sauverRefresh(data.refresh);
+    return data.access;
+  })().finally(() => { rafraichissement = null; });
   return rafraichissement;
 }
 
 export async function api(chemin, options = {}, dejaRetente = false) {
   const { method = "GET", body, formData, signal } = options;
-  const headers = {};
+  const headers = { ...entetes() };
   if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
   if (body !== undefined) headers["Content-Type"] = "application/json";
 
@@ -50,12 +67,7 @@ export async function api(chemin, options = {}, dejaRetente = false) {
     }
     throw new ApiError(r.status, data);
   }
-  if (r.status === 204) return null;
-  const texte = await r.text();
-  if (!texte) return null;
-  try {
-    return JSON.parse(texte);
-  } catch {
-    return null;
-  }
+  return r.status === 204 ? null : r.json();
 }
+
+export const jetonPourWs = () => rafraichir();

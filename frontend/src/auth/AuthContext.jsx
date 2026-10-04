@@ -1,8 +1,9 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
-import { api, rafraichir, setAccessToken } from "../api/client";
+import { api, effacerRefresh, lireRefresh, rafraichir, sauverRefresh, setAccessToken } from "../api/client";
 import { desactiverPush } from "../utils/push";
+import { estNatif } from "../utils/plateforme";
 
 const AuthContext = createContext(null);
 export const useAuth = () => useContext(AuthContext);
@@ -48,12 +49,17 @@ export function AuthProvider({ children }) {
     qc.clear(); // aucune donnée d'un autre compte ne doit rester en cache
     const data = await api("/auth/connexion/", { method: "POST", body: { email, password } });
     setAccessToken(data.access);
+    await sauverRefresh(data.refresh);
     setUtilisateur(data.utilisateur);
   }, [qc]);
 
   const deconnexion = useCallback(async () => {
-    await desactiverPush().catch(() => {});
-    try { await api("/auth/deconnexion/", { method: "POST" }); } finally {
+    try {
+      await desactiverPush().catch(() => {});
+      const refresh = estNatif() ? await lireRefresh() : null;
+      await api("/auth/deconnexion/", { method: "POST", body: refresh ? { refresh } : undefined });
+    } finally {
+      await effacerRefresh();
       setAccessToken(null);
       setUtilisateur(null);
       qc.clear();
@@ -67,6 +73,7 @@ export function AuthProvider({ children }) {
         method: "POST", body: statut ? { credential, statut } : { credential } });
       if (data.access) {
         setAccessToken(data.access);
+        await sauverRefresh(data.refresh);
         setUtilisateur(data.utilisateur);
         return { etat: "connecte" };
       }

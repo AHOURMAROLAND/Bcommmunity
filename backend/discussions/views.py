@@ -8,10 +8,18 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from amis.services import ids_bloques
+
 from .models import InvitationDiscussion, Message, Participant
 from .services import (
-    accepter, contexte, diffuser, envoyer_message, inviter,
-    marquer_lu, resume, serialiser_message, verifier_ecriture,
+    accepter,
+    contexte,
+    diffuser,
+    envoyer_message,
+    inviter,
+    marquer_lu,
+    resume,
+    serialiser_message,
+    verifier_ecriture,
 )
 
 

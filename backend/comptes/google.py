@@ -9,10 +9,12 @@ _requete = google_requests.Request(session=cachecontrol.CacheControl(requests.se
 
 
 def verifier(credential):
-    """Vérifie signature, audience, émetteur et expiration du jeton Google."""
-    if not settings.GOOGLE_CLIENT_ID:
+    """Vérifie signature, émetteur et expiration, puis l'audience (parmi nos identifiants client)."""
+    if not settings.GOOGLE_CLIENT_IDS:
         raise ValueError("Google n'est pas configuré.")
-    info = id_token.verify_oauth2_token(credential, _requete, settings.GOOGLE_CLIENT_ID)
+    info = id_token.verify_oauth2_token(credential, _requete)  # sans audience : on la contrôle ci-dessous
+    if info.get("aud") not in settings.GOOGLE_CLIENT_IDS:
+        raise ValueError("Jeton destiné à une autre application.")
     if not info.get("email_verified"):
         raise ValueError("Adresse e-mail Google non vérifiée.")
     return info

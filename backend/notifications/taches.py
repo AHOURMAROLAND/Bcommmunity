@@ -5,6 +5,7 @@ from django.db.models import Count
 from django.utils import timezone
 
 from amis.services import ids_bloques, profils_actifs
+
 from .models import Notification, Preferences
 from .presence import presents
 from .push import pousser

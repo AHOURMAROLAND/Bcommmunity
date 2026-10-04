@@ -9,6 +9,7 @@ import { useProfil } from "../api/hooks";
 import { useAuth } from "../auth/AuthContext";
 import { useTempsReel } from "../temps-reel/TempsReel";
 import Avatar from "./Avatar";
+import { BandeauHorsLigne, BandeauInstallation, MiseAJour } from "./Bandeaux";
 import { SqRoute } from "./Squelettes";
 
 const ONGLETS = [
@@ -49,6 +50,8 @@ export default function Coque() {
 
   return (
     <div className="coque">
+      <BandeauHorsLigne />
+      <MiseAJour />
       {/* ======= Barre laterale Desktop ======= */}
       <aside className="barre-laterale" aria-label="Navigation principale">
         <Link to="/fil" className="sidebar-marque">
@@ -122,6 +125,7 @@ export default function Coque() {
       </main>
 
       {/* ======= Navigation inferieure Mobile ======= */}
+      <BandeauInstallation />
       <nav className="nav-bas" aria-label="Navigation mobile">
         {ONGLETS.map(({ to, label, Icone }) => (
           <NavLink

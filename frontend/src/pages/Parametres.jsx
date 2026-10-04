@@ -6,8 +6,10 @@ import { useMajPreferences, usePreferences } from "../api/notifications";
 import { useAuth } from "../auth/AuthContext";
 import { activerPush, desactiverPush, estIOS, estInstalle, pushActif, pushSupporte } from "../utils/push";
 import { appliquerTheme, themeActuel } from "../utils/theme";
+import useInstallation from "../hooks/useInstallation";
 import { Bouton } from "../components/ui";
 import { SqFormulaire } from "../components/Squelettes";
+import SuppressionCompte from "../components/SuppressionCompte";
 
 const ERREURS_PUSH = {
   non_supporte: "Ce navigateur ne gère pas les notifications.",
@@ -26,6 +28,7 @@ function Interrupteur({ label, valeur, onChange }) {
 
 export default function Parametres() {
   const { deconnexion } = useAuth();
+  const inst = useInstallation();
   const qc = useQueryClient();
   const prefs = usePreferences();
   const maj = useMajPreferences();
@@ -97,6 +100,15 @@ export default function Parametres() {
         {erreur && <p role="alert" className="erreur">{erreur}</p>}
       </div>
 
+      {(inst.peutInstaller || inst.ios) && (
+        <div className="carte" style={{ marginBottom: "1rem" }}>
+          <strong>Installer l'application</strong>
+          {inst.ios
+            ? <p className="doux">Appuyez sur Partager, puis sur « Sur l'écran d'accueil ».</p>
+            : <Bouton onClick={inst.installer}>Installer sur cet appareil</Bouton>}
+        </div>
+      )}
+
       <h2 style={{ fontSize: "1.05rem" }}>Utilisateurs bloqués</h2>
       {bloques.isPending ? <SqFormulaire champs={1} /> : (bloques.data ?? []).length === 0 ? (
         <p className="doux">Vous n'avez bloqué personne.</p>
@@ -110,6 +122,9 @@ export default function Parametres() {
           ))}
         </ul>
       )}
+
+      <h2 style={{ fontSize: "1.05rem", marginTop: "1.5rem" }}>Mon compte</h2>
+      <SuppressionCompte />
 
       <div style={{ marginTop: "1.5rem" }}><Bouton secondaire onClick={deconnexion}>Se déconnecter</Bouton></div>
       <ChargementLong actif={occupe} label="Activation des notifications..." />

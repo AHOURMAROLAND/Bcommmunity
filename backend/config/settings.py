@@ -7,6 +7,22 @@ import dj_database_url
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+# Chargement automatique du fichier .env s'il existe
+for _env_fichier in (BASE_DIR.parent / ".env", BASE_DIR / ".env"):
+    if _env_fichier.is_file():
+        try:
+            with open(_env_fichier, "r", encoding="utf-8") as _f:
+                for _ligne in _f:
+                    _ligne = _ligne.strip()
+                    if _ligne and not _ligne.startswith("#") and "=" in _ligne:
+                        _cle, _, _val = _ligne.partition("=")
+                        _cle, _val = _cle.strip(), _val.strip().strip("'\"")
+                        if _cle and _cle not in os.environ:
+                            os.environ[_cle] = _val
+            break
+        except Exception:
+            pass
+
 
 def env(nom, defaut=None, requis=False):
     valeur = os.environ.get(nom, defaut)
@@ -264,3 +280,16 @@ VAPID_PUBLIC_KEY    = env("VAPID_PUBLIC_KEY", "")
 VAPID_PRIVATE_KEY   = env("VAPID_PRIVATE_KEY", "")
 VAPID_ADMIN_EMAIL   = env("VAPID_ADMIN_EMAIL", "admin@bakhita.example")
 FCM_SERVICE_ACCOUNT_JSON = env("FCM_SERVICE_ACCOUNT_JSON", "")
+
+# ---- Google & CORS (M7 Natif & PWA) ----
+from corsheaders.defaults import default_headers  # noqa: E402
+
+GOOGLE_CLIENT_IDS = [c for c in env("GOOGLE_CLIENT_IDS", env("GOOGLE_CLIENT_ID", "")).split(",") if c]
+CORS_ALLOW_HEADERS = (*default_headers, "x-client")
+CORS_ALLOWED_ORIGINS = [
+    o for o in env(
+        "CORS_ALLOWED_ORIGINS",
+        "http://localhost:5173,http://127.0.0.1:5173,https://localhost,capacitor://localhost"
+    ).split(",") if o
+]
+CORS_ALLOW_CREDENTIALS = True

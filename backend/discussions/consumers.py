@@ -12,6 +12,7 @@ from rest_framework_simplejwt.tokens import AccessToken
 
 from comptes.models import User
 from notifications.presence import marquer_present, retirer_presence
+
 from .services import autres_de, envoyer_message, marquer_lu
 
 presence = sync_to_async(marquer_present)

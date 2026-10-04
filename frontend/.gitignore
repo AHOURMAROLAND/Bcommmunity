@@ -22,3 +22,10 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Mobile Android secrets & env
+*.jks
+google-services.json
+.env
+.env.native
+

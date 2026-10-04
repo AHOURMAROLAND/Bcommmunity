@@ -6,6 +6,7 @@ from django.db.models import F
 from django.utils import timezone
 
 from amis.services import ids_bloques
+
 from .models import Notification, Preferences
 from .presence import presents
 from .push import pousser

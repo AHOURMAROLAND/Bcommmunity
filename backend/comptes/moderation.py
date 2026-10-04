@@ -6,6 +6,7 @@ from rest_framework_simplejwt.token_blacklist.models import BlacklistedToken, Ou
 
 from discussions.services import diffuser
 from notifications.services import evenement, lancer
+
 from .models import Suspension
 from .taches import notifier_avertissement, notifier_suspension
 

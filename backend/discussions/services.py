@@ -11,6 +11,7 @@ from rest_framework.exceptions import NotFound, PermissionDenied, ValidationErro
 from amis.services import ids_bloques, profils_actifs
 from notifications.services import evenement, lancer
 from notifications.taches import pousser_message
+
 from .models import Conversation, InvitationDiscussion, Message, Participant
 
 logger = logging.getLogger(__name__)

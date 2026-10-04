@@ -7,6 +7,7 @@ from django.utils.html import format_html, format_html_join
 from comptes import moderation
 from comptes.moderation import MOTIFS_PUBLICS
 from publications.models import Publication
+
 from .models import Signalement
 
 OUVERTS = ["nouveau", "en_cours"]

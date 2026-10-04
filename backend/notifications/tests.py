@@ -3,6 +3,7 @@ from django.core.cache import cache
 
 from amis.tests import api, membre
 from publications.models import Publication
+
 from . import push
 from .models import Notification, Preferences, PushAbonnement
 from .services import notifier, texte

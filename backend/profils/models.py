@@ -1,5 +1,7 @@
 from django.core.validators import MinValueValidator
 from django.db import models
+from django.db.models.signals import post_delete
+from django.dispatch import receiver
 
 from comptes.models import User
 
@@ -86,3 +88,11 @@ class SituationActuelle(models.Model):
 
     def __str__(self):
         return f"Situation de {self.profil.user}"
+
+
+@receiver(post_delete, sender=Profil)
+def supprimer_photos(sender, instance, **kwargs):
+    for f in (instance.photo, instance.photo_s):
+        if f:
+            f.delete(save=False)
+

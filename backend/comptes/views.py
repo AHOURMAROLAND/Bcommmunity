@@ -7,7 +7,7 @@ from django.utils.encoding import force_bytes
 from django.utils.http import urlsafe_base64_encode
 from google.auth.exceptions import GoogleAuthError
 from rest_framework import generics, serializers, status
-from rest_framework.exceptions import AuthenticationFailed, PermissionDenied
+from rest_framework.exceptions import AuthenticationFailed, PermissionDenied, ValidationError
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -43,17 +43,22 @@ def poser_cookie(reponse, refresh):
         samesite=settings.REFRESH_COOKIE_SAMESITE, path=CHEMIN_COOKIE)
 
 
-def reponse_connexion(user):
+def natif(request):
+    return request.headers.get("X-Client") == "natif"
+
+
+def reponse_connexion(user, nat=False):
     refresh = RefreshToken.for_user(user)
-    rep = Response({"access": str(refresh.access_token),
-                    "utilisateur": UtilisateurSerializer(user).data})
+    corps = {"access": str(refresh.access_token), "utilisateur": UtilisateurSerializer(user).data}
+    if nat:  # application Android : le jeton de session est stocké dans le Keystore, pas dans un cookie
+        return Response({**corps, "refresh": str(refresh)})
+    rep = Response(corps)
     poser_cookie(rep, refresh)
     return rep
 
 
 class PublicView(APIView):
     permission_classes = [AllowAny]
-    authentication_classes = []
 
 
 class InscriptionView(generics.CreateAPIView):
@@ -76,7 +81,7 @@ class ConnexionView(PublicView):
     def post(self, request):
         ser = ConnexionSerializer(data=request.data)
         ser.is_valid(raise_exception=True)
-        return reponse_connexion(ser.validated_data["user"])
+        return reponse_connexion(ser.validated_data["user"], natif(request))
 
 
 class GoogleView(PublicView):
@@ -118,7 +123,7 @@ class GoogleView(PublicView):
                 user.email_verifie = True
             user.save(update_fields=["google_sub", "email_verifie", "password"])
         verifier_acces(user)  # non validé, suspendu ou banni : 403 avec code
-        return reponse_connexion(user)
+        return reponse_connexion(user, natif(request))
 
 
 def envoyer_lien_reinitialisation(user):
@@ -169,8 +174,9 @@ class RafraichirView(PublicView):
     throttle_scope = "connexion"
 
     def post(self, request):
-        brut = request.COOKIES.get(COOKIE)
-        if not brut:
+        nat = natif(request)
+        brut = request.data.get("refresh") if nat else request.COOKIES.get(COOKIE)
+        if not isinstance(brut, str) or not brut:
             raise AuthenticationFailed("Session expirée.")
         try:
             user = User.objects.get(pk=RefreshToken(brut)["user_id"])
@@ -179,20 +185,48 @@ class RafraichirView(PublicView):
             ser.is_valid(raise_exception=True)
         except (TokenError, User.DoesNotExist):
             raise AuthenticationFailed("Session expirée.")
-        rep = Response({"access": ser.validated_data["access"]})
-        if "refresh" in ser.validated_data:
-            poser_cookie(rep, ser.validated_data["refresh"])
+        corps = {"access": ser.validated_data["access"]}
+        nouveau = ser.validated_data.get("refresh")
+        if nouveau and nat:
+            corps["refresh"] = nouveau
+        rep = Response(corps)
+        if nouveau and not nat:
+            poser_cookie(rep, nouveau)
         return rep
 
 
 class DeconnexionView(PublicView):
     def post(self, request):
-        brut = request.COOKIES.get(COOKIE)
-        if brut:
+        brut = request.data.get("refresh") if natif(request) else request.COOKIES.get(COOKIE)
+        if isinstance(brut, str) and brut:
             try:
                 RefreshToken(brut).blacklist()
             except TokenError:
                 pass
+        rep = Response(status=status.HTTP_204_NO_CONTENT)
+        rep.delete_cookie(COOKIE, path=CHEMIN_COOKIE)
+        return rep
+
+
+class SupprimerCompteView(APIView):
+    """Droit à l'effacement : supprime le compte et tout ce qui lui appartient (exigé par Google Play)."""
+    throttle_scope = "connexion"
+
+    def delete(self, request):
+        user = request.user
+        if user.is_staff:
+            raise PermissionDenied("Un compte administrateur ne peut pas être supprimé ici.")
+        if user.has_usable_password():
+            if not user.check_password(str(request.data.get("password") or "")):
+                raise ValidationError({"password": "Mot de passe incorrect."})
+        else:  # compte créé avec Google : nouvelle confirmation Google obligatoire
+            try:
+                info = google_service.verifier(str(request.data.get("credential") or ""))
+            except (ValueError, GoogleAuthError):
+                raise ValidationError({"credential": "Confirmation Google refusée."})
+            if info.get("sub") != user.google_sub:
+                raise ValidationError({"credential": "Ce n'est pas le compte Google lié."})
+        user.delete()
         rep = Response(status=status.HTTP_204_NO_CONTENT)
         rep.delete_cookie(COOKIE, path=CHEMIN_COOKIE)
         return rep

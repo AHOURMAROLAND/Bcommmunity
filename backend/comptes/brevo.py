@@ -5,6 +5,7 @@ In development (BREVO_SMTP_LOGIN not set), falls back to Django's configured
 EMAIL_BACKEND (console by default), so no real emails are sent.
 """
 import logging
+import re
 import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
@@ -14,17 +15,25 @@ from django.conf import settings
 logger = logging.getLogger(__name__)
 
 
-def send_smtp(to: str, subject: str, html: str) -> None:
-    """Send a transactional HTML email via Brevo SMTP or fall back to Django's email backend."""
+def send_smtp(to: str, subject: str, html: str, plain: str | None = None) -> None:
+    """Send a transactional HTML email via Brevo SMTP or fall back to Django's email backend.
+
+    Args:
+        to: Recipient email address.
+        subject: Email subject.
+        html: HTML email body.
+        plain: Plain-text fallback. If None, basic HTML stripping is used (suitable only when
+               the URL is visible as text in the HTML body, not hidden in href attributes).
+    """
     login = getattr(settings, "BREVO_SMTP_LOGIN", "") or ""
     password = getattr(settings, "BREVO_SMTP_PASSWORD", "") or ""
+
+    if plain is None:
+        plain = re.sub(r"<[^>]+>", "", html).strip()
 
     if not login:
         # Dev fallback: use Django's mail backend (console in dev)
         from django.core.mail import send_mail
-        # Strip basic HTML tags for plain-text fallback
-        import re
-        plain = re.sub(r"<[^>]+>", "", html).strip()
         send_mail(subject, plain, settings.DEFAULT_FROM_EMAIL, [to], html_message=html,
                   fail_silently=False)
         return
@@ -33,6 +42,7 @@ def send_smtp(to: str, subject: str, html: str) -> None:
     msg["Subject"] = subject
     msg["From"] = settings.DEFAULT_FROM_EMAIL
     msg["To"] = to
+    msg.attach(MIMEText(plain, "plain", "utf-8"))
     msg.attach(MIMEText(html, "html", "utf-8"))
 
     with smtplib.SMTP("smtp-relay.brevo.com", 587) as server:
@@ -45,6 +55,12 @@ def send_smtp(to: str, subject: str, html: str) -> None:
 def envoyer_otp(email: str, prenom: str, code: str) -> None:
     """Send the 6-digit OTP verification email."""
     subject = "Votre code de vérification — Bakhita Community"
+    plain = (
+        f"Bonjour {prenom},\n\n"
+        f"Voici votre code de vérification Bakhita Community : {code}\n"
+        f"Il est valable 10 minutes.\n\n"
+        f"Si vous n'êtes pas à l'origine de cette demande, ignorez ce message."
+    )
     html = f"""<!DOCTYPE html>
 <html lang="fr">
 <head><meta charset="UTF-8"><title>{subject}</title></head>
@@ -88,7 +104,7 @@ def envoyer_otp(email: str, prenom: str, code: str) -> None:
 </body>
 </html>"""
     try:
-        send_smtp(email, subject, html)
+        send_smtp(email, subject, html, plain=plain)
     except Exception:
         logger.exception("Échec d'envoi du code OTP à %s", email)
 
@@ -96,6 +112,13 @@ def envoyer_otp(email: str, prenom: str, code: str) -> None:
 def envoyer_reinitialisation(email: str, prenom: str, lien: str) -> None:
     """Send the password reset link email."""
     subject = "Réinitialisation de votre mot de passe — Bakhita Community"
+    # Plain-text body explicitly includes the link so tests and email clients can parse it
+    plain = (
+        f"Bonjour {prenom},\n\n"
+        f"Pour choisir un nouveau mot de passe, ouvrez ce lien (valable 1 heure) :\n"
+        f"{lien}\n\n"
+        f"Si vous n'êtes pas à l'origine de cette demande, ignorez ce message."
+    )
     html = f"""<!DOCTYPE html>
 <html lang="fr">
 <head><meta charset="UTF-8"><title>{subject}</title></head>
@@ -142,6 +165,6 @@ def envoyer_reinitialisation(email: str, prenom: str, lien: str) -> None:
 </body>
 </html>"""
     try:
-        send_smtp(email, subject, html)
+        send_smtp(email, subject, html, plain=plain)
     except Exception:
         logger.exception("Échec d'envoi du lien de réinitialisation à %s", email)

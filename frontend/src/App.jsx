@@ -11,6 +11,7 @@ const Connexion       = lazy(() => import("./pages/Connexion"));
 const Inscription     = lazy(() => import("./pages/Inscription"));
 const MotDePasseOublie = lazy(() => import("./pages/MotDePasseOublie"));
 const Reinitialiser   = lazy(() => import("./pages/Reinitialiser"));
+const VerifierOTP     = lazy(() => import("./pages/VerifierOTP"));
 const EnAttente       = lazy(() => import("./pages/EnAttente"));
 const Onboarding      = lazy(() => import("./pages/Onboarding"));
 const PageSuppression = lazy(() => import("./pages/PageSuppression"));
@@ -60,6 +61,7 @@ export default function App() {
           {/* Pages publiques */}
           <Route path="/connexion"         element={<Invite><Connexion /></Invite>} />
           <Route path="/inscription"       element={<Invite><Inscription /></Invite>} />
+          <Route path="/verifier-email"    element={<Invite><VerifierOTP /></Invite>} />
           <Route path="/mot-de-passe-oublie" element={<Invite><MotDePasseOublie /></Invite>} />
           <Route path="/reinitialiser"     element={<Reinitialiser />} />
           <Route path="/en-attente"        element={<EnAttente />} />

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { api } from "../api/client";
 import { Bouton, Champ, Marque, Selecteur } from "../components/ui";
 import { erreursChamps, tousMessages } from "../api/erreurs";
@@ -9,6 +9,7 @@ import ChargementLong from "@/components/ChargementLong";
 const VIDE = { prenom: "", nom: "", email: "", statut: "eleve", password: "", confirmation: "" };
 
 export default function Inscription() {
+  const navigate = useNavigate();
   const [f, setF] = useState(VIDE);
   const [accepte, setAccepte] = useState(false);
   const [erreurs, setErreurs] = useState({});
@@ -43,7 +44,11 @@ export default function Inscription() {
         body: { prenom: f.prenom.trim(), nom: f.nom.trim(), email: f.email.trim(),
                 statut: f.statut, password: f.password },
       });
-      setTermine(true);
+      if (f.email.trim()) {
+        navigate(`/verifier-email?email=${encodeURIComponent(f.email.trim())}`);
+      } else {
+        setTermine(true);
+      }
     } catch (err) {
       const champs = erreursChamps(err);
       const connus = ["prenom", "nom", "email", "password", "statut"];

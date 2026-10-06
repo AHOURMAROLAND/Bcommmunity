@@ -4,7 +4,7 @@ COPY package.json package-lock.json ./
 RUN --mount=type=cache,target=/root/.npm \
     npm ci --fetch-retries=5 --fetch-retry-factor=2 \
       --fetch-retry-mintimeout=10000 --fetch-retry-maxtimeout=120000 \
-      --fetch-timeout=300000
+      --fetch-timeout=300000 --ignore-scripts
 COPY . .
 ARG VITE_GOOGLE_CLIENT_ID
 ARG VITE_ADMIN_URL

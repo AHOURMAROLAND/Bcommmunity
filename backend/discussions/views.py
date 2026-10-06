@@ -1,7 +1,7 @@
 import json
 
 from django.db import transaction
-from django.db.models import Count, F, OuterRef, Subquery
+from django.db.models import Count, F, OuterRef, Prefetch, Subquery
 from django.db.models.functions import Coalesce
 from django.utils import timezone
 from rest_framework.exceptions import NotFound, PermissionDenied, ValidationError
@@ -11,16 +11,27 @@ from rest_framework.views import APIView
 
 from amis.services import ids_bloques
 
-from .models import InvitationDiscussion, Message, Participant, ReactionMessage
+from .models import (
+    InvitationDiscussion,
+    Message,
+    MessageFavori,
+    Participant,
+    ReactionMessage,
+)
 from .services import (
     accepter,
     contexte,
+    definir_epingle,
+    definir_favori,
     diffuser,
     envoyer_message,
     inviter,
     marquer_lu,
+    modifier_message,
     resume,
     serialiser_message,
+    supprimer_message,
+    transferer_message,
     verifier_ecriture,
 )
 
@@ -149,6 +160,8 @@ class CompteursView(APIView):
                    .filter(conversation__participants__user=moi,
                            id__gt=F("conversation__participants__dernier_lu"))
                    .exclude(auteur=moi)
+                   .exclude(masques__user=moi)
+                   .exclude(supprime_pour_tous=True)
                    .exclude(conversation__participants__user_id__in=bloques)
                    .count())
         return Response({"invitations": inv, "non_lus": non_lus})
@@ -158,11 +171,15 @@ class ConversationsView(APIView):
     def get(self, request):
         moi = request.user
         bloques = ids_bloques(moi)
-        dernier = Message.objects.filter(conversation=OuterRef("conversation")).order_by("-id")
+        dernier = (Message.objects.filter(conversation=OuterRef("conversation"))
+                   .exclude(masques__user=moi)
+                   .order_by("-id"))
         non_lus = (Message.objects
                    .filter(conversation=OuterRef("conversation"),
                            id__gt=OuterRef("dernier_lu"))
                    .exclude(auteur=OuterRef("user"))
+                   .exclude(masques__user=moi)
+                   .exclude(supprime_pour_tous=True)
                    .order_by()
                    .values("conversation")
                    .annotate(n=Count("id"))
@@ -173,6 +190,8 @@ class ConversationsView(APIView):
                   d_texte=Subquery(dernier.values("texte")[:1]),
                   d_auteur=Subquery(dernier.values("auteur_id")[:1]),
                   d_date=Subquery(dernier.values("cree_le")[:1]),
+                  d_type=Subquery(dernier.values("type")[:1]),
+                  d_supprime=Subquery(dernier.values("supprime_pour_tous")[:1]),
                   nb=Coalesce(Subquery(non_lus), 0),
               )
               .order_by("-conversation__dernier_message_le", "-pk"))
@@ -194,8 +213,13 @@ class ConversationsView(APIView):
                 "id": p.conversation_id,
                 "autre": resume(a.user),
                 "non_lus": p.nb,
-                "dernier": {"texte": p.d_texte, "auteur": p.d_auteur, "cree_le": str(p.d_date)}
-                if p.d_texte else None,
+                "dernier": {
+                    "texte": p.d_texte,
+                    "auteur": p.d_auteur,
+                    "cree_le": str(p.d_date),
+                    "type": p.d_type,
+                    "supprime_pour_tous": p.d_supprime,
+                } if p.d_date else None,
             })
         return pag.get_paginated_response(items)
 
@@ -237,8 +261,16 @@ class MessagesView(APIView):
             raise NotFound()
         pag = PaginationMessages()
         qs = (Message.objects.filter(conversation_id=pk)
+              .exclude(masques__user=request.user)
               .select_related("en_reponse_a", "auteur")
-              .prefetch_related("reactions"))
+              .prefetch_related(
+                  "reactions",
+                  Prefetch(
+                      "favoris",
+                      queryset=MessageFavori.objects.filter(user=request.user),
+                      to_attr="_favoris_moi",
+                  ),
+              ))
         page = pag.paginate_queryset(qs, request, view=self)
         return pag.get_paginated_response([
             serialiser_message(m, user_id=request.user.pk) for m in page
@@ -303,6 +335,80 @@ class MessagesMediaView(APIView):
             en_reponse_a_id=entier_optionnel(
                 request.data.get("en_reponse_a_id"), "en_reponse_a_id", minimum=1
             ),
+        )
+        transaction.on_commit(lambda: diffuser(ids, data))
+        return Response(data["message"], status=201)
+
+
+class MessageActionView(APIView):
+    def get_throttles(self):
+        if self.request.method == "PATCH":
+            self.throttle_scope = "message"
+        return super().get_throttles()
+
+    def patch(self, request, pk, msg_id):
+        data, ids = modifier_message(
+            request.user, pk, msg_id, request.data.get("texte"),
+        )
+        transaction.on_commit(lambda: diffuser(ids, data))
+        return Response(data["message"])
+
+    def delete(self, request, pk, msg_id):
+        # Legacy endpoint retained for existing clients.
+        pour = request.query_params.get("pour", "moi")
+        if pour not in ("moi", "tous"):
+            raise ValidationError({"pour": "Utilisez 'moi' ou 'tous'."})
+        data, ids = supprimer_message(
+            request.user, pk, msg_id, pour_tous=pour == "tous",
+        )
+        if data is not None:
+            transaction.on_commit(lambda: diffuser(ids, data))
+        return Response(status=204)
+
+
+class MessageSuppressionView(APIView):
+    def post(self, request, pk, msg_id):
+        portee = request.data.get("portee", "moi")
+        if portee not in ("moi", "tous"):
+            raise ValidationError({"portee": "Utilisez 'moi' ou 'tous'."})
+        data, ids = supprimer_message(
+            request.user, pk, msg_id, pour_tous=portee == "tous",
+        )
+        if data is not None:
+            transaction.on_commit(lambda: diffuser(ids, data))
+        return Response(status=204)
+
+
+class MessageFavoriView(APIView):
+    def post(self, request, pk, msg_id):
+        result = definir_favori(request.user, pk, msg_id, True)
+        return Response(result, status=201 if result["created"] else 200)
+
+    def delete(self, request, pk, msg_id):
+        definir_favori(request.user, pk, msg_id, False)
+        return Response(status=204)
+
+
+class MessageEpingleView(APIView):
+    def post(self, request, pk, msg_id):
+        data, ids = definir_epingle(request.user, pk, msg_id, True)
+        transaction.on_commit(lambda: diffuser(ids, data))
+        return Response({"epingle": True})
+
+    def delete(self, request, pk, msg_id):
+        data, ids = definir_epingle(request.user, pk, msg_id, False)
+        transaction.on_commit(lambda: diffuser(ids, data))
+        return Response(status=204)
+
+
+class MessageTransfertView(APIView):
+    def get_throttles(self):
+        self.throttle_scope = "message"
+        return super().get_throttles()
+
+    def post(self, request, pk, msg_id):
+        data, ids = transferer_message(
+            request.user, pk, msg_id, request.data.get("conversation_id"),
         )
         transaction.on_commit(lambda: diffuser(ids, data))
         return Response(data["message"], status=201)

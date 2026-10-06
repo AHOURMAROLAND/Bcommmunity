@@ -92,6 +92,13 @@ class Message(models.Model):
     forme_onde   = models.JSONField(default=list, blank=True)
     client_id    = models.CharField(max_length=40, blank=True, default="")
     en_reponse_a = models.ForeignKey("self", null=True, blank=True, on_delete=models.SET_NULL, related_name="reponses")
+    message_origine = models.ForeignKey(
+        "self", null=True, blank=True, on_delete=models.SET_NULL, related_name="transferts"
+    )
+    modifie_le = models.DateTimeField(null=True, blank=True)
+    transfere = models.BooleanField(default=False)
+    supprime_pour_tous = models.BooleanField(default=False)
+    epingle = models.BooleanField(default=False)
     cree_le      = models.DateTimeField(default=timezone.now)
 
     class Meta:
@@ -125,3 +132,31 @@ class ReactionMessage(models.Model):
 
     def __str__(self):
         return f"{self.user} {self.emoji} sur {self.message_id}"
+
+
+class MessageFavori(models.Model):
+    message = models.ForeignKey(Message, related_name="favoris", on_delete=models.CASCADE)
+    user = models.ForeignKey(U, related_name="messages_favoris", on_delete=models.CASCADE)
+    cree_le = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["message", "user"], name="message_favori_unique"),
+        ]
+        indexes = [
+            models.Index(fields=["user", "-cree_le"], name="msgfav_user_created_idx"),
+        ]
+
+
+class MessageMasque(models.Model):
+    message = models.ForeignKey(Message, related_name="masques", on_delete=models.CASCADE)
+    user = models.ForeignKey(U, related_name="messages_masques", on_delete=models.CASCADE)
+    cree_le = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["message", "user"], name="message_masque_unique"),
+        ]
+        indexes = [
+            models.Index(fields=["user", "message"], name="msgmask_user_msg_idx"),
+        ]

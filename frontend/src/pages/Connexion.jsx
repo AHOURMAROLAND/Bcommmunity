@@ -1,16 +1,19 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { Eye, EyeOff } from "lucide-react";
 import { useAuth } from "../auth/AuthContext";
 import { Bouton, Champ, Marque } from "../components/ui";
 import { tousMessages } from "../api/erreurs";
 import AccesGoogle from "../components/AccesGoogle";
 import ChargementLong from "@/components/ChargementLong";
+import "./Connexion.css";
 
 export default function Connexion() {
   const { connexion } = useAuth();
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [passwordVisible, setPasswordVisible] = useState(false);
   const [erreur, setErreur] = useState("");
   const [envoi, setEnvoi] = useState(false);
 
@@ -45,8 +48,20 @@ export default function Connexion() {
           <form onSubmit={soumettre} noValidate>
             <Champ label="Adresse e-mail" type="email" autoComplete="username" required
               value={email} onChange={(e) => setEmail(e.target.value)} />
-            <Champ label="Mot de passe" type="password" autoComplete="current-password" required
-              value={password} onChange={(e) => setPassword(e.target.value)} />
+            <div className="connexion-mot-de-passe">
+              <Champ label="Mot de passe" type={passwordVisible ? "text" : "password"}
+                autoComplete="current-password" required
+                value={password} onChange={(e) => setPassword(e.target.value)} />
+              <button
+                className="connexion-mot-de-passe-toggle"
+                type="button"
+                aria-label={passwordVisible ? "Masquer le mot de passe" : "Afficher le mot de passe"}
+                aria-pressed={passwordVisible}
+                onClick={() => setPasswordVisible((visible) => !visible)}
+              >
+                {passwordVisible ? <EyeOff size={20} aria-hidden="true" /> : <Eye size={20} aria-hidden="true" />}
+              </button>
+            </div>
             {erreur && <p role="alert" className="erreur" style={{ marginBottom: "1rem" }}>{erreur}</p>}
             <Bouton type="submit" chargement={envoi}>Se connecter</Bouton>
           </form>

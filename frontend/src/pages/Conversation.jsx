@@ -2,12 +2,13 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import {
-  ArrowLeft, Check, CheckCheck, ExternalLink, File as FileIcon, Flag, Link2,
-  Mic, MoreHorizontal, Paperclip, Pause, Play, Reply, Send, Smile, Timer, Trash2, X,
+  ArrowLeft, Check, CheckCheck, Copy, ExternalLink, File as FileIcon, Flag, Forward,
+  Link2, Mic, MoreHorizontal, Paperclip, Pause, Pencil, Pin, Play, Reply,
+  Send, Smile, Star, Timer, Trash2, X,
 } from "lucide-react";
 import { api } from "../api/client";
 import { estErreurReseau } from "../api/stockage-hors-ligne";
-import { useConversation, useMessages } from "../api/discussions";
+import { useConversation, useConversations, useMessages } from "../api/discussions";
 import { useAuth } from "../auth/AuthContext";
 import { majMessage, useTempsReel } from "../temps-reel/TempsReel";
 import Avatar from "../components/Avatar";
@@ -165,6 +166,7 @@ export default function Conversation() {
   const { utilisateur } = useAuth();
   const { envoyer, abonner, mettreEnFile } = useTempsReel();
   const conv = useConversation(id);
+  const conversations = useConversations();
   const msgs = useMessages(id);
 
   const [texte, setTexte] = useState("");
@@ -177,15 +179,28 @@ export default function Conversation() {
   const [enregistrementPause, setEnregistrementPause] = useState(false);
   const [dureeEnregistrement, setDureeEnregistrement] = useState(0);
   const [envoiVocal, setEnvoiVocal] = useState(false);
+  const envoiVocalRef = useRef(false);
   const [analyseOnde, setAnalyseOnde] = useState(false);
   const [niveauxEnregistrement, setNiveauxEnregistrement] = useState(
     Array.from({ length: 48 }, () => 0.04),
   );
   const [reactionOuverte, setReactionOuverte] = useState(null);
+  const [menuMessage, setMenuMessage] = useState(null);
+  const [editionMessage, setEditionMessage] = useState(null);
+  const [texteEdition, setTexteEdition] = useState("");
+  const [suppressionMessage, setSuppressionMessage] = useState(null);
+  const [transfertMessage, setTransfertMessage] = useState(null);
+  const [conversationCible, setConversationCible] = useState("");
+  const [actionMessageEnCours, setActionMessageEnCours] = useState(false);
   const [imagePleinEcran, setImagePleinEcran] = useState(null);
   const [erreurEnvoi, setErreurEnvoi] = useState("");
+  const [maintenant, setMaintenant] = useState(null);
 
   const fil = useRef(null);
+  const saisieTexte = useRef(null);
+  const glissementMessage = useRef(null);
+  const annulerClicGlissement = useRef(false);
+  const minuterieClicGlissement = useRef(0);
   const hauteurAvant = useRef(0);
   const dernierLu = useRef(0);
   const dernierTyping = useRef(0);
@@ -223,6 +238,10 @@ export default function Conversation() {
   const [luAutreWS, setLuAutreWS] = useState(0);
   const luAutre = Math.max(luAutreWS, conv.data?.dernier_lu_autre ?? 0);
 
+  useEffect(() => {
+    if (enReponseA) saisieTexte.current?.focus();
+  }, [enReponseA]);
+
   useEffect(() => abonner((d) => {
     if (String(d.conversation) !== id) return;
     if (d.type === "typing") {
@@ -242,6 +261,12 @@ export default function Conversation() {
     }
   }), [abonner, id, utilisateur.id]);
   useEffect(() => () => clearTimeout(minuterie.current), []);
+  useEffect(() => {
+    const actualiser = () => setMaintenant(Date.now());
+    actualiser();
+    const intervalle = setInterval(actualiser, 60_000);
+    return () => clearInterval(intervalle);
+  }, []);
   useEffect(() => {
     if (!fichierChoisi?.preview) return undefined;
     return () => URL.revokeObjectURL(fichierChoisi.preview);
@@ -433,6 +458,9 @@ export default function Conversation() {
   }
 
   async function envoyerVocal(selection) {
+    if (envoiVocalRef.current) return;
+    envoiVocalRef.current = true;
+    setEnvoiVocal(true);
     const contenu = texte.trim();
     const cid = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     const date = new Date().toISOString();
@@ -485,6 +513,7 @@ export default function Conversation() {
         majMessage(qc, id, { id: cid, cid, statut: "echec" });
         setErreurEnvoi(err.message || "Le message vocal n'a pas pu être enregistré hors ligne.");
       } finally {
+        envoiVocalRef.current = false;
         setEnvoiVocal(false);
       }
       return;
@@ -510,6 +539,7 @@ export default function Conversation() {
       majMessage(qc, id, { id: cid, cid, statut: "echec" });
       setErreurEnvoi(err.message || "Le message vocal n'a pas pu être envoyé.");
     } finally {
+      envoiVocalRef.current = false;
       setEnvoiVocal(false);
     }
   }
@@ -580,10 +610,12 @@ export default function Conversation() {
           abandonnerVocal.current = false;
           return;
         }
-        setFichierChoisi(selection);
-        if (envoyerApresArret.current) {
-          envoyerApresArret.current = false;
+        const envoyerMaintenant = envoyerApresArret.current;
+        envoyerApresArret.current = false;
+        if (envoyerMaintenant) {
           await envoyerVocal(selection);
+        } else {
+          setFichierChoisi(selection);
         }
       };
       recorder.start();
@@ -617,6 +649,7 @@ export default function Conversation() {
 
   async function envoyerMessage(e) {
     e?.preventDefault();
+    if (envoiVocalRef.current) return;
     const contenu = texte.trim();
     if (!contenu && !fichierChoisi) return;
     if (analyseOnde) {
@@ -746,6 +779,82 @@ export default function Conversation() {
     }
   }
 
+  async function actionMessage(message, action, method = "POST", body) {
+    if (typeof message.id !== "number" || actionMessageEnCours) return;
+    setActionMessageEnCours(true);
+    setErreurEnvoi("");
+    try {
+      await api(
+        `/conversations/${id}/messages/${message.id}/${action}/`,
+        { method, ...(body ? { body } : {}) },
+      );
+      setMenuMessage(null);
+      await qc.invalidateQueries({ queryKey: ["messages", String(id)] });
+      return true;
+    } catch (err) {
+      setErreurEnvoi(err.message || "L’action sur le message a échoué.");
+      return null;
+    } finally {
+      setActionMessageEnCours(false);
+    }
+  }
+
+  async function copierMessage(message) {
+    if (!message.texte) return;
+    try {
+      await navigator.clipboard.writeText(message.texte);
+      setMenuMessage(null);
+      setErreurEnvoi("");
+    } catch (err) {
+      setErreurEnvoi(err.message || "Impossible de copier ce message.");
+    }
+  }
+
+  function commencerEdition(message) {
+    setEditionMessage(message);
+    setTexteEdition(message.texte || "");
+    setMenuMessage(null);
+  }
+
+  async function enregistrerEdition(event) {
+    event.preventDefault();
+    const texteModifie = texteEdition.trim();
+    if (!texteModifie || !editionMessage) return;
+    const resultat = await actionMessage(
+      editionMessage,
+      "modifier",
+      "PATCH",
+      { texte: texteModifie },
+    );
+    if (resultat) setEditionMessage(null);
+  }
+
+  async function supprimerMessage(portee) {
+    if (!suppressionMessage) return;
+    const resultat = await actionMessage(
+      suppressionMessage,
+      "suppression",
+      "POST",
+      { portee },
+    );
+    if (resultat) setSuppressionMessage(null);
+  }
+
+  async function transfererMessage(event) {
+    event.preventDefault();
+    if (!transfertMessage || !conversationCible) return;
+    const resultat = await actionMessage(
+      transfertMessage,
+      "transferer",
+      "POST",
+      { conversation_id: Number(conversationCible) },
+    );
+    if (resultat) {
+      setTransfertMessage(null);
+      setConversationCible("");
+    }
+  }
+
   if (conv.isError) {
     return (
       <div className="chat">
@@ -815,7 +924,15 @@ export default function Conversation() {
           <Sq key={i} w={`${w}%`} h="2.4rem" r="1.1rem"
             style={{ alignSelf: i % 2 ? "flex-end" : "flex-start" }} />
         ))}
-        {!msgs.isPending && liste.length === 0 && (
+        {msgs.isError && (
+          <div className="chat-erreur-chargement" role="alert">
+            <p>Les messages n’ont pas pu être chargés. Vérifiez votre connexion et réessayez.</p>
+            <Bouton secondaire chargement={msgs.isFetching} onClick={() => msgs.refetch()}>
+              Réessayer
+            </Bouton>
+          </div>
+        )}
+        {!msgs.isPending && !msgs.isError && liste.length === 0 && (
           <div className="chat-vide">
             <span>👋</span>
             <strong>Votre conversation commence ici</strong>
@@ -839,6 +956,7 @@ export default function Conversation() {
                   <div className="message-entete">
                     <strong>{moi ? "Vous" : `${autre?.prenom ?? ""} ${autre?.nom ?? ""}`}</strong>
                     <time>{m.cree_le && heure(m.cree_le)}</time>
+                    {m.modifie_le && <small className="message-modifie">modifié</small>}
                     {moi && (
                       m.statut === "echec"
                         ? <span className="message-echec" aria-label="Échec de l'envoi">!</span>
@@ -851,7 +969,74 @@ export default function Conversation() {
                             : <Check size={14} className="message-coche" aria-label="Envoyé" />
                     )}
                   </div>
-                  <div className={`message-contenu${moi ? " sortant" : ""}`}>
+                  <div
+                    className={`message-contenu${moi ? " sortant" : ""}${typeof m.id === "number" && !m.supprime_pour_tous ? " message-cliquable" : ""}`}
+                    onClickCapture={(event) => {
+                      if (!annulerClicGlissement.current) return;
+                      event.preventDefault();
+                      event.stopPropagation();
+                      annulerClicGlissement.current = false;
+                      clearTimeout(minuterieClicGlissement.current);
+                    }}
+                    onClick={(event) => {
+                      if (typeof m.id !== "number" || m.supprime_pour_tous) return;
+                      if (event.target instanceof Element && event.target.closest("a, button, audio, input, textarea, select")) return;
+                      setMenuMessage((actuel) => actuel === m.id ? null : m.id);
+                    }}
+                    onContextMenu={(event) => {
+                      if (typeof m.id !== "number" || m.supprime_pour_tous) return;
+                      event.preventDefault();
+                      setMenuMessage(m.id);
+                    }}
+                    onTouchStart={(event) => {
+                      if (event.target instanceof Element && event.target.closest("a, audio, .message-actions, .message-menu, .reaction-choix")) {
+                        glissementMessage.current = null;
+                        return;
+                      }
+                      const toucher = event.changedTouches[0];
+                      glissementMessage.current = { id: m.id, x: toucher.clientX, y: toucher.clientY };
+                    }}
+                    onTouchEnd={(event) => {
+                      const debut = glissementMessage.current;
+                      glissementMessage.current = null;
+                      if (!debut || debut.id !== m.id || typeof m.id !== "number") return;
+                      const toucher = event.changedTouches[0];
+                      const dx = toucher.clientX - debut.x;
+                      const dy = toucher.clientY - debut.y;
+                      if (Math.abs(dx) > 55 && Math.abs(dx) > Math.abs(dy) * 1.25) {
+                        annulerClicGlissement.current = true;
+                        clearTimeout(minuterieClicGlissement.current);
+                        minuterieClicGlissement.current = setTimeout(() => {
+                          annulerClicGlissement.current = false;
+                        }, 500);
+                        setMenuMessage(null);
+                        setEnReponseA(m);
+                      }
+                    }}
+                  >
+                    {m.transfere && (
+                      <div className="message-transfere"><Forward size={13} /> Transféré</div>
+                    )}
+                    {m.supprime_pour_tous ? (
+                      <p className="message-supprime">Ce message a été supprimé.</p>
+                    ) : editionMessage?.id === m.id ? (
+                      <form className="message-edition" onSubmit={enregistrerEdition}>
+                        <textarea
+                          aria-label="Modifier le message"
+                          maxLength={2000}
+                          value={texteEdition}
+                          onChange={(event) => setTexteEdition(event.target.value)}
+                          autoFocus
+                        />
+                        <div>
+                          <button type="button" onClick={() => setEditionMessage(null)}>Annuler</button>
+                          <button type="submit" disabled={actionMessageEnCours || !texteEdition.trim()}>
+                            Enregistrer
+                          </button>
+                        </div>
+                      </form>
+                    ) : (
+                      <>
                     {m.en_reponse_a && (
                       <div className="message-citation">
                         <strong>{m.en_reponse_a.auteur_id === utilisateur.id ? "Vous" : autre?.prenom}</strong>
@@ -861,9 +1046,9 @@ export default function Conversation() {
                     {(m.type === "image" && m.fichier_url) ? (
                       <div className="image-message">
                         <button type="button" onClick={() => setImagePleinEcran(m.fichier_url)} aria-label="Afficher l'image en plein écran">
-                          <img src={m.fichier_url} alt={m.nom_fichier || "Image partagée"} loading="lazy" />
+                          <img src={m.fichier_url} alt="Image partagée" loading="lazy" />
                         </button>
-                        {m.nom_fichier && <small>{m.nom_fichier} · {tailleLisible(m.taille_fichier)}</small>}
+                        <small>{tailleLisible(m.taille_fichier)}</small>
                       </div>
                     ) : m.type === "vocal" && m.fichier_url ? (
                       <BulleVocale message={m} moi={moi} />
@@ -873,8 +1058,12 @@ export default function Conversation() {
                       <TexteMessage texte={m.texte || ""} />
                     )}
                     {m.type !== "texte" && m.texte && <p className="message-legende">{m.texte}</p>}
+                      </>
+                    )}
                   </div>
                   <div className="message-bas">
+                    {m.epingle && <span className="message-indicateur" title="Message épinglé"><Pin size={13} /></span>}
+                    {m.favori && <span className="message-indicateur" title="Dans vos favoris"><Star size={13} /></span>}
                     {(m.reactions ?? []).map((reaction) => (
                       <button
                         key={reaction.emoji}
@@ -887,9 +1076,6 @@ export default function Conversation() {
                       </button>
                     ))}
                     <div className="message-actions">
-                      <button type="button" aria-label="Répondre au message" onClick={() => setEnReponseA(m)}>
-                        <Reply size={15} />
-                      </button>
                       <button
                         type="button"
                         aria-label="Ajouter une réaction"
@@ -898,6 +1084,70 @@ export default function Conversation() {
                       >
                         <Smile size={15} />
                       </button>
+                      {typeof m.id === "number" && !m.supprime_pour_tous && (
+                        <div className="message-menu">
+                          {menuMessage === m.id && (
+                            <div className="menu-contextuel" role="menu" aria-label="Actions du message">
+                              <button
+                                type="button"
+                                className="menu-item"
+                                role="menuitem"
+                                onClick={() => { setMenuMessage(null); setEnReponseA(m); }}
+                              >
+                                <Reply size={14} /> Répondre
+                              </button>
+                              {m.texte && (
+                                <button type="button" className="menu-item" role="menuitem" onClick={() => copierMessage(m)}>
+                                  <Copy size={14} /> Copier
+                                </button>
+                              )}
+                              <button
+                                type="button"
+                                className="menu-item"
+                                role="menuitem"
+                                onClick={() => actionMessage(m, "favori", m.favori ? "DELETE" : "POST")}
+                              >
+                                <Star size={14} /> {m.favori ? "Retirer des favoris" : "Ajouter aux favoris"}
+                              </button>
+                              <button
+                                type="button"
+                                className="menu-item"
+                                role="menuitem"
+                                onClick={() => actionMessage(m, "epingler", m.epingle ? "DELETE" : "POST")}
+                              >
+                                <Pin size={14} /> {m.epingle ? "Désépingler" : "Épingler"}
+                              </button>
+                              <button
+                                type="button"
+                                className="menu-item"
+                                role="menuitem"
+                                onClick={() => {
+                                  setMenuMessage(null);
+                                  setTransfertMessage(m);
+                                }}
+                              >
+                                <Forward size={14} /> Transférer
+                              </button>
+                              {moi && maintenant !== null && maintenant - new Date(m.cree_le).getTime() <= 15 * 60 * 1000 && !m.supprime_pour_tous && (
+                                <button type="button" className="menu-item" role="menuitem" onClick={() => commencerEdition(m)}>
+                                  <Pencil size={14} /> Modifier
+                                </button>
+                              )}
+                              <button
+                                type="button"
+                                className="menu-item danger"
+                                role="menuitem"
+                                onClick={() => {
+                                  setMenuMessage(null);
+                                  setSuppressionMessage(m);
+                                }}
+                              >
+                                <Trash2 size={14} /> Supprimer
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                     {reactionOuverte === m.id && (
                       <div className="reaction-choix" role="group" aria-label="Choisir une réaction">
@@ -938,7 +1188,7 @@ export default function Conversation() {
               {enReponseA && (
                 <div className="saisie-citation">
                   <Reply size={16} />
-                  <span><strong>Réponse à {enReponseA.auteur === utilisateur.id ? "vous" : autre?.prenom}</strong><small>{enReponseA.texte || enReponseA.nom_fichier || "Pièce jointe"}</small></span>
+                  <span><strong>Réponse à {enReponseA.auteur === utilisateur.id ? "vous" : autre?.prenom}</strong><small>{enReponseA.texte || (enReponseA.type === "image" ? "Photo" : enReponseA.type === "vocal" ? "Message vocal" : "Pièce jointe")}</small></span>
                   <button type="button" aria-label="Annuler la réponse" onClick={() => setEnReponseA(null)}><X size={16} /></button>
                 </div>
               )}
@@ -947,7 +1197,7 @@ export default function Conversation() {
                   {fichierChoisi.preview
                     ? <img src={fichierChoisi.preview} alt="Aperçu du fichier à envoyer" />
                     : <FileIcon size={20} />}
-                  <span>{fichierChoisi.file.name}<small>{tailleLisible(fichierChoisi.file.size)}</small></span>
+                  <span>{fichierChoisi.preview ? "Image" : fichierChoisi.file.name}<small>{tailleLisible(fichierChoisi.file.size)}</small></span>
                   <button type="button" aria-label="Retirer la pièce jointe" onClick={() => setFichierChoisi(null)}><X size={16} /></button>
                 </div>
               )}
@@ -1022,6 +1272,7 @@ export default function Conversation() {
                 <Paperclip size={19} />
               </button>
               <textarea
+                ref={saisieTexte}
                 className="champ"
                 rows={1}
                 maxLength={2000}
@@ -1045,7 +1296,7 @@ export default function Conversation() {
                 type="submit"
                 className="saisie-envoi"
                 aria-label="Envoyer"
-                disabled={analyseOnde || (!texte.trim() && !fichierChoisi)}
+                disabled={envoiVocal || analyseOnde || (!texte.trim() && !fichierChoisi)}
               >
                 <Send size={18} />
               </button>
@@ -1055,7 +1306,67 @@ export default function Conversation() {
           {erreurEnvoi && <p role="alert" className="erreur saisie-erreur">{erreurEnvoi}</p>}
         </form>
       )}
-      {imagePleinEcran && (
+        {suppressionMessage && (
+          <div className="message-dialog-fond" role="presentation" onMouseDown={(event) => {
+            if (event.target === event.currentTarget) setSuppressionMessage(null);
+          }}>
+            <section className="message-dialog" role="dialog" aria-modal="true" aria-labelledby="suppression-titre">
+              <h2 id="suppression-titre">Supprimer le message ?</h2>
+              <p>Choisissez où ce message doit être supprimé.</p>
+              <button type="button" className="menu-item" disabled={actionMessageEnCours} onClick={() => supprimerMessage("moi")}>
+                Supprimer pour moi
+              </button>
+              {suppressionMessage.auteur === utilisateur.id && (
+                <button type="button" className="menu-item danger" disabled={actionMessageEnCours} onClick={() => supprimerMessage("tous")}>
+                  Supprimer pour tout le monde
+                </button>
+              )}
+              <button type="button" className="menu-item" onClick={() => setSuppressionMessage(null)}>Annuler</button>
+            </section>
+          </div>
+        )}
+        {transfertMessage && (
+          <div className="message-dialog-fond" role="presentation" onMouseDown={(event) => {
+            if (event.target === event.currentTarget) setTransfertMessage(null);
+          }}>
+            <form className="message-dialog" role="dialog" aria-modal="true" aria-labelledby="transfert-titre" onSubmit={transfererMessage}>
+              <h2 id="transfert-titre">Transférer le message</h2>
+              <label htmlFor="transfert-conversation">Choisir une conversation</label>
+              <select
+                id="transfert-conversation"
+                required
+                value={conversationCible}
+                onChange={(event) => setConversationCible(event.target.value)}
+              >
+                <option value="">Sélectionner…</option>
+                {(conversations.data?.pages.flatMap((page) => page.results) ?? [])
+                  .filter((item) => String(item.id) !== String(id))
+                  .map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.autre.prenom} {item.autre.nom}
+                    </option>
+                  ))}
+              </select>
+              {conversations.hasNextPage && (
+                  <button
+                    type="button"
+                    className="menu-item"
+                    disabled={conversations.isFetchingNextPage}
+                    onClick={() => conversations.fetchNextPage()}
+                  >
+                    {conversations.isFetchingNextPage ? "Chargement…" : "Charger plus de conversations"}
+                  </button>
+              )}
+              <div className="message-dialog-actions">
+                <button type="button" className="menu-item" onClick={() => setTransfertMessage(null)}>Annuler</button>
+                <button type="submit" className="menu-item" disabled={actionMessageEnCours || !conversationCible}>
+                  Transférer
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
+        {imagePleinEcran && (
         <div className="visionneuse" role="dialog" aria-modal="true" aria-label="Aperçu de l'image" onClick={() => setImagePleinEcran(null)}>
           <button type="button" className="puce" aria-label="Fermer l'image" onClick={() => setImagePleinEcran(null)}><X size={22} /></button>
           <img src={imagePleinEcran} alt="Image partagée en plein écran" onClick={(event) => event.stopPropagation()} />

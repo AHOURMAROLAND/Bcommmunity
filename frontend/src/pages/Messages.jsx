@@ -49,7 +49,16 @@ function Conversations() {
                     ? "Enregistre un message vocal…"
                     : activites[String(c.id)]?.type === "texte"
                       ? "Écrit…"
-                      : c.dernier?.texte ?? "Nouvelle conversation"}
+                      : c.dernier
+                        ? c.dernier.supprime_pour_tous
+                          ? "Message supprimé"
+                          : c.dernier.texte || (
+                            c.dernier.type === "image" ? "Photo"
+                              : c.dernier.type === "vocal" ? "Message vocal"
+                                : c.dernier.type === "fichier" ? "Fichier joint"
+                                  : "Nouvelle conversation"
+                          )
+                        : "Nouvelle conversation"}
                 </div>
               </div>
               <div style={{ textAlign: "right", flexShrink: 0 }}>

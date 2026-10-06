@@ -12,12 +12,21 @@ from amis.services import ids_bloques, profils_actifs
 from notifications.services import evenement, lancer
 from notifications.taches import pousser_message
 
-from .models import Conversation, InvitationDiscussion, Message, Participant, ReactionMessage
+from .models import (
+    Conversation,
+    InvitationDiscussion,
+    Message,
+    MessageFavori,
+    MessageMasque,
+    Participant,
+    ReactionMessage,
+)
 
 logger = logging.getLogger(__name__)
 DELAI_REFUS = timedelta(days=7)
 MAX_EN_ATTENTE = 10
 MAX_TEXTE = 2000
+DELAI_MODIFICATION = timedelta(minutes=15)
 
 
 def cle(a, b):
@@ -67,18 +76,33 @@ def serialiser_message(m, cid=None, user_id=None):
             "texte": (m.en_reponse_a.texte or "")[:80],
             "auteur_id": m.en_reponse_a.auteur_id,
         }
+    supprime = m.supprime_pour_tous
+    favoris = getattr(m, "_favoris_moi", None)
+    favori = bool(favoris) if favoris is not None else (
+        MessageFavori.objects.filter(message=m, user_id=user_id).exists()
+        if user_id is not None else False
+    )
     return {
         "id": m.pk,
         "auteur": m.auteur_id,
-        "texte": m.texte,
+        "texte": "" if supprime else m.texte,
         "type": m.type,
-        "fichier_url": m.fichier.url if m.fichier else None,
-        "nom_fichier": m.nom_fichier,
-        "taille_fichier": m.taille_fichier,
-        "duree_vocale": m.duree_vocale,
-        "forme_onde": m.forme_onde or [],
+        "fichier_url": m.fichier.url if m.fichier and not supprime else None,
+        "nom_fichier": "" if supprime else m.nom_fichier,
+        "taille_fichier": None if supprime else m.taille_fichier,
+        "duree_vocale": None if supprime else m.duree_vocale,
+        "forme_onde": [] if supprime else (m.forme_onde or []),
         "en_reponse_a": reponse,
-        "reactions": serialiser_reactions(m, user_id) if user_id is not None else [],
+        "reactions": (
+            serialiser_reactions(m, user_id)
+            if user_id is not None and not supprime else []
+        ),
+        "modifie_le": m.modifie_le.isoformat() if m.modifie_le else None,
+        "transfere": m.transfere,
+        "message_origine_id": m.message_origine_id,
+        "supprime_pour_tous": supprime,
+        "epingle": m.epingle,
+        "favori": favori,
         "cree_le": m.cree_le.isoformat(),
         "cid": cid or m.client_id or None,
     }
@@ -273,6 +297,159 @@ def envoyer_message(user, conv_id, texte="", cid=None, type="texte", fichier=Non
     }
     transaction.on_commit(lambda: lancer(pousser_message, m.pk))
     return data, [user.pk, *autres]
+
+
+def _message_action(user, conv_id, msg_id):
+    _, autres = contexte(user, conv_id)
+    if set(autres) & ids_bloques(user):
+        raise NotFound()
+    message = (
+        Message.objects.filter(pk=msg_id, conversation_id=conv_id)
+        .exclude(masques__user=user)
+        .first()
+    )
+    if message is None:
+        raise NotFound()
+    return message, autres
+
+
+def modifier_message(user, conv_id, msg_id, texte):
+    message, autres = _message_action(user, conv_id, msg_id)
+    if not isinstance(texte, str):
+        raise ValidationError({"texte": "Texte invalide."})
+    texte = texte.strip()
+    if message.type == Message.Type.TEXTE and not texte:
+        raise ValidationError({"texte": "Message vide."})
+    if len(texte) > MAX_TEXTE:
+        raise ValidationError({"texte": "Message trop long."})
+    with transaction.atomic():
+        message = Message.objects.select_for_update().get(pk=message.pk)
+        if message.auteur_id != user.pk:
+            raise PermissionDenied("Vous ne pouvez modifier que vos propres messages.")
+        if message.supprime_pour_tous:
+            raise NotFound()
+        maintenant = timezone.now()
+        if maintenant > message.cree_le + DELAI_MODIFICATION:
+            raise ValidationError({"detail": "Le délai de modification de 15 minutes est dépassé."})
+        message.texte = texte
+        message.modifie_le = maintenant
+        message.save(update_fields=["texte", "modifie_le"])
+        data = {
+            "type": "message.modifie",
+            "conversation": conv_id,
+            "message": serialiser_message(message, user_id=user.pk),
+        }
+    return data, [user.pk, *autres]
+
+
+def supprimer_message(user, conv_id, msg_id, pour_tous=False):
+    message, autres = _message_action(user, conv_id, msg_id)
+    with transaction.atomic():
+        message = Message.objects.select_for_update().get(pk=message.pk)
+        if message.supprime_pour_tous:
+            raise NotFound()
+        if pour_tous:
+            if message.auteur_id != user.pk:
+                raise PermissionDenied("Vous ne pouvez supprimer que vos propres messages pour tous.")
+            message.texte = ""
+            message.fichier = ""
+            message.nom_fichier = ""
+            message.taille_fichier = None
+            message.duree_vocale = None
+            message.forme_onde = []
+            message.supprime_pour_tous = True
+            message.epingle = False
+            message.save(update_fields=[
+                "texte", "fichier", "nom_fichier", "taille_fichier",
+                "duree_vocale", "forme_onde", "supprime_pour_tous", "epingle",
+            ])
+            ReactionMessage.objects.filter(message=message).delete()
+            event = {
+                "type": "message.supprime_pour_tous",
+                "conversation": conv_id,
+                "message": serialiser_message(message, user_id=user.pk),
+            }
+            ids = [user.pk, *autres]
+        else:
+            MessageMasque.objects.get_or_create(message=message, user=user)
+            event = None
+            ids = [user.pk]
+    return event, ids
+
+
+def definir_favori(user, conv_id, msg_id, actif):
+    message, _ = _message_action(user, conv_id, msg_id)
+    if message.supprime_pour_tous:
+        raise NotFound()
+    if actif:
+        _, created = MessageFavori.objects.get_or_create(message=message, user=user)
+        return {"favori": True, "created": created}
+    MessageFavori.objects.filter(message=message, user=user).delete()
+    return {"favori": False, "created": False}
+
+
+def definir_epingle(user, conv_id, msg_id, actif):
+    message, autres = _message_action(user, conv_id, msg_id)
+    with transaction.atomic():
+        Conversation.objects.select_for_update().get(pk=conv_id)
+        message = Message.objects.select_for_update().get(pk=message.pk)
+        if message.supprime_pour_tous:
+            raise NotFound()
+        if actif:
+            Message.objects.filter(
+                conversation_id=conv_id, epingle=True,
+            ).exclude(pk=message.pk).update(epingle=False)
+        Message.objects.filter(pk=message.pk).update(epingle=actif)
+    return {
+        "type": "message.epingle",
+        "conversation": conv_id,
+        "message_id": message.pk,
+        "epingle": actif,
+    }, [user.pk, *autres]
+
+
+def transferer_message(user, conv_id, msg_id, destination_id):
+    source, _ = _message_action(user, conv_id, msg_id)
+    try:
+        destination_id = int(destination_id)
+    except (TypeError, ValueError):
+        raise ValidationError({"conversation": "Conversation invalide."})
+    if destination_id == conv_id:
+        raise ValidationError({"conversation": "Choisissez une autre conversation."})
+    _, autres_destination = contexte(user, destination_id)
+    if set(autres_destination) & ids_bloques(user):
+        raise NotFound()
+    verifier_ecriture(user, autres_destination)
+    with transaction.atomic():
+        source = Message.objects.select_for_update().get(pk=source.pk)
+        if source.supprime_pour_tous:
+            raise NotFound()
+        transfert = Message.objects.create(
+            conversation_id=destination_id,
+            auteur=user,
+            texte=source.texte,
+            type=source.type,
+            fichier=source.fichier.name if source.fichier else "",
+            nom_fichier=source.nom_fichier,
+            taille_fichier=source.taille_fichier,
+            duree_vocale=source.duree_vocale,
+            forme_onde=source.forme_onde or [],
+            transfere=True,
+            message_origine=source,
+        )
+        Conversation.objects.filter(pk=destination_id).update(
+            dernier_message_le=transfert.cree_le,
+        )
+        Participant.objects.filter(
+            conversation_id=destination_id, user=user,
+        ).update(dernier_lu=transfert.pk)
+        data = {
+            "type": "message.nouveau",
+            "conversation": destination_id,
+            "message": serialiser_message(transfert, user_id=user.pk),
+        }
+    transaction.on_commit(lambda: lancer(pousser_message, transfert.pk))
+    return data, [user.pk, *autres_destination]
 
 
 def marquer_lu(user, conv_id, jusqua):

@@ -165,6 +165,12 @@ export function TempsReelProvider({ children }) {
         invalider(qc, "conversations", "compteurs-disc");
       } else if (d.type === "reaction.maj") {
         qc.invalidateQueries({ queryKey: ["messages", String(d.conversation)] });
+      } else if (
+        d.type === "message.modifie" ||
+        d.type === "message.supprime_pour_tous" ||
+        d.type === "message.epingle"
+      ) {
+        qc.invalidateQueries({ queryKey: ["messages", String(d.conversation)] });
       } else if (d.type === "message.lu") {
         qc.invalidateQueries({ queryKey: ["conversation", String(d.conversation)] });
         invalider(qc, "conversations", "compteurs-disc");

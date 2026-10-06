@@ -262,9 +262,11 @@ REST_FRAMEWORK = {
         "publier": "20/hour", "commenter": "60/hour", "like": "120/min", "photo": "10/hour",
         "invitation": "20/hour", "message": "120/min",
         "push": "20/hour",
+        "push_reply": "20/min",
         "signalement": "10/hour",
         "otp_envoyer": "3/hour",
         "otp_verifier": "10/hour",
+        "link_preview": "30/hour",
     },
 }
 

@@ -1,16 +1,18 @@
 import json
 
+import urllib3
 from django.db import transaction
 from django.db.models import Count, F, OuterRef, Prefetch, Subquery
 from django.db.models.functions import Coalesce
 from django.utils import timezone
-from rest_framework.exceptions import NotFound, PermissionDenied, ValidationError
+from rest_framework.exceptions import APIException, NotFound, PermissionDenied, ValidationError
 from rest_framework.pagination import CursorPagination, PageNumberPagination
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from amis.services import ids_bloques
 
+from .apercu_lien import lire_apercu
 from .models import (
     InvitationDiscussion,
     Message,
@@ -36,6 +38,25 @@ from .services import (
 )
 
 TAILLE_MAX_MEDIA = 10 * 1024 * 1024
+
+
+class ApercuLienView(APIView):
+    throttle_scope = "link_preview"
+
+    def get(self, request):
+        url = request.query_params.get("url", "")
+        if not url:
+            raise ValidationError({"url": "Un lien est obligatoire."})
+        try:
+            return Response(lire_apercu(url))
+        except (OSError, TimeoutError, urllib3.exceptions.HTTPError) as erreur:
+            raise ApercuIndisponible() from erreur
+
+
+class ApercuIndisponible(APIException):
+    status_code = 502
+    default_detail = "Impossible de charger l’aperçu de ce lien."
+    default_code = "apercu_indisponible"
 EXTENSIONS_INTERDITES = {".bat", ".com", ".exe", ".htm", ".html", ".js", ".msi", ".svg"}
 
 
@@ -407,11 +428,26 @@ class MessageTransfertView(APIView):
         return super().get_throttles()
 
     def post(self, request, pk, msg_id):
+        destination = request.data.get("conversation_ids")
+        if destination is None:
+            destination = request.data.get("conversation_id")
         data, ids = transferer_message(
-            request.user, pk, msg_id, request.data.get("conversation_id"),
+            request.user,
+            pk,
+            msg_id,
+            destination,
+            client_id=request.data.get("cid"),
         )
-        transaction.on_commit(lambda: diffuser(ids, data))
-        return Response(data["message"], status=201)
+        evenements = data.pop("_evenements", None)
+        if evenements is None:
+            transaction.on_commit(lambda: diffuser(ids, data))
+            return Response(data["message"], status=201)
+        for evenement, destinataires in evenements:
+            transaction.on_commit(
+                lambda evenement=evenement, destinataires=destinataires:
+                    diffuser(destinataires, evenement)
+            )
+        return Response(data, status=201)
 
 
 class ReactionView(APIView):
@@ -432,11 +468,36 @@ class ReactionView(APIView):
         emoji = str(request.data.get("emoji") or "").strip()
         if not emoji or len(emoji) > 8:
             raise ValidationError({"emoji": "Réaction invalide."})
-        message = self._message(pk, msg_id, request.user)
-        obj, created = ReactionMessage.objects.get_or_create(message=message, user=request.user, emoji=emoji)
-        data = {"type": "reaction.maj", "conversation": pk, "message_id": msg_id, "emoji": emoji, "created": created}
-        transaction.on_commit(lambda: diffuser([*autres, request.user.pk], data))
-        return Response({"emoji": emoji, "created": created}, status=201 if created else 200)
+        self._message(pk, msg_id, request.user)
+        with transaction.atomic():
+            Message.objects.select_for_update().get(pk=msg_id, conversation_id=pk)
+            actuelle = (
+                ReactionMessage.objects.select_for_update()
+                .filter(message_id=msg_id, user=request.user)
+                .first()
+            )
+            remplace = actuelle.emoji if actuelle and actuelle.emoji != emoji else None
+            created = actuelle is None
+            if actuelle is None:
+                ReactionMessage.objects.create(
+                    message_id=msg_id, user=request.user, emoji=emoji,
+                )
+            elif remplace:
+                actuelle.emoji = emoji
+                actuelle.save(update_fields=["emoji"])
+            data = {
+                "type": "reaction.maj",
+                "conversation": pk,
+                "message_id": msg_id,
+                "emoji": emoji,
+                "remplace": remplace,
+                "created": created,
+            }
+            transaction.on_commit(lambda: diffuser([*autres, request.user.pk], data))
+        return Response(
+            {"emoji": emoji, "created": created, "remplace": remplace},
+            status=201 if created else 200,
+        )
 
     def delete(self, request, pk, msg_id):
         _, autres = contexte(request.user, pk)
@@ -446,7 +507,9 @@ class ReactionView(APIView):
         if not emoji or len(emoji) > 8:
             raise ValidationError({"emoji": "Réaction invalide."})
         self._message(pk, msg_id, request.user)
-        n = ReactionMessage.objects.filter(message_id=msg_id, user=request.user, emoji=emoji).delete()[0]
+        n = ReactionMessage.objects.filter(
+            message_id=msg_id, user=request.user, emoji=emoji,
+        ).delete()[0]
         data = {"type": "reaction.maj", "conversation": pk, "message_id": msg_id, "emoji": emoji, "deleted": n}
         transaction.on_commit(lambda: diffuser([*autres, request.user.pk], data))
         return Response(status=204)

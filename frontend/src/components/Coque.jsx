@@ -12,6 +12,7 @@ import Avatar from "./Avatar";
 import BoutonRetour from "./BoutonRetour";
 import { BandeauHorsLigne, BandeauInstallation, BandeauSynchronisation, MiseAJour } from "./Bandeaux";
 import { SqRoute } from "./Squelettes";
+import { LogoApp } from "./ui";
 
 const ONGLETS = [
   { to: "/fil",      label: "Fil",      Icone: Home },
@@ -58,15 +59,7 @@ export default function Coque() {
       {/* ======= Barre laterale Desktop ======= */}
       <aside className="barre-laterale" aria-label="Navigation principale">
         <Link to="/fil" className="sidebar-marque">
-          <picture>
-            <source srcSet="/icon-dark.jpg" media="(prefers-color-scheme: dark)" />
-            <img
-              src="/icon-light.jpg"
-              alt="Bakhita Community"
-              width="40" height="40"
-              style={{ borderRadius: "0.6rem", flexShrink: 0 }}
-            />
-          </picture>
+          <LogoApp taille={40} style={{ borderRadius: "0.6rem", flexShrink: 0 }} />
           <span style={{ display: "flex", flexDirection: "column" }}>
             <span className="titre-bakhita">Bakhita</span>
             <span className="titre-community">Community</span>

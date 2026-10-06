@@ -10,5 +10,6 @@ urlpatterns = [
     path("push/cle/",    views.PushCleView.as_view()),
     path("push/web/",    views.PushWebView.as_view()),
     path("push/fcm/",    views.PushFcmView.as_view()),
+    path("push/reply/",  views.PushReponseView.as_view()),
     path("push/",        views.PushRetirerView.as_view()),
 ]

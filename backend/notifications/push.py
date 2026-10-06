@@ -71,10 +71,6 @@ def _envoyer_fcm(a, charge):
             messaging.Message(
                 token=a.cible,
                 data={k: str(v) for k, v in charge.items()},
-                notification=messaging.Notification(
-                    title=charge.get("titre", "Bakhita"),
-                    body=charge.get("corps", ""),
-                ),
                 android=messaging.AndroidConfig(
                     priority="high",
                     collapse_key=charge.get("tag"),

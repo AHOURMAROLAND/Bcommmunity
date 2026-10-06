@@ -6,7 +6,8 @@ L'application permet aux lyceens actuels et aux anciens eleves de :
 - Retrouver leurs camarades de classe grace a l'historique de leur parcours scolaire.
 - Suivre les parcours professionnels et universitaires des anciens eleves.
 - Publier des articles et actualites visibles par la communaute avec partage Open Graph.
-- Echanger par messagerie instantanee apres acceptation d'une invitation de discussion.
+- Echanger par messagerie instantanee apres acceptation d'une invitation, avec transfert vers jusqu'a cinq conversations et apercus Open Graph des liens.
+- Utiliser une barre de navigation mobile coherente avec les themes clair et sombre.
 - Garantir un environnement securise avec validation administrative des comptes et moderation via le Django admin.
 
 ---
@@ -93,7 +94,31 @@ docker compose ps
 ```
 Le cache npm BuildKit est conserve entre les essais. Si `ECONNRESET` persiste, verifiez la connexion/proxy configure dans Docker Desktop, puis relancez `docker compose build web`; les commandes `exec` ne fonctionneront qu'apres que le service `api` soit demarre.
 
-Cette configuration est destinee au developpement local : `SECURE_SSL_REDIRECT` est desactive et le port HTTP 8080 n'est pas chiffre. Ne l'exposez pas directement sur Internet. Pour une mise en production publique, configurez TLS et des secrets robustes dans un environnement gere hors du depot.
+Par defaut, cette configuration est destinee au developpement local : `SECURE_SSL_REDIRECT` est desactive. Pour une mise en production publique, adaptez les variables ci-dessous et placez un proxy TLS de confiance devant le port web.
+
+### Deploiement public derriere un proxy TLS
+
+1. Dans `.env`, remplacez `DJANGO_SECRET_KEY` et `DB_PASSWORD` par des valeurs fortes et uniques. Gardez ce fichier hors du depot et limitez-en l'acces. `DB_PASSWORD` doit rester alphanumerique car Compose l'integre a `DATABASE_URL`.
+2. Configurez les domaines publics et activez la redirection HTTPS :
+```dotenv
+ALLOWED_HOSTS=community.example.org
+CORS_ALLOWED_ORIGINS=https://community.example.org
+CSRF_TRUSTED_ORIGINS=https://community.example.org
+SITE_URL=https://community.example.org
+FRONTEND_URL=https://community.example.org
+SECURE_SSL_REDIRECT=1
+WEB_BIND_ADDRESS=127.0.0.1
+WEB_PORT=8080
+```
+3. Configurez votre proxy TLS pour relayer vers `127.0.0.1:8080`, transmettre l'en-tete `X-Forwarded-Proto` avec la valeur `https`, et autoriser les connexions WebSocket pour `/ws/`. Le Nginx Compose conserve cet en-tete afin que Django reconnaisse la requete HTTPS.
+4. Construisez et demarrez les services :
+```bash
+docker compose up -d --build
+docker compose ps
+docker compose logs --tail=100 api web
+```
+
+Les donnees PostgreSQL et les fichiers media utilisent des volumes Docker persistants. Mettez-les dans une strategie de sauvegarde adaptee avant toute mise a jour; ne lancez pas `docker compose down -v` sur une instance qui contient des donnees.
 
 4. Charger les referentiels de base et creer un compte administrateur :
 ```bash

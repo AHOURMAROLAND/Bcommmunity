@@ -19,6 +19,9 @@ export function appliquerTheme(t) {
     t === "dark" ||
     (t === "auto" && window.matchMedia("(prefers-color-scheme: dark)").matches);
 
+  const couleurNavigateur = document.querySelector('meta[name="theme-color"]');
+  if (couleurNavigateur) couleurNavigateur.content = sombre ? "#08142f" : "#ffffff";
+
   // Synchronise la classe dark-mode pour les composants Untitled UI
   r.classList.toggle("dark-mode", sombre);
 }

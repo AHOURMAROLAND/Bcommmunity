@@ -4,6 +4,7 @@ import { ArrowLeft } from "lucide-react";
 import { useAjouterCommentaire, useCommentaires, usePublication, useSupprimerCommentaire } from "../api/publications";
 import { tousMessages } from "../api/erreurs";
 import { ilYa } from "../utils/date";
+import { afficherToast } from "../utils/toast";
 import Avatar from "../components/Avatar";
 import PublicationCard from "../components/PublicationCard";
 import { Bouton } from "../components/ui";
@@ -40,7 +41,15 @@ export default function PublicationPage() {
     e.preventDefault();
     if (!texte.trim() || ajouter.isPending) return;
     setErreur("");
-    try { await ajouter.mutateAsync(texte.trim()); setTexte(""); } catch (err) { setErreur(tousMessages(err)); }
+    try {
+      await ajouter.mutateAsync(texte.trim());
+      setTexte("");
+      afficherToast("Commentaire publié.", "succes");
+    } catch (err) {
+      const message = tousMessages(err);
+      setErreur(message);
+      afficherToast(message, "erreur");
+    }
   }
 
   return (

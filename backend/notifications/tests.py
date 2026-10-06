@@ -2,10 +2,12 @@ import pytest
 from django.core.cache import cache
 
 from amis.tests import api, membre
+from discussions.models import Conversation, Message, Participant
 from publications.models import Publication
 
 from . import push
 from .models import Notification, Preferences, PushAbonnement
+from .reponse_push import creer_jeton_reponse
 from .services import notifier, texte
 from .taches import annoncer_publication
 
@@ -118,3 +120,57 @@ def test_abonnement_mort_supprime_et_echecs_desactivent(monkeypatch):
     push.pousser([(a.pk, {"titre": "t", "corps": "c"})])
     fragile.refresh_from_db()
     assert fragile.actif is False
+
+
+def test_reponse_push_envoie_un_message_avec_citation():
+    a, b = membre("Alice"), membre("Bob")
+    conversation = Conversation.objects.create()
+    Participant.objects.bulk_create([
+        Participant(conversation=conversation, user=user) for user in (a, b)
+    ])
+    original = Message.objects.create(
+        conversation=conversation, auteur=b, texte="Bonjour !")
+    jeton = creer_jeton_reponse(a.pk, conversation.pk, original.pk)
+
+    reponse = api(a).post(
+        "/api/notifications/push/reply/",
+        {"jeton": jeton, "texte": "Salut !"},
+        format="json",
+    )
+
+    assert reponse.status_code == 201
+    message = Message.objects.get(pk=reponse.data["id"])
+    assert message.auteur == a
+    assert message.texte == "Salut !"
+    assert message.en_reponse_a_id == original.pk
+
+
+def test_reponse_push_refuse_jeton_invalide_et_rejoue():
+    a, b = membre("Alice"), membre("Bob")
+    conversation = Conversation.objects.create()
+    Participant.objects.bulk_create([
+        Participant(conversation=conversation, user=user) for user in (a, b)
+    ])
+    original = Message.objects.create(
+        conversation=conversation, auteur=b, texte="Bonjour !")
+    jeton = creer_jeton_reponse(a.pk, conversation.pk, original.pk)
+
+    invalide = api(a).post(
+        "/api/notifications/push/reply/",
+        {"jeton": "jeton-invalide", "texte": "Salut !"},
+        format="json",
+    )
+    succes = api(a).post(
+        "/api/notifications/push/reply/",
+        {"jeton": jeton, "texte": "Salut !"},
+        format="json",
+    )
+    rejoue = api(a).post(
+        "/api/notifications/push/reply/",
+        {"jeton": jeton, "texte": "Encore !"},
+        format="json",
+    )
+
+    assert invalide.status_code == 403
+    assert succes.status_code == 201
+    assert rejoue.status_code == 403

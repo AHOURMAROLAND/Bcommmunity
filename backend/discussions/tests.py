@@ -12,7 +12,7 @@ from comptes.models import User
 from profils.models import Profil, SituationActuelle
 
 from .consumers import HubConsumer
-from .models import Conversation, Message, Participant
+from .models import Conversation, Message, Participant, ReactionMessage
 
 
 @pytest.fixture
@@ -73,11 +73,28 @@ def test_media_message_reply_reaction_toggle_and_serialization(discussion, setti
 
     reaction_url = f"/api/conversations/{conversation.pk}/messages/{message_id}/reactions/"
     assert client(bob).post(reaction_url, {"emoji": "❤️"}, format="json").status_code == 201
+    remplacement = client(bob).post(
+        reaction_url, {"emoji": "👍"}, format="json",
+    )
+    assert remplacement.status_code == 200
+    assert remplacement.data["remplace"] == "❤️"
+    reactions_bob = ReactionMessage.objects.filter(
+        message_id=message_id, user=bob,
+    )
+    assert reactions_bob.count() == 1
+    assert reactions_bob.get().emoji == "👍"
     messages = client(alice).get(f"/api/conversations/{conversation.pk}/messages/")
     image_message = next(item for item in messages.data["results"] if item["id"] == message_id)
-    assert image_message["reactions"] == [{"emoji": "❤️", "nb": 1, "moi": False}]
+    assert image_message["reactions"] == [{"emoji": "👍", "nb": 1, "moi": False}]
 
-    assert client(alice).delete(reaction_url, {"emoji": "❤️"}, format="json").status_code == 204
+    messages_bob = client(bob).get(f"/api/conversations/{conversation.pk}/messages/")
+    image_message_bob = next(
+        item for item in messages_bob.data["results"] if item["id"] == message_id
+    )
+    assert image_message_bob["reactions"] == [{"emoji": "👍", "nb": 1, "moi": True}]
+    assert client(bob).delete(
+        reaction_url, {"emoji": "👍"}, format="json",
+    ).status_code == 204
 
 
 @pytest.mark.django_db
@@ -318,6 +335,76 @@ def test_forward_rejects_nonparticipant_destination(discussion):
     )
 
     assert response.status_code == 404
+
+
+@pytest.mark.django_db
+def test_forward_batch_limits_five_destinations_and_is_idempotent(discussion):
+    source_conversation, (alice, bob) = discussion
+    source = Message.objects.create(
+        conversation=source_conversation, auteur=bob, texte="À transférer",
+    )
+    destinations = []
+    for _ in range(6):
+        destination = Conversation.objects.create()
+        Participant.objects.bulk_create([
+            Participant(conversation=destination, user=alice),
+            Participant(conversation=destination, user=bob),
+        ])
+        destinations.append(destination.pk)
+    url = f"/api/conversations/{source_conversation.pk}/messages/{source.pk}/transferer/"
+
+    refuse = client(alice).post(
+        url, {"conversation_ids": destinations, "cid": "forward-limit-1"}, format="json")
+    assert refuse.status_code == 400
+    assert not Message.objects.filter(message_origine=source).exists()
+
+    payload = {"conversation_ids": destinations[:5], "cid": "forward-batch-1"}
+    premier = client(alice).post(url, payload, format="json")
+    second = client(alice).post(url, payload, format="json")
+    assert premier.status_code == 201
+    assert second.status_code == 201
+    assert len(premier.data["messages"]) == 5
+    assert [m["id"] for m in second.data["messages"]] == [
+        m["id"] for m in premier.data["messages"]
+    ]
+    assert Message.objects.filter(message_origine=source).count() == 5
+
+
+@pytest.mark.django_db
+def test_link_preview_parses_open_graph_and_rejects_private_hosts(monkeypatch, discussion):
+    from discussions import apercu_lien
+
+    _, (alice, bob) = discussion
+    hote_public = apercu_lien._hote_public
+    monkeypatch.setattr(
+        apercu_lien,
+        "_telecharger_html",
+        lambda url: (
+            '<html><head><meta property="og:title" content="Une page">'
+            '<meta property="og:description" content="Summary">'
+            '<meta property="og:image" content="https://example.com/image.jpg">'
+            "</head></html>",
+            url,
+        ),
+    )
+    monkeypatch.setattr(
+        apercu_lien,
+        "_hote_public",
+        lambda host: "127.0.0.1" if host in {"127.0.0.1", "localhost"} else "93.184.216.34",
+    )
+    preview = client(alice).get(
+        "/api/discussions/apercu-lien/?url=https%3A%2F%2Fexample.com%2Farticle"
+    )
+    monkeypatch.setattr(apercu_lien, "_hote_public", hote_public)
+    blocked = client(bob).get(
+        "/api/discussions/apercu-lien/?url=http%3A%2F%2F127.0.0.1%2Fadmin"
+    )
+
+    assert preview.status_code == 200
+    assert preview.data["titre"] == "Une page"
+    assert preview.data["description"] == "Summary"
+    assert "image" not in preview.data
+    assert blocked.status_code == 400
 
 
 @pytest.mark.asyncio

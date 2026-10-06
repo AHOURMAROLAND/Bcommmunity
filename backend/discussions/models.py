@@ -124,7 +124,7 @@ class ReactionMessage(models.Model):
 
     class Meta:
         constraints = [
-            models.UniqueConstraint(fields=["message", "user", "emoji"], name="reaction_unique"),
+            models.UniqueConstraint(fields=["message", "user"], name="reaction_unique"),
         ]
         indexes = [
             models.Index(fields=["message"]),

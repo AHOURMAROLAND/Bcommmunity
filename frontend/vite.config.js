@@ -26,7 +26,7 @@ export default defineConfig(({ mode }) => {
         id: "/", name: "Bakhita Community", short_name: "Bakhita",
         description: "Le réseau des élèves et anciens élèves de l'école.",
         lang: "fr", start_url: "/", scope: "/", display: "standalone", orientation: "portrait",
-        background_color: "#FFFFFF", theme_color: "#0B1F4B", categories: ["social", "education"],
+        background_color: "#ffffff", theme_color: "#0b1f4b", categories: ["social", "education"],
         icons: [
           { src: "/icons/192.png", sizes: "192x192", type: "image/png" },
           { src: "/icons/512.png", sizes: "512x512", type: "image/png" },
@@ -38,7 +38,12 @@ export default defineConfig(({ mode }) => {
         ],
       },
       injectManifest: {
-        globPatterns: ["**/*.{js,css,html}", "icons/*.png", "**/*-latin-[0-9]*-normal*.woff2"],
+        globPatterns: [
+          "**/*.{js,css,html}",
+          "icons/*.png",
+          "logos/*.jpeg",
+          "**/*-latin-[0-9]*-normal*.woff2",
+        ],
         maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
       },
     })],

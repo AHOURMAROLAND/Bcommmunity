@@ -10,6 +10,7 @@ import {
 } from "../api/publications";
 import { ilYa } from "../utils/date";
 import { partager } from "../utils/partager";
+import { afficherToast } from "../utils/toast";
 import Avatar from "./Avatar";
 import HtmlSur from "./HtmlSur";
 import ImageHD, { ImageZoom } from "./ImageHD";
@@ -23,7 +24,6 @@ export default function PublicationCard({ p, detail = false }) {
   const [nbCom, setNbCom] = useState(p.nb_commentaires);
   const [occupe, setOccupe] = useState(false);
   const [menu, setMenu] = useState(false);
-  const [info, setInfo] = useState("");
   const [signalement, setSignalement] = useState(false);
   const [commentairesOuverts, setCommentairesOuverts] = useState(false);
   const [nouveauCommentaire, setNouveauCommentaire] = useState("");
@@ -49,6 +49,7 @@ export default function PublicationCard({ p, detail = false }) {
     } catch {
       setAime(!suivant);
       setNb((n) => Math.max(0, n + (suivant ? -1 : 1)));
+      afficherToast("Impossible de mettre à jour la réaction.", "erreur");
     } finally {
       setOccupe(false);
     }
@@ -57,8 +58,7 @@ export default function PublicationCard({ p, detail = false }) {
   async function partagerLien() {
     const r = await partager(p);
     if (r === "copie") {
-      setInfo("Lien copié dans le presse-papiers !");
-      setTimeout(() => setInfo(""), 2500);
+      afficherToast("Lien copié dans le presse-papiers !", "succes");
     }
   }
 
@@ -76,8 +76,9 @@ export default function PublicationCard({ p, detail = false }) {
       await ajouterCom.mutateAsync(texte);
       setNouveauCommentaire("");
       setNbCom((n) => n + 1);
-    } catch {
-      // Erreur affichée via formulaire ou toast
+      afficherToast("Commentaire publié.", "succes");
+    } catch (err) {
+      afficherToast(err.message || "Impossible de publier le commentaire.", "erreur");
     }
   }
 
@@ -190,8 +191,6 @@ export default function PublicationCard({ p, detail = false }) {
           <span>Partager</span>
         </button>
       </div>
-
-      {info && <p role="status" className="toast-info">{info}</p>}
 
       {/* Accordéon commentaires en ligne sur le fil */}
       {!detail && commentairesOuverts && (

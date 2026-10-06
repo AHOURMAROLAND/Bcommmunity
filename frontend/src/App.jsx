@@ -7,6 +7,7 @@ import Coque from "./components/Coque";
 import BoutonRetour from "./components/BoutonRetour";
 import { BandeauHorsLigne, BandeauSynchronisation } from "./components/Bandeaux";
 import PontNatif from "./components/PontNatif";
+import ToastViewport from "./components/ToastViewport";
 import { TempsReelProvider } from "./temps-reel/TempsReel";
 
 const Connexion       = lazy(() => import("./pages/Connexion"));
@@ -75,6 +76,7 @@ export default function App() {
   return (
     <>
       <PontNatif />
+      <ToastViewport />
       <Suspense fallback={<SqRoute />}>
         <Routes>
           {/* Pages publiques */}

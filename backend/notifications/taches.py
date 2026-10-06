@@ -1,6 +1,7 @@
 from datetime import timedelta
 
 from celery import shared_task
+from django.conf import settings
 from django.db.models import Count
 from django.utils import timezone
 
@@ -9,6 +10,7 @@ from amis.services import ids_bloques, profils_actifs
 from .models import Notification, Preferences
 from .presence import presents
 from .push import pousser
+from .reponse_push import creer_jeton_reponse
 from .services import livrer, notifier, prefs_de
 
 
@@ -70,14 +72,18 @@ def pousser_message(message_id):
         return
     prefs   = prefs_de(dest)
     absents = set(dest) - presents(dest)
-    charge  = {
+    charge = {
         "titre": f"{m.auteur.prenom} {m.auteur.nom}",
         "corps": "Nouveau message",
         "url":   f"/messages/{m.conversation_id}",
         "tag":   f"conv-{m.conversation_id}",
     }
     pousser([
-        (u, charge) for u in absents
+        (u, {
+            **charge,
+            "reply_url": f"{settings.SITE_URL.rstrip('/')}/api/notifications/push/reply/",
+            "reply_token": creer_jeton_reponse(u, m.conversation_id, m.pk),
+        }) for u in absents
         if prefs[u].push and prefs[u].discussions
     ])
 

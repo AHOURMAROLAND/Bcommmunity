@@ -408,48 +408,88 @@ def definir_epingle(user, conv_id, msg_id, actif):
     }, [user.pk, *autres]
 
 
-def transferer_message(user, conv_id, msg_id, destination_id):
+def transferer_message(user, conv_id, msg_id, destination_id, client_id=None):
     source, _ = _message_action(user, conv_id, msg_id)
-    try:
-        destination_id = int(destination_id)
-    except (TypeError, ValueError):
-        raise ValidationError({"conversation": "Conversation invalide."})
-    if destination_id == conv_id:
-        raise ValidationError({"conversation": "Choisissez une autre conversation."})
-    _, autres_destination = contexte(user, destination_id)
-    if set(autres_destination) & ids_bloques(user):
-        raise NotFound()
-    verifier_ecriture(user, autres_destination)
+    multiple = isinstance(destination_id, list)
+    destinations_brutes = destination_id if multiple else [destination_id]
+    if not destinations_brutes or len(destinations_brutes) > 5:
+        raise ValidationError({"conversations": "Choisissez entre 1 et 5 conversations."})
+    destinations = []
+    for valeur in destinations_brutes:
+        if isinstance(valeur, bool):
+            raise ValidationError({"conversations": "Conversation invalide."})
+        try:
+            valeur = int(valeur)
+        except (TypeError, ValueError):
+            raise ValidationError({"conversations": "Conversation invalide."})
+        if valeur not in destinations:
+            destinations.append(valeur)
+    if len(destinations) != len(destinations_brutes):
+        raise ValidationError({"conversations": "Une conversation ne peut être choisie deux fois."})
+    if conv_id in destinations:
+        raise ValidationError({"conversations": "Choisissez une autre conversation."})
+    if client_id is not None and (
+        not isinstance(client_id, str)
+        or not 1 <= len(client_id) <= 40
+        or not client_id.replace("-", "").isalnum()
+    ):
+        raise ValidationError({"cid": "Identifiant de transfert invalide."})
+    destinataires = {}
+    for destination in destinations:
+        _, autres = contexte(user, destination)
+        verifier_ecriture(user, autres)
+        destinataires[destination] = autres
+
+    evenements = []
     with transaction.atomic():
         source = Message.objects.select_for_update().get(pk=source.pk)
         if source.supprime_pour_tous:
             raise NotFound()
-        transfert = Message.objects.create(
-            conversation_id=destination_id,
-            auteur=user,
-            texte=source.texte,
-            type=source.type,
-            fichier=source.fichier.name if source.fichier else "",
-            nom_fichier=source.nom_fichier,
-            taille_fichier=source.taille_fichier,
-            duree_vocale=source.duree_vocale,
-            forme_onde=source.forme_onde or [],
-            transfere=True,
-            message_origine=source,
-        )
-        Conversation.objects.filter(pk=destination_id).update(
-            dernier_message_le=transfert.cree_le,
-        )
-        Participant.objects.filter(
-            conversation_id=destination_id, user=user,
-        ).update(dernier_lu=transfert.pk)
-        data = {
-            "type": "message.nouveau",
-            "conversation": destination_id,
-            "message": serialiser_message(transfert, user_id=user.pk),
-        }
-    transaction.on_commit(lambda: lancer(pousser_message, transfert.pk))
-    return data, [user.pk, *autres_destination]
+        anciens = {}
+        if client_id:
+            anciens = {
+                message.conversation_id: message
+                for message in Message.objects.filter(
+                    auteur=user,
+                    conversation_id__in=destinations,
+                    client_id=client_id,
+                )
+            }
+        messages = []
+        for destination in destinations:
+            transfert = anciens.get(destination)
+            if transfert is None:
+                transfert = Message.objects.create(
+                    conversation_id=destination,
+                    auteur=user,
+                    texte=source.texte,
+                    type=source.type,
+                    fichier=source.fichier.name if source.fichier else "",
+                    nom_fichier=source.nom_fichier,
+                    taille_fichier=source.taille_fichier,
+                    duree_vocale=source.duree_vocale,
+                    forme_onde=source.forme_onde or [],
+                    client_id=client_id or "",
+                    transfere=True,
+                    message_origine=source,
+                )
+                Conversation.objects.filter(pk=destination).update(
+                    dernier_message_le=transfert.cree_le,
+                )
+                Participant.objects.filter(
+                    conversation_id=destination, user=user,
+                ).update(dernier_lu=transfert.pk)
+                transaction.on_commit(
+                    lambda message_id=transfert.pk: lancer(pousser_message, message_id)
+                )
+            messages.append(serialiser_message(transfert, user_id=user.pk))
+            evenements.append((
+                {"type": "message.nouveau", "conversation": destination, "message": messages[-1]},
+                [user.pk, *destinataires[destination]],
+            ))
+    if multiple:
+        return {"messages": messages, "transfere": True, "_evenements": evenements}, [user.pk]
+    return evenements[0][0], evenements[0][1]
 
 
 def marquer_lu(user, conv_id, jusqua):

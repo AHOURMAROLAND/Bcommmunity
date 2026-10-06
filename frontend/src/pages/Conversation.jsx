@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowLeft, Check, CheckCheck, Copy, ExternalLink, File as FileIcon, Flag, Forward,
   Link2, Mic, MoreHorizontal, Paperclip, Pause, Pencil, Pin, Play, Reply,
@@ -15,6 +15,7 @@ import Avatar from "../components/Avatar";
 import ModaleSignalement from "../components/ModaleSignalement";
 import { Bouton } from "../components/ui";
 import { Sq } from "../components/Squelettes";
+import { afficherToast } from "../utils/toast";
 
 const HEURE = new Intl.DateTimeFormat("fr-FR", { hour: "2-digit", minute: "2-digit" });
 const DATE = new Intl.DateTimeFormat("fr-FR", { weekday: "long", day: "numeric", month: "long" });
@@ -130,6 +131,35 @@ function CarteFichier({ message }) {
   );
 }
 
+function ApercuLien({ href }) {
+  const apercu = useQuery({
+    queryKey: ["apercu-lien", href],
+    queryFn: () => api(`/discussions/apercu-lien/?url=${encodeURIComponent(href)}`),
+    staleTime: 6 * 60 * 60 * 1000,
+    retry: false,
+  });
+  if (!apercu.data) {
+    const domaine = new URL(href).host;
+    return (
+      <a className="lien-apercu" href={href} target="_blank" rel="noreferrer">
+        <span className="lien-apercu-icone"><Link2 size={16} /></span>
+        <span><strong>{domaine}</strong><small>{domaine}</small></span>
+        <ExternalLink size={14} />
+      </a>
+    );
+  }
+  return (
+    <a className="lien-apercu lien-apercu-og" href={href} target="_blank" rel="noreferrer">
+      <span className="lien-apercu-contenu">
+        <strong>{apercu.data.titre || apercu.data.domaine}</strong>
+        {apercu.data.description && <small>{apercu.data.description}</small>}
+        <small>{apercu.data.domaine}</small>
+      </span>
+      <ExternalLink size={14} />
+    </a>
+  );
+}
+
 function TexteMessage({ texte }) {
   const match = texte.match(/https?:\/\/[^\s]+/i);
   if (!match) return <p>{texte}</p>;
@@ -149,11 +179,7 @@ function TexteMessage({ texte }) {
         <a href={url.href} target="_blank" rel="noreferrer">{urlBrute}</a>
         {apres}
       </p>
-      <a className="lien-apercu" href={url.href} target="_blank" rel="noreferrer">
-        <span className="lien-apercu-icone"><Link2 size={16} /></span>
-        <span><strong>{url.hostname}</strong><small>{url.host}</small></span>
-        <ExternalLink size={14} />
-      </a>
+      <ApercuLien href={url.href} />
     </>
   );
 }
@@ -190,7 +216,9 @@ export default function Conversation() {
   const [texteEdition, setTexteEdition] = useState("");
   const [suppressionMessage, setSuppressionMessage] = useState(null);
   const [transfertMessage, setTransfertMessage] = useState(null);
-  const [conversationCible, setConversationCible] = useState("");
+  const [conversationsCibles, setConversationsCibles] = useState([]);
+  const [rechercheTransfert, setRechercheTransfert] = useState("");
+  const [transfertCid, setTransfertCid] = useState("");
   const [actionMessageEnCours, setActionMessageEnCours] = useState(false);
   const [imagePleinEcran, setImagePleinEcran] = useState(null);
   const [erreurEnvoi, setErreurEnvoi] = useState("");
@@ -842,17 +870,49 @@ export default function Conversation() {
 
   async function transfererMessage(event) {
     event.preventDefault();
-    if (!transfertMessage || !conversationCible) return;
+    if (!transfertMessage || conversationsCibles.length === 0 || conversationsCibles.length > 5) return;
     const resultat = await actionMessage(
       transfertMessage,
       "transferer",
       "POST",
-      { conversation_id: Number(conversationCible) },
+      {
+        conversation_ids: conversationsCibles,
+        cid: transfertCid,
+      },
     );
     if (resultat) {
+      await qc.invalidateQueries({ queryKey: ["conversations"] });
+      afficherToast(
+        conversationsCibles.length === 1
+          ? "Message transféré."
+          : `Message transféré à ${conversationsCibles.length} conversations.`,
+        "succes",
+      );
       setTransfertMessage(null);
-      setConversationCible("");
+      setConversationsCibles([]);
+      setRechercheTransfert("");
+      setTransfertCid("");
     }
+  }
+
+  function ouvrirTransfert(message) {
+    setConversationsCibles([]);
+    setRechercheTransfert("");
+    setTransfertCid(globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`);
+    setTransfertMessage(message);
+  }
+
+  function basculerConversationTransfert(conversationId) {
+    setConversationsCibles((selection) => {
+      if (selection.includes(conversationId)) {
+        return selection.filter((idConversation) => idConversation !== conversationId);
+      }
+      if (selection.length >= 5) {
+        afficherToast("Vous pouvez choisir au maximum 5 conversations.", "avertissement");
+        return selection;
+      }
+      return [...selection, conversationId];
+    });
   }
 
   if (conv.isError) {
@@ -1123,7 +1183,7 @@ export default function Conversation() {
                                 role="menuitem"
                                 onClick={() => {
                                   setMenuMessage(null);
-                                  setTransfertMessage(m);
+                                  ouvrirTransfert(m);
                                 }}
                               >
                                 <Forward size={14} /> Transférer
@@ -1329,24 +1389,38 @@ export default function Conversation() {
           <div className="message-dialog-fond" role="presentation" onMouseDown={(event) => {
             if (event.target === event.currentTarget) setTransfertMessage(null);
           }}>
-            <form className="message-dialog" role="dialog" aria-modal="true" aria-labelledby="transfert-titre" onSubmit={transfererMessage}>
+            <form className="message-dialog transfert-dialog" role="dialog" aria-modal="true" aria-labelledby="transfert-titre" onSubmit={transfererMessage}>
               <h2 id="transfert-titre">Transférer le message</h2>
-              <label htmlFor="transfert-conversation">Choisir une conversation</label>
-              <select
-                id="transfert-conversation"
-                required
-                value={conversationCible}
-                onChange={(event) => setConversationCible(event.target.value)}
-              >
-                <option value="">Sélectionner…</option>
+              <p className="doux transfert-compteur">
+                Choisissez jusqu’à 5 conversations ({conversationsCibles.length}/5).
+              </p>
+              <label htmlFor="recherche-transfert">Rechercher une conversation</label>
+              <input
+                id="recherche-transfert"
+                className="champ"
+                type="search"
+                value={rechercheTransfert}
+                onChange={(event) => setRechercheTransfert(event.target.value)}
+                placeholder="Nom du membre"
+              />
+              <div className="transfert-liste" role="group" aria-label="Conversations disponibles">
                 {(conversations.data?.pages.flatMap((page) => page.results) ?? [])
                   .filter((item) => String(item.id) !== String(id))
+                  .filter((item) => `${item.autre.prenom} ${item.autre.nom}`.toLocaleLowerCase()
+                    .includes(rechercheTransfert.trim().toLocaleLowerCase()))
                   .map((item) => (
-                    <option key={item.id} value={item.id}>
-                      {item.autre.prenom} {item.autre.nom}
-                    </option>
+                    <label className="transfert-destination" key={item.id}>
+                      <input
+                        type="checkbox"
+                        checked={conversationsCibles.includes(item.id)}
+                        onChange={() => basculerConversationTransfert(item.id)}
+                        disabled={!conversationsCibles.includes(item.id) && conversationsCibles.length >= 5}
+                      />
+                      <Avatar prenom={item.autre.prenom} nom={item.autre.nom} photo={item.autre.photo} taille={40} />
+                      <span>{item.autre.prenom} {item.autre.nom}</span>
+                    </label>
                   ))}
-              </select>
+              </div>
               {conversations.hasNextPage && (
                   <button
                     type="button"
@@ -1359,8 +1433,8 @@ export default function Conversation() {
               )}
               <div className="message-dialog-actions">
                 <button type="button" className="menu-item" onClick={() => setTransfertMessage(null)}>Annuler</button>
-                <button type="submit" className="menu-item" disabled={actionMessageEnCours || !conversationCible}>
-                  Transférer
+                <button type="submit" className="menu-item" disabled={actionMessageEnCours || !conversationsCibles.length}>
+                  {actionMessageEnCours ? "Transfert…" : `Transférer${conversationsCibles.length ? ` (${conversationsCibles.length})` : ""}`}
                 </button>
               </div>
             </form>

@@ -59,7 +59,7 @@ L'application permet aux lyceens actuels et aux anciens eleves de :
 
 ---
 
-## 3. Demarrage rapide avec Docker
+## 3. Demarrage local avec Docker Compose
 
 ### Prerequis
 - Docker et Docker Compose installes.
@@ -72,27 +72,75 @@ git clone https://github.com/AHOURMAROLAND/Bcommmunity.git
 cd Bcommmunity
 ```
 
-2. Configurer les variables d'environnement :
+2. Configurer les variables d'environnement locales :
 ```bash
 cp .env.example .env
 ```
-Renseignez les variables requises dans `.env` (`DJANGO_SECRET_KEY`, `DB_PASSWORD`, etc.).
+Remplacez `DJANGO_SECRET_KEY` et `DB_PASSWORD`. Le mot de passe PostgreSQL Docker doit rester alphanumerique car il est aussi inclus dans `DATABASE_URL`. Pour activer le bouton de connexion Google, renseignez `VITE_GOOGLE_CLIENT_ID` avec l'identifiant client OAuth de type Web de Google Cloud Console (et le meme identifiant web dans `GOOGLE_CLIENT_IDS`). Cet identifiant client est public; ne mettez jamais le secret client dans le frontend.
 
-3. Demarrer les conteneurs :
+3. Construire et demarrer la pile locale :
 ```bash
 docker compose up -d --build
 ```
+L'interface est disponible sur `http://localhost:8080`. Nginx sert le frontend et les fichiers statiques/media, puis relaie `/api/`, `/ws/`, `/p/` et l'URL d'administration vers Daphne. PostgreSQL, Redis, Celery worker et Celery Beat sont demarres avec des controles de disponibilite. Les migrations et `collectstatic` sont executes au demarrage de l'API.
 
-4. Executer les migrations et charger les referentiels de base :
+Si la construction echoue avec `npm error ECONNRESET` pendant `npm ci`, c'est une interruption d'acces au registre npm depuis Docker. Relancez les constructions en plusieurs etapes pour isoler le telechargement frontend et limiter la pression reseau/memoire :
+```powershell
+docker compose build web
+docker compose build api worker beat
+docker compose up -d
+docker compose ps
+```
+Le cache npm BuildKit est conserve entre les essais. Si `ECONNRESET` persiste, verifiez la connexion/proxy configure dans Docker Desktop, puis relancez `docker compose build web`; les commandes `exec` ne fonctionneront qu'apres que le service `api` soit demarre.
+
+Cette configuration est destinee au developpement local : `SECURE_SSL_REDIRECT` est desactive et le port HTTP 8080 n'est pas chiffre. Ne l'exposez pas directement sur Internet. Pour une mise en production publique, configurez TLS et des secrets robustes dans un environnement gere hors du depot.
+
+4. Charger les referentiels de base et creer un compte administrateur :
 ```bash
-docker compose exec api python manage.py migrate
 docker compose exec api python manage.py charger_referentiels
 docker compose exec api python manage.py createsuperuser
 ```
+Le Django admin est accessible sous la valeur `ADMIN_URL` definie dans `.env`.
 
 5. Lancer les tests unitaires backend dans le conteneur :
 ```bash
 docker compose exec api pytest -q
+```
+
+### Recuperer l'historique SQLite local
+
+Le lancement Docker cree une base PostgreSQL distincte de `backend/db.sqlite3`. Les anciennes conversations et publications SQLite ne sont donc pas copiees automatiquement. Sur Windows, depuis la racine du depot, la procedure suivante exporte les donnees SQLite et les importe dans une base Compose vide. Elle ne remplace pas une procedure de fusion si PostgreSQL contient deja des comptes. Arretez d'abord le serveur de developpement local afin que la sauvegarde SQLite soit coherente.
+
+1. Sauvegarder la base SQLite, puis exporter les donnees. La commande utilise l'environnement `.venv` du backend :
+```powershell
+Copy-Item .\backend\db.sqlite3 .\backend\db.sqlite3.backup
+$env:DATABASE_URL = "sqlite:///$((Resolve-Path .\backend\db.sqlite3).Path -replace '\\','/')"
+$env:DJANGO_DEBUG = "1"
+& .\backend\.venv\Scripts\python.exe .\backend\manage.py dumpdata --natural-foreign --natural-primary --exclude contenttypes --exclude auth.permission --exclude admin.logentry --exclude sessions.session --exclude token_blacklist --indent 2 --output .\migration-bakhita.json
+Remove-Item Env:DATABASE_URL
+Remove-Item Env:DJANGO_DEBUG
+```
+
+2. Demarrer Compose et verifier que PostgreSQL n'a pas encore de comptes. N'importez pas le fixture si cette commande affiche un nombre superieur a `0` :
+```powershell
+docker compose up -d --build
+docker compose exec api python manage.py shell -c "from comptes.models import User; print(User.objects.count())"
+```
+
+3. Importer le fixture, puis copier les fichiers media existants dans le volume partage :
+```powershell
+docker compose cp .\migration-bakhita.json api:/tmp/migration-bakhita.json
+docker compose exec api python manage.py loaddata /tmp/migration-bakhita.json
+docker compose cp .\backend\media api:/tmp/
+docker compose exec api sh -c "cp -a /tmp/media/. /app/media/"
+```
+
+Le fichier `migration-bakhita.json` contient des donnees personnelles : gardez-le localement et supprimez-le apres avoir confirme l'import. Ne lancez pas `docker compose down -v` : cette commande supprimerait les volumes PostgreSQL et media.
+
+Pour consulter les journaux ou arreter les services :
+```bash
+docker compose logs -f api web worker beat
+docker compose down
 ```
 
 ---

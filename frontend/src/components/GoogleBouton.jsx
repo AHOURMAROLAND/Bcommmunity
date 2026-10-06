@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
 const CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 let chargement = null;
@@ -19,6 +19,7 @@ function chargerScript() {
 export default function GoogleBouton({ onCredential, texte = "signin_with" }) {
   const conteneur = useRef(null);
   const rappel = useRef(onCredential);
+  const [erreurGoogle, setErreurGoogle] = useState(false);
   useEffect(() => {
     rappel.current = onCredential;
   }, [onCredential]);
@@ -33,10 +34,31 @@ export default function GoogleBouton({ onCredential, texte = "signin_with" }) {
       window.google.accounts.id.renderButton(conteneur.current, {
         type: "standard", theme: "outline", size: "large", shape: "pill", locale: "fr", text: texte,
         width: Math.min(conteneur.current.offsetWidth || 320, 400) });
-    }).catch(() => {});
+    }).catch(() => {
+      if (actif) setErreurGoogle(true);
+    });
     return () => { actif = false; };
   }, [texte]);
 
-  if (!CLIENT_ID) return null;
+  if (!CLIENT_ID) {
+    return (
+      <button
+        type="button"
+        className="google-configuration-requise"
+        disabled
+        title="Configurez VITE_GOOGLE_CLIENT_ID dans le fichier .env à la racine."
+      >
+        <span aria-hidden="true">G</span>
+        Continuer avec Google — configuration requise
+      </button>
+    );
+  }
+  if (erreurGoogle) {
+    return (
+      <p className="google-erreur" role="status">
+        Le bouton Google ne s’est pas chargé. Vérifiez votre connexion puis rechargez la page.
+      </p>
+    );
+  }
   return <div ref={conteneur} style={{ display: "flex", justifyContent: "center", minHeight: 44 }} />;
 }

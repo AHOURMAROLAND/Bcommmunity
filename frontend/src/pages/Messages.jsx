@@ -9,10 +9,12 @@ import { ilYa } from "../utils/date";
 import Avatar from "../components/Avatar";
 import { Bouton } from "../components/ui";
 import { SqListe } from "../components/Squelettes";
+import { useTempsReel } from "../temps-reel/TempsReel";
 
 // ---- Liste des conversations ----
 function Conversations() {
   const q = useConversations();
+  const { activites } = useTempsReel();
   if (q.isPending) return <SqListe n={5} />;
   const items = q.data?.pages.flatMap((p) => p.results) ?? [];
   if (!items.length) return (
@@ -40,9 +42,14 @@ function Conversations() {
                     fontSize: "0.85rem",
                     whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
                     fontWeight: c.non_lus ? 700 : 500,
+                    color: activites[String(c.id)] ? "var(--primaire)" : undefined,
                   }}
                 >
-                  {c.dernier?.texte ?? "Nouvelle conversation"}
+                  {activites[String(c.id)]?.type === "vocal"
+                    ? "Enregistre un message vocal…"
+                    : activites[String(c.id)]?.type === "texte"
+                      ? "Écrit…"
+                      : c.dernier?.texte ?? "Nouvelle conversation"}
                 </div>
               </div>
               <div style={{ textAlign: "right", flexShrink: 0 }}>

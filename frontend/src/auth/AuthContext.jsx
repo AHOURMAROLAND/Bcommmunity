@@ -1,7 +1,11 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
+import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
 import { api, effacerRefresh, lireRefresh, rafraichir, sauverRefresh, setAccessToken } from "../api/client";
+import {
+  effacerCacheHorsLigne, effacerFileHorsLigne, persisterRequetes,
+} from "../api/stockage-hors-ligne";
 import { desactiverPush } from "../utils/push";
 import { estNatif } from "../utils/plateforme";
 
@@ -14,6 +18,11 @@ export function AuthProvider({ children }) {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const connecte = useRef(false);
+  const persistance = useMemo(() => ({
+    persister: persisterRequetes(utilisateur?.id ?? "invité"),
+    buster: "bakhita-cache-v1",
+    maxAge: 7 * 24 * 60 * 60 * 1000,
+  }), [utilisateur?.id]);
 
   useEffect(() => { connecte.current = !!utilisateur; }, [utilisateur]);
 
@@ -63,8 +72,10 @@ export function AuthProvider({ children }) {
       setAccessToken(null);
       setUtilisateur(null);
       qc.clear();
+      await effacerCacheHorsLigne(utilisateur?.id);
+      await effacerFileHorsLigne(utilisateur?.id);
     }
-  }, [qc]);
+  }, [qc, utilisateur?.id]);
 
   const connexionGoogle = useCallback(async (credential, statut) => {
     qc.clear();
@@ -90,5 +101,9 @@ export function AuthProvider({ children }) {
     () => ({ utilisateur, chargement, connexion, deconnexion, connexionGoogle }),
     [utilisateur, chargement, connexion, deconnexion, connexionGoogle]
   );
-  return <AuthContext.Provider value={valeur}>{children}</AuthContext.Provider>;
+  return (
+    <PersistQueryClientProvider client={qc} persistOptions={persistance}>
+      <AuthContext.Provider value={valeur}>{children}</AuthContext.Provider>
+    </PersistQueryClientProvider>
+  );
 }

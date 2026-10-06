@@ -143,24 +143,43 @@ class HubConsumer(AsyncJsonWebsocketConsumer):
         if not isinstance(conv, int):
             return await self.send_json({**err, "detail": "Conversation invalide."})
         try:
-            data, ids = await envoyer_sync(self.user, conv, c.get("texte"), cid)
+            data, ids = await envoyer_sync(
+                self.user,
+                conv,
+                c.get("texte"),
+                cid,
+                en_reponse_a_id=c.get("en_reponse_a_id"),
+            )
         except APIException:
             return await self.send_json({**err, "detail": "Message refuse."})
         await self._diffuser(ids, data)
 
     async def _typing(self, c):
         conv = c.get("conversation")
-        t    = time.monotonic()
-        if not isinstance(conv, int) or t - self.typing.get(conv, 0) < 2:
+        activite = c.get("activite", "texte")
+        actif = c.get("actif", True)
+        if not isinstance(conv, int) or activite not in ("texte", "vocal") or not isinstance(actif, bool):
             return
-        self.typing[conv] = t
+        t    = time.monotonic()
+        if actif and t - self.typing.get(conv, 0) < 1.5:
+            return
+        if actif:
+            self.typing[conv] = t
+        else:
+            self.typing.pop(conv, None)
         ts, autres = self.autres.get(conv, (0, None))
         if t - ts > 60:
             autres = await autres_sync(self.user, conv)
             self.autres[conv] = (t, autres)
         if autres:
             await self._diffuser(
-                autres, {"type": "typing", "conversation": conv, "user": self.user.pk})
+                autres, {
+                    "type": "typing",
+                    "conversation": conv,
+                    "user": self.user.pk,
+                    "activite": activite,
+                    "actif": actif,
+                })
 
     async def _lu(self, c):
         try:

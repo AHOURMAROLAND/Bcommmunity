@@ -10,6 +10,7 @@ class Publication(models.Model):
         PUBLIE = "publie", "Publiée"
 
     auteur = models.ForeignKey(settings.AUTH_USER_MODEL, related_name="publications", on_delete=models.CASCADE)
+    client_id = models.CharField(max_length=40, blank=True, default="")
     titre = models.CharField(max_length=150)
     contenu = models.TextField(blank=True)  # HTML déjà nettoyé
     extrait = models.CharField(max_length=300, blank=True)
@@ -30,6 +31,13 @@ class Publication(models.Model):
     class Meta:
         indexes = [models.Index(fields=["statut", "masquee", "-publie_le"]),
                    models.Index(fields=["auteur", "-cree_le"])]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["auteur", "client_id"],
+                condition=~models.Q(client_id=""),
+                name="publication_client_id_unique",
+            ),
+        ]
 
 
 class Like(models.Model):

@@ -88,6 +88,11 @@ class FilView(generics.ListCreateAPIView):
     def create(self, request, *args, **kwargs):
         ser = PublicationEcritureSerializer(data=request.data)
         ser.is_valid(raise_exception=True)
+        client_id = ser.validated_data.get("client_id")
+        if client_id:
+            existing = Publication.objects.filter(auteur=request.user, client_id=client_id).first()
+            if existing:
+                return Response(detail(publication_accessible(request.user, existing.pk), request))
         pub = ser.creer(request.user)
         if pub.statut == "publie":
             annoncer(pub)

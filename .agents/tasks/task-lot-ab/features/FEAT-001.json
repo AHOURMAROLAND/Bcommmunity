@@ -2,7 +2,7 @@
   "id": "FEAT-001",
   "type": "feat",
   "description": "LOT A — OTP email via Brevo + signup redirect. Adds OTPEmail model, Brevo SMTP wrapper, EnvoyerOTPView/VerifierOTPView, OTP routes, settings/env Brevo config, VerifierOTP.jsx frontend page, and signup-flow redirect to /verifier-email. Google-only auth on Connexion/Inscription pages is already implemented (AccesGoogle component used, no Facebook/Apple present — nothing to remove). Existing email/password + Google auth must remain fully working.",
-  "status": "pending",
+  "status": "completed",
   "steps": [
     "1. Create backend/comptes/brevo.py. Import smtplib, email.mime, django.conf.settings, logging. Define send_smtp(to, subject, html) — reads BREVO_SMTP_LOGIN/BREVO_SMTP_PASSWORD from settings; if missing, falls back to django.core.mail.send_mail to the console backend. Define envoyer_otp(email, prenom, code) — HTML email template with 6-digit code, subject 'Votre code de vérification — Bakhita Community'. Define envoyer_reinitialisation(email, prenom, lien) — HTML email replacing the existing send_mail call in OubliView.",
     "2. Add OTPEmail model to backend/comptes/models.py. Fields: user (FK User CASCADE, related_name='otps'), code (CharField max_length=128 — stores hashed value), expire_le (DateTimeField), utilise (BooleanField default=False). Meta: indexes=[Index(fields=['user','utilise','expire_le'])]. Import make_password/check_password from django.contrib.auth.hashers (do not store raw codes).",
@@ -32,5 +32,5 @@
     "cd frontend && npm run build"
   ],
   "blocked_reason": null,
-  "findings": ""
+  "findings": "Backend changes (brevo.py, models.py, views.py, urls.py, settings.py, migration 0003) were committed in a prior interrupted run (286791c). This commit adds the brevo.py plain-text body fix (test_reinitialisation_complete parses mailoutbox[0].body for the reset link — HTML stripping dropped href URLs, so send_smtp now accepts an explicit plain param), the VerifierOTP.jsx page, the Inscription.jsx redirect to /verifier-email, and the /verifier-email route in App.jsx. .env is gitignored (contains BREVO_* blank vars but won't be committed). All 4 verifications pass: manage.py check (0 issues), migrate (clean), pytest (50 passed), npm run build (clean). .env Brevo vars appended but not committed due to gitignore."
 }

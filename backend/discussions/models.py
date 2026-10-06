@@ -75,15 +75,53 @@ class Participant(models.Model):
 
 
 class Message(models.Model):
+    class Type(models.TextChoices):
+        TEXTE = "texte", "Texte"
+        IMAGE = "image", "Image"
+        FICHIER = "fichier", "Fichier"
+        VOCAL = "vocal", "Vocal"
+
     conversation = models.ForeignKey(Conversation, related_name="messages", on_delete=models.CASCADE)
     auteur       = models.ForeignKey(U, on_delete=models.CASCADE)
-    texte        = models.TextField(max_length=2000)
+    texte        = models.TextField(max_length=2000, blank=True, default="")
+    type         = models.CharField(max_length=10, choices=Type.choices, default=Type.TEXTE)
+    fichier      = models.FileField(upload_to="messages/%Y/%m/", null=True, blank=True)
+    nom_fichier  = models.CharField(max_length=255, blank=True)
+    taille_fichier = models.PositiveIntegerField(null=True, blank=True)
+    duree_vocale = models.PositiveSmallIntegerField(null=True, blank=True)
+    forme_onde   = models.JSONField(default=list, blank=True)
+    client_id    = models.CharField(max_length=40, blank=True, default="")
+    en_reponse_a = models.ForeignKey("self", null=True, blank=True, on_delete=models.SET_NULL, related_name="reponses")
     cree_le      = models.DateTimeField(default=timezone.now)
 
     class Meta:
         indexes = [
             models.Index(fields=["conversation", "id"]),
         ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["conversation", "auteur", "client_id"],
+                condition=~Q(client_id=""),
+                name="message_client_id_unique",
+            ),
+        ]
 
     def __str__(self):
         return f"Msg {self.pk} de {self.auteur} dans {self.conversation}"
+
+
+class ReactionMessage(models.Model):
+    message = models.ForeignKey(Message, related_name="reactions", on_delete=models.CASCADE)
+    user = models.ForeignKey(U, on_delete=models.CASCADE)
+    emoji = models.CharField(max_length=8)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["message", "user", "emoji"], name="reaction_unique"),
+        ]
+        indexes = [
+            models.Index(fields=["message"]),
+        ]
+
+    def __str__(self):
+        return f"{self.user} {self.emoji} sur {self.message_id}"

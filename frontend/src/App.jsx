@@ -1,9 +1,11 @@
 import { lazy, Suspense } from "react";
-import { Navigate, Outlet, Route, Routes } from "react-router-dom";
+import { Navigate, Outlet, Route, Routes, useLocation } from "react-router-dom";
 import { useAuth } from "./auth/AuthContext";
 import { useProfil } from "./api/hooks";
 import { SqCentree, SqRoute } from "./components/Squelettes";
 import Coque from "./components/Coque";
+import BoutonRetour from "./components/BoutonRetour";
+import { BandeauHorsLigne, BandeauSynchronisation } from "./components/Bandeaux";
 import PontNatif from "./components/PontNatif";
 import { TempsReelProvider } from "./temps-reel/TempsReel";
 
@@ -34,6 +36,15 @@ function Invite({ children }) {
   return utilisateur ? <Navigate to="/fil" replace /> : children;
 }
 
+function PageAvecRetour({ children }) {
+  return (
+    <>
+      <div className="retour-publique"><BoutonRetour /></div>
+      {children}
+    </>
+  );
+}
+
 function Connecte({ children }) {
   const { utilisateur, chargement } = useAuth();
   if (chargement) return <SqRoute />;
@@ -49,7 +60,15 @@ function Portail({ children }) {
 }
 
 function Plein() {
-  return <main className="contenu"><Outlet /></main>;
+  const location = useLocation();
+  return (
+    <main className="contenu">
+      <BandeauHorsLigne />
+      <BandeauSynchronisation />
+      {!location.pathname.startsWith("/messages/") && <BoutonRetour />}
+      <Outlet />
+    </main>
+  );
 }
 
 export default function App() {
@@ -60,22 +79,28 @@ export default function App() {
         <Routes>
           {/* Pages publiques */}
           <Route path="/connexion"         element={<Invite><Connexion /></Invite>} />
-          <Route path="/inscription"       element={<Invite><Inscription /></Invite>} />
-          <Route path="/verifier-email"    element={<Invite><VerifierOTP /></Invite>} />
-          <Route path="/mot-de-passe-oublie" element={<Invite><MotDePasseOublie /></Invite>} />
-          <Route path="/reinitialiser"     element={<Reinitialiser />} />
-          <Route path="/en-attente"        element={<EnAttente />} />
-          <Route path="/suppression-compte" element={<PageSuppression />} />
+          <Route path="/inscription"       element={<Invite><PageAvecRetour><Inscription /></PageAvecRetour></Invite>} />
+          <Route path="/verifier-email"    element={<Invite><PageAvecRetour><VerifierOTP /></PageAvecRetour></Invite>} />
+          <Route path="/mot-de-passe-oublie" element={<Invite><PageAvecRetour><MotDePasseOublie /></PageAvecRetour></Invite>} />
+          <Route path="/reinitialiser"     element={<PageAvecRetour><Reinitialiser /></PageAvecRetour>} />
+          <Route path="/en-attente"        element={<PageAvecRetour><EnAttente /></PageAvecRetour>} />
+          <Route path="/suppression-compte" element={<PageAvecRetour><PageSuppression /></PageAvecRetour>} />
           <Route path="/onboarding"        element={<Connecte><Onboarding /></Connecte>} />
 
           {/* Pages connectees sans Coque (plein ecran) */}
-          <Route element={<Connecte><Portail><Plein /></Portail></Connecte>}>
+          <Route element={
+            <Connecte>
+              <Portail>
+                <TempsReelProvider>
+                  <Plein />
+                </TempsReelProvider>
+              </Portail>
+            </Connecte>
+          }>
             <Route path="/publier"     element={<Publier />} />
             <Route path="/publier/:id" element={<Publier />} />
             {/* Conversation : plein ecran sur mobile */}
-            <Route path="/messages/:id" element={
-              <TempsReelProvider><Conversation /></TempsReelProvider>
-            } />
+            <Route path="/messages/:id" element={<Conversation />} />
           </Route>
 
           {/* Pages connectees avec Coque (nav) */}

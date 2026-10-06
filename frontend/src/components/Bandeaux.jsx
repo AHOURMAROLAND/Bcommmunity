@@ -5,6 +5,7 @@ import useEnLigne from "../hooks/useEnLigne";
 import useInstallation from "../hooks/useInstallation";
 import { estNatif } from "../utils/plateforme";
 import { Bouton } from "./ui";
+import { useTempsReel } from "../temps-reel/TempsReel";
 
 const CLE = "bk_install_masque";
 const masque = () => { try { return Date.now() - Number(localStorage.getItem(CLE) || 0) < 7 * 86400000; } catch { return false; } };
@@ -12,6 +13,28 @@ const masque = () => { try { return Date.now() - Number(localStorage.getItem(CLE
 export function BandeauHorsLigne() {
   if (useEnLigne()) return null;
   return <div className="bandeau-haut" role="status">Vous êtes hors ligne. Les informations affichées peuvent être anciennes.</div>;
+}
+
+export function BandeauSynchronisation() {
+  const { fileHorsLigne, synchroniser } = useTempsReel();
+  if (!fileHorsLigne.length) return null;
+  const echecs = fileHorsLigne.filter((element) => element.derniereErreur).length;
+  return (
+    <div className="bandeau-haut bandeau-synchronisation" role="status">
+      <span>
+        {echecs
+          ? `${echecs} élément${echecs > 1 ? "s" : ""} en attente d’une correction.`
+          : navigator.onLine
+            ? `${fileHorsLigne.length} élément${fileHorsLigne.length > 1 ? "s" : ""} en cours de synchronisation…`
+            : `${fileHorsLigne.length} élément${fileHorsLigne.length > 1 ? "s" : ""} en attente de connexion.`}
+      </span>
+      {echecs > 0 && (
+        <button type="button" className="lien" onClick={synchroniser}>
+          Réessayer
+        </button>
+      )}
+    </div>
+  );
 }
 
 export function BandeauInstallation() {

@@ -15,7 +15,6 @@ export default function Inscription() {
   const [erreurs, setErreurs] = useState({});
   const [general, setGeneral] = useState("");
   const [envoi, setEnvoi] = useState(false);
-  const [termine, setTermine] = useState(false);
 
   const maj = (champ) => (e) => setF((v) => ({ ...v, [champ]: e.target.value }));
 
@@ -44,10 +43,16 @@ export default function Inscription() {
         body: { prenom: f.prenom.trim(), nom: f.nom.trim(), email: f.email.trim(),
                 statut: f.statut, password: f.password },
       });
-      if (f.email.trim()) {
-        navigate(`/verifier-email?email=${encodeURIComponent(f.email.trim())}`);
-      } else {
-        setTermine(true);
+      const email = f.email.trim();
+      try {
+        await api("/auth/otp/envoyer/", { method: "POST", body: { email } });
+        navigate(`/verifier-email?email=${encodeURIComponent(email)}`, {
+          state: { codeEnvoye: true },
+        });
+      } catch (err) {
+        navigate(`/verifier-email?email=${encodeURIComponent(email)}`, {
+          state: { erreurEnvoi: tousMessages(err) },
+        });
       }
     } catch (err) {
       const champs = erreursChamps(err);
@@ -57,19 +62,6 @@ export default function Inscription() {
     } finally {
       setEnvoi(false);
     }
-  }
-
-  if (termine) {
-    return (
-      <main className="page"><div className="boite">
-        <Marque />
-        <div className="carte" role="status">
-          <h1 style={{ marginTop: 0, fontSize: "1.3rem" }}>Compte créé</h1>
-          <p>Votre inscription est enregistrée. L'école doit la valider avant votre première connexion.</p>
-          <Link className="lien" to="/connexion">Retour à la connexion</Link>
-        </div>
-      </div></main>
-    );
   }
 
   return (

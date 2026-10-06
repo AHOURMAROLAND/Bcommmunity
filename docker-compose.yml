@@ -1,58 +1,129 @@
 services:
   db:
-    image: postgres:16
+    image: postgres:16-alpine
     environment:
       POSTGRES_DB: bakhita
       POSTGRES_USER: bakhita
-      POSTGRES_PASSWORD: ${DB_PASSWORD:?defini dans .env}
-    volumes: [pgdata:/var/lib/postgresql/data]
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-local-compose-only}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U bakhita"]
+      test: ["CMD-SHELL", "pg_isready -U bakhita -d bakhita"]
       interval: 5s
+      timeout: 3s
       retries: 10
+      start_period: 5s
+    restart: unless-stopped
 
   redis:
     image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
 
   api:
     build: ./backend
-    command: daphne -b 0.0.0.0 -p 8000 config.asgi:application
+    command: >-
+      sh -c "python manage.py migrate --noinput &&
+             python manage.py collectstatic --noinput &&
+             daphne -b 0.0.0.0 -p 8000 config.asgi:application"
     env_file: .env
     environment:
-      DATABASE_URL: postgres://bakhita:${DB_PASSWORD}@db:5432/bakhita
+      DJANGO_DEBUG: "0"
+      DATABASE_URL: postgres://bakhita:${DB_PASSWORD:-local-compose-only}@db:5432/bakhita
       REDIS_URL: redis://redis:6379/0
       CELERY_BROKER_URL: redis://redis:6379/1
+      ALLOWED_HOSTS: localhost,127.0.0.1,api,web
+      CORS_ALLOWED_ORIGINS: http://localhost:8080
+      CSRF_TRUSTED_ORIGINS: http://localhost:8080
+      SITE_URL: http://localhost:8080
+      FRONTEND_URL: http://localhost:8080
+      SECURE_SSL_REDIRECT: "0"
+      R2_BUCKET: ""
+      ADMIN_URL: ${ADMIN_URL:-admin/}
     depends_on:
-      db: { condition: service_healthy }
-      redis: { condition: service_started }
-    volumes: [media:/app/media]
-    ports: ["8000:8000"]
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - media:/app/media
+      - staticfiles:/app/staticfiles
+    expose:
+      - "8000"
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import socket; socket.create_connection(('127.0.0.1', 8000), 2).close()"
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 30s
+    restart: unless-stopped
 
   worker:
     build: ./backend
     command: celery -A config worker -l info --concurrency 2
     env_file: .env
     environment:
-      DATABASE_URL: postgres://bakhita:${DB_PASSWORD}@db:5432/bakhita
+      DJANGO_DEBUG: "0"
+      DATABASE_URL: postgres://bakhita:${DB_PASSWORD:-local-compose-only}@db:5432/bakhita
       REDIS_URL: redis://redis:6379/0
       CELERY_BROKER_URL: redis://redis:6379/1
     depends_on:
-      db: { condition: service_healthy }
-      redis: { condition: service_started }
-    volumes: [media:/app/media]
+      api:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - media:/app/media
+    restart: unless-stopped
 
   beat:
     build: ./backend
-    command: celery -A config beat -l info --scheduler django_celery_beat.schedulers:DatabaseScheduler
+    command: celery -A config beat -l info
     env_file: .env
     environment:
-      DATABASE_URL: postgres://bakhita:${DB_PASSWORD}@db:5432/bakhita
+      DJANGO_DEBUG: "0"
+      DATABASE_URL: postgres://bakhita:${DB_PASSWORD:-local-compose-only}@db:5432/bakhita
       REDIS_URL: redis://redis:6379/0
       CELERY_BROKER_URL: redis://redis:6379/1
     depends_on:
-      db: { condition: service_healthy }
-      redis: { condition: service_started }
+      api:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  web:
+    build:
+      context: ./frontend
+      args:
+        VITE_GOOGLE_CLIENT_ID: ${VITE_GOOGLE_CLIENT_ID:-}
+    environment:
+      ADMIN_URL: ${ADMIN_URL:-admin/}
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - "8080:80"
+    volumes:
+      - media:/app/media:ro
+      - staticfiles:/app/staticfiles:ro
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1/"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
 
 volumes:
   pgdata:
   media:
+  staticfiles:

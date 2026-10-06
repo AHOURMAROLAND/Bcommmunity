@@ -87,6 +87,7 @@ class PublicationDetailSerializer(PublicationSerializer):
 
 
 class PublicationEcritureSerializer(serializers.Serializer):
+    client_id = serializers.CharField(max_length=40, required=False, allow_blank=False, write_only=True)
     titre = serializers.CharField(min_length=3, max_length=150)
     contenu = serializers.CharField(max_length=20000, allow_blank=True, trim_whitespace=False)
     statut = serializers.ChoiceField(choices=["brouillon", "publie"], default="brouillon")
@@ -113,7 +114,8 @@ class PublicationEcritureSerializer(serializers.Serializer):
     def creer(self, auteur):
         d = self.validated_data
         self._pret(d["statut"], d["contenu"])
-        pub = Publication(auteur=auteur, titre=d["titre"], contenu=d["contenu"], extrait=extrait(d["contenu"]),
+        pub = Publication(auteur=auteur, client_id=d.get("client_id", ""),
+                          titre=d["titre"], contenu=d["contenu"], extrait=extrait(d["contenu"]),
                           apercu_public=d["apercu_public"], statut=d["statut"])
         if d["statut"] == "publie":
             pub.publie_le = timezone.now()

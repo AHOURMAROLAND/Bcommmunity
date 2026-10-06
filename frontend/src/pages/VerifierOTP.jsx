@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { api, sauverRefresh, setAccessToken } from "../api/client";
 import { Bouton, Marque } from "../components/ui";
 import { tousMessages } from "../api/erreurs";
@@ -10,13 +10,14 @@ const COOLDOWN_S = 60;
 
 export default function VerifierOTP() {
   const [searchParams] = useSearchParams();
-  const email = decodeURIComponent(searchParams.get("email") ?? "");
+  const email = searchParams.get("email") ?? "";
   const navigate = useNavigate();
+  const location = useLocation();
 
   const [chiffres, setChiffres] = useState(Array(NB_CHIFFRES).fill(""));
-  const [erreur, setErreur] = useState("");
+  const [erreur, setErreur] = useState(location.state?.erreurEnvoi ?? "");
   const [envoi, setEnvoi] = useState(false);
-  const [cooldown, setCooldown] = useState(0);
+  const [cooldown, setCooldown] = useState(location.state?.codeEnvoye ? COOLDOWN_S : 0);
   const refs = useRef(Array.from({ length: NB_CHIFFRES }, () => null));
 
   // Focus first input on mount
@@ -51,6 +52,8 @@ export default function VerifierOTP() {
       } catch (err) {
         if (err.status === 429) {
           setErreur("Trop de tentatives. Veuillez patienter avant de réessayer.");
+        } else if (err.status === 403 && err.data?.code) {
+          navigate("/en-attente", { replace: true, state: err.data });
         } else {
           setErreur(tousMessages(err) || "Code invalide ou expiré.");
         }
@@ -61,7 +64,7 @@ export default function VerifierOTP() {
         setEnvoi(false);
       }
     },
-    [email, envoi]
+    [email, envoi, navigate]
   );
 
   function onInput(index, e) {
@@ -103,11 +106,12 @@ export default function VerifierOTP() {
 
   async function renvoyer() {
     if (cooldown > 0) return;
-    setCooldown(COOLDOWN_S);
     try {
       await api("/auth/otp/envoyer/", { method: "POST", body: { email } });
-    } catch {
-      // Silently fail — server always returns 200 for valid requests
+      setErreur("");
+      setCooldown(COOLDOWN_S);
+    } catch (err) {
+      setErreur(tousMessages(err) || "Le code n'a pas pu être envoyé. Réessayez.");
     }
   }
 

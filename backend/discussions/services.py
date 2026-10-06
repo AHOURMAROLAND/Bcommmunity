@@ -12,7 +12,7 @@ from amis.services import ids_bloques, profils_actifs
 from notifications.services import evenement, lancer
 from notifications.taches import pousser_message
 
-from .models import Conversation, InvitationDiscussion, Message, Participant
+from .models import Conversation, InvitationDiscussion, Message, Participant, ReactionMessage
 
 logger = logging.getLogger(__name__)
 DELAI_REFUS = timedelta(days=7)
@@ -50,13 +50,37 @@ def resume(u):
     }
 
 
-def serialiser_message(m, cid=None):
+def serialiser_reactions(message, user_id):
+    comptes = {}
+    for reaction in message.reactions.all():
+        compte = comptes.setdefault(reaction.emoji, {"emoji": reaction.emoji, "nb": 0, "moi": False})
+        compte["nb"] += 1
+        compte["moi"] |= reaction.user_id == user_id
+    return sorted(comptes.values(), key=lambda reaction: (-reaction["nb"], reaction["emoji"]))
+
+
+def serialiser_message(m, cid=None, user_id=None):
+    reponse = None
+    if m.en_reponse_a_id:
+        reponse = {
+            "id": m.en_reponse_a_id,
+            "texte": (m.en_reponse_a.texte or "")[:80],
+            "auteur_id": m.en_reponse_a.auteur_id,
+        }
     return {
         "id": m.pk,
         "auteur": m.auteur_id,
         "texte": m.texte,
+        "type": m.type,
+        "fichier_url": m.fichier.url if m.fichier else None,
+        "nom_fichier": m.nom_fichier,
+        "taille_fichier": m.taille_fichier,
+        "duree_vocale": m.duree_vocale,
+        "forme_onde": m.forme_onde or [],
+        "en_reponse_a": reponse,
+        "reactions": serialiser_reactions(m, user_id) if user_id is not None else [],
         "cree_le": m.cree_le.isoformat(),
-        "cid": cid,
+        "cid": cid or m.client_id or None,
     }
 
 
@@ -186,23 +210,66 @@ def autres_de(user, conv_id):
     return None if set(autres) & ids_bloques(user) else autres
 
 
-def envoyer_message(user, conv_id, texte, cid=None):
+def envoyer_message(user, conv_id, texte="", cid=None, type="texte", fichier=None,
+                   nom_fichier="", taille_fichier=None, duree_vocale=None,
+                   forme_onde=None, en_reponse_a_id=None):
+    if type not in Message.Type.values:
+        raise ValidationError({"type": "Type de message invalide."})
     texte = (texte or "").strip() if isinstance(texte, str) else ""
-    if not texte:
+    if type == "texte" and not texte:
         raise ValidationError({"texte": "Message vide."})
-    if len(texte) > MAX_TEXTE:
+    if type == "texte" and len(texte) > MAX_TEXTE:
+        raise ValidationError({"texte": "Message trop long."})
+    if type != "texte" and fichier is None:
+        raise ValidationError({"fichier": "Un fichier est obligatoire pour ce message."})
+    if texte and len(texte) > MAX_TEXTE:
         raise ValidationError({"texte": "Message trop long."})
     part, autres = contexte(user, conv_id)
     verifier_ecriture(user, autres)
+    cid_propre = (cid or "")[:40]
+    if cid_propre:
+        existant = (Message.objects
+                    .filter(conversation_id=conv_id, auteur=user, client_id=cid_propre)
+                    .select_related("en_reponse_a")
+                    .prefetch_related("reactions")
+                    .first())
+        if existant:
+            return {
+                "type": "message.nouveau",
+                "conversation": conv_id,
+                "message": serialiser_message(existant, cid_propre, user.pk),
+            }, [user.pk, *autres]
+    if en_reponse_a_id not in (None, ""):
+        try:
+            en_reponse_a_id = int(en_reponse_a_id)
+        except (TypeError, ValueError):
+            raise ValidationError({"en_reponse_a_id": "Message cité invalide."})
+        if en_reponse_a_id < 1 or not Message.objects.filter(
+            pk=en_reponse_a_id, conversation_id=conv_id
+        ).exists():
+            raise ValidationError({"en_reponse_a_id": "Message cité invalide."})
+    else:
+        en_reponse_a_id = None
     with transaction.atomic():
-        m = Message.objects.create(conversation_id=conv_id, auteur=user, texte=texte)
+        m = Message.objects.create(
+            conversation_id=conv_id,
+            auteur=user,
+            texte=texte,
+            type=type,
+            fichier=fichier,
+            nom_fichier=nom_fichier or "",
+            taille_fichier=taille_fichier,
+            duree_vocale=duree_vocale,
+            forme_onde=forme_onde or [],
+            client_id=cid_propre,
+            en_reponse_a_id=en_reponse_a_id,
+        )
         Conversation.objects.filter(pk=conv_id).update(dernier_message_le=m.cree_le)
         Participant.objects.filter(pk=part.pk).update(dernier_lu=m.pk)
-    cid_propre = (cid or "")[:40] or None
     data = {
         "type": "message.nouveau",
         "conversation": conv_id,
-        "message": serialiser_message(m, cid_propre),
+        "message": serialiser_message(m, cid_propre or None, user.pk),
     }
     transaction.on_commit(lambda: lancer(pousser_message, m.pk))
     return data, [user.pk, *autres]

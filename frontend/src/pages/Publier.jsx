@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Globe, ImageIcon, X } from "lucide-react";
 import { useEnregistrerPublication, usePublication } from "../api/publications";
@@ -8,6 +8,8 @@ import ChargementLong from "@/components/ChargementLong";
 import { Bouton } from "../components/ui";
 import { SqEditeur } from "../components/Squelettes";
 import Editeur from "../components/Editeur";
+import { useTempsReel } from "../temps-reel/TempsReel";
+import { estErreurReseau } from "../api/stockage-hors-ligne";
 
 // Chargement paresseux de l'editeur d'image (lourd)
 const EditeurImage = lazy(() => import("../editeur/EditeurImage"));
@@ -22,7 +24,9 @@ export default function Publier() {
 
 function Formulaire({ id, pub }) {
   const navigate = useNavigate();
+  const { mettreEnFile } = useTempsReel();
   const enregistrer = useEnregistrerPublication(id);
+  const clientId = useRef(id ? "" : crypto.randomUUID());
   const [titre, setTitre] = useState(pub?.titre ?? "");
   const [html, setHtml] = useState(pub?.contenu ?? "");
   const [longueur, setLongueur] = useState(pub ? 1 : 0);
@@ -76,13 +80,41 @@ function Formulaire({ id, pub }) {
     fd.append("contenu", html);
     fd.append("statut", statut);
     fd.append("apercu_public", apercu ? "true" : "false");
+    if (!id) fd.append("client_id", clientId.current);
     if (image) fd.append("image", image);
     if (supprimer && !image) fd.append("supprimer_image", "true");
+    const mettreEnAttente = async () => {
+      await mettreEnFile({
+        type: "publication",
+        chemin: id ? `/publications/${id}/` : "/publications/",
+        methode: id ? "PATCH" : "POST",
+        entrees: Array.from(fd.entries()),
+      });
+      setFini(true);
+      navigate("/fil", { replace: true });
+    };
+    if (!navigator.onLine) {
+      try {
+        await mettreEnAttente();
+      } catch (err) {
+        setGeneral(err.message || "Impossible d’enregistrer la publication hors ligne.");
+      }
+      return;
+    }
     try {
       const r = await enregistrer.mutateAsync(fd);
       setFini(true);
       navigate(statut === "publie" ? `/publications/${r.id}` : "/profil", { replace: true });
     } catch (err) {
+      if (estErreurReseau(err)) {
+        try {
+          await mettreEnAttente();
+          return;
+        } catch (erreurFile) {
+          setGeneral(erreurFile.message || "Impossible de mettre la publication en attente.");
+          return;
+        }
+      }
       const champs = erreursChamps(err);
       setErreurs(champs);
       if (!Object.keys(champs).length) setGeneral(tousMessages(err));

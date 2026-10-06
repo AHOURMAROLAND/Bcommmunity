@@ -1,5 +1,5 @@
 import { Suspense } from "react";
-import { Link, NavLink, Outlet } from "react-router-dom";
+import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
 import { Bell, Home, LogOut, MessageCircle, Plus, User, UserCheck, Users } from "lucide-react";
 import { ChargementEnLigne } from "@/components/ChargementLong";
 import { useCompteurs } from "../api/amis";
@@ -9,7 +9,8 @@ import { useProfil } from "../api/hooks";
 import { useAuth } from "../auth/AuthContext";
 import { useTempsReel } from "../temps-reel/TempsReel";
 import Avatar from "./Avatar";
-import { BandeauHorsLigne, BandeauInstallation, MiseAJour } from "./Bandeaux";
+import BoutonRetour from "./BoutonRetour";
+import { BandeauHorsLigne, BandeauInstallation, BandeauSynchronisation, MiseAJour } from "./Bandeaux";
 import { SqRoute } from "./Squelettes";
 
 const ONGLETS = [
@@ -30,6 +31,7 @@ const ONGLETS_DESKTOP = [
 ];
 
 export default function Coque() {
+  const location = useLocation();
   const { utilisateur, deconnexion } = useAuth();
   const { data: profil } = useProfil(!!utilisateur);
   const { data: compteursAmis } = useCompteurs();
@@ -51,6 +53,7 @@ export default function Coque() {
   return (
     <div className="coque">
       <BandeauHorsLigne />
+      <BandeauSynchronisation />
       <MiseAJour />
       {/* ======= Barre laterale Desktop ======= */}
       <aside className="barre-laterale" aria-label="Navigation principale">
@@ -119,6 +122,7 @@ export default function Coque() {
 
       {/* ======= Contenu principal ======= */}
       <main className="contenu">
+        {location.pathname !== "/fil" && <BoutonRetour />}
         <Suspense fallback={<SqRoute />}>
           <Outlet />
         </Suspense>

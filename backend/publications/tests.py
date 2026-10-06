@@ -94,6 +94,25 @@ def test_like_idempotent_et_compteur():
     assert Publication.objects.get().nb_likes == 0
 
 
+def test_rejouer_publication_hors_ligne_ne_cree_pas_de_doublon():
+    a = membre("Alice")
+    payload = {
+        "titre": "Publication hors ligne",
+        "contenu": "<p>Texte remis en ligne</p>",
+        "statut": "publie",
+        "apercu_public": "true",
+        "client_id": "offline-publication-1",
+    }
+
+    first = api(a).post("/api/publications/", payload, format="multipart")
+    replay = api(a).post("/api/publications/", payload, format="multipart")
+
+    assert first.status_code == 201
+    assert replay.status_code == 200
+    assert first.data["id"] == replay.data["id"]
+    assert Publication.objects.filter(auteur=a, client_id="offline-publication-1").count() == 1
+
+
 def test_publications_d_un_bloque_ou_d_un_suspendu_invisibles():
     a, b, c = membre("Alice"), membre("Bob"), membre("Chloe")
     publier(a)

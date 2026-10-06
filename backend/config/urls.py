@@ -5,11 +5,15 @@ from django.urls import include, path
 
 from publications.views import partage
 
+from .sante import sante, vivant
+
 admin.site.site_header = "Bakhita Community"
 admin.site.site_title = "Bakhita Community"
 admin.site.index_title = "Administration"
 
 urlpatterns = [
+    path("api/vivant/", vivant),
+    path("api/sante/", sante),
     path(settings.ADMIN_URL, admin.site.urls),
     path("p/<int:pk>/", partage),
     path("api/", include("comptes.urls")),

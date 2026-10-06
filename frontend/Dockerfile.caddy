@@ -1,0 +1,20 @@
+FROM node:22-alpine AS build
+WORKDIR /app
+COPY package.json package-lock.json ./
+RUN --mount=type=cache,target=/root/.npm \
+    npm ci --fetch-retries=5 --fetch-retry-factor=2 \
+      --fetch-retry-mintimeout=10000 --fetch-retry-maxtimeout=120000 \
+      --fetch-timeout=300000
+COPY . .
+ARG VITE_GOOGLE_CLIENT_ID
+ARG VITE_ADMIN_URL
+ARG VITE_CONTACT_EMAIL
+ENV VITE_GOOGLE_CLIENT_ID=$VITE_GOOGLE_CLIENT_ID \
+    VITE_ADMIN_URL=$VITE_ADMIN_URL \
+    VITE_CONTACT_EMAIL=$VITE_CONTACT_EMAIL
+RUN npm run build
+
+FROM caddy:2-alpine
+COPY Caddyfile /etc/caddy/Caddyfile
+COPY --from=build /app/dist /srv
+EXPOSE 80 443 443/udp

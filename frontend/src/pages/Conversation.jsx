@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  ArrowLeft, Check, CheckCheck, Copy, ExternalLink, File as FileIcon, Flag, Forward,
+  ArrowLeft, Check, CheckCheck, ChevronUp, Copy, ExternalLink, File as FileIcon, Flag, Forward,
   Link2, Mic, MoreHorizontal, Paperclip, Pause, Pencil, Pin, Play, Reply,
   Send, Smile, Star, Timer, Trash2, X,
 } from "lucide-react";
@@ -223,6 +223,7 @@ export default function Conversation() {
   const [imagePleinEcran, setImagePleinEcran] = useState(null);
   const [erreurEnvoi, setErreurEnvoi] = useState("");
   const [maintenant, setMaintenant] = useState(null);
+  const [messageEpingleCible, setMessageEpingleCible] = useState(null);
 
   const fil = useRef(null);
   const saisieTexte = useRef(null);
@@ -367,6 +368,15 @@ export default function Conversation() {
   useEffect(() => {
     fil.current?.scrollTo({ top: fil.current.scrollHeight });
   }, [dernier?.id]);
+
+  useEffect(() => {
+    if (!messageEpingleCible) return undefined;
+    const element = fil.current?.querySelector(`[data-message-id="${messageEpingleCible}"]`);
+    if (!element) return undefined;
+    element.scrollIntoView({ behavior: "smooth", block: "center" });
+    const minuterieCible = setTimeout(() => setMessageEpingleCible(null), 1800);
+    return () => clearTimeout(minuterieCible);
+  }, [messageEpingleCible, liste.length]);
 
   useLayoutEffect(() => {
     if (hauteurAvant.current && fil.current) {
@@ -816,14 +826,68 @@ export default function Conversation() {
         `/conversations/${id}/messages/${message.id}/${action}/`,
         { method, ...(body ? { body } : {}) },
       );
+      if (action === "favori" || action === "epingler") {
+        const actif = method === "POST";
+        qc.setQueryData(["messages", String(id)], (ancienne) => {
+          if (!ancienne) return ancienne;
+          return {
+            ...ancienne,
+            pages: ancienne.pages.map((page) => ({
+              ...page,
+              results: page.results.map((item) => ({
+                ...item,
+                ...(action === "favori" && item.id === message.id ? { favori: actif } : {}),
+                ...(action === "epingler" && actif && item.id !== message.id ? { epingle: false } : {}),
+                ...(action === "epingler" && item.id === message.id ? { epingle: actif } : {}),
+              })),
+            })),
+          };
+        });
+        afficherToast(
+          action === "favori"
+            ? (actif ? "Message ajouté aux favoris." : "Message retiré des favoris.")
+            : (actif ? "Message épinglé dans la conversation." : "Message désépinglé."),
+          "succes",
+        );
+      }
       setMenuMessage(null);
-      await qc.invalidateQueries({ queryKey: ["messages", String(id)] });
+      void qc.invalidateQueries({ queryKey: ["messages", String(id)] });
+      if (action === "epingler") {
+        void qc.invalidateQueries({ queryKey: ["conversation", String(id)] });
+      }
       return true;
     } catch (err) {
-      setErreurEnvoi(err.message || "L’action sur le message a échoué.");
+      const messageErreur = err.message || "L’action sur le message a échoué.";
+      setErreurEnvoi(messageErreur);
+      afficherToast(messageErreur, "erreur");
       return null;
     } finally {
       setActionMessageEnCours(false);
+    }
+  }
+
+  async function allerAuMessageEpingle() {
+    const epingle = conv.data?.message_epingle;
+    if (!epingle) return;
+    try {
+      let donnees = qc.getQueryData(["messages", String(id)]);
+      if (!donnees) {
+        donnees = (await msgs.refetch()).data;
+      }
+      while (!donnees?.pages?.some((page) => page.results.some((message) => message.id === epingle.id))) {
+        const pageSuivante = await msgs.fetchNextPage();
+        donnees = pageSuivante.data;
+        if (pageSuivante.isError) {
+          throw pageSuivante.error;
+        }
+        if (!pageSuivante.hasNextPage) {
+          afficherToast("Le message épinglé n’est plus disponible dans l’historique.", "avertissement");
+          return;
+        }
+      }
+      setMessageEpingleCible(epingle.id);
+    } catch (err) {
+      afficherToast(err.message || "Le message épinglé n’a pas pu être chargé.", "erreur");
     }
   }
 
@@ -972,6 +1036,27 @@ export default function Conversation() {
         )}
       </header>
 
+      {conv.data?.message_epingle && (
+        <button
+          type="button"
+          className="chat-epingle-banniere"
+          onClick={allerAuMessageEpingle}
+          aria-label="Afficher le message épinglé"
+        >
+          <Pin size={17} />
+          <span>
+            <strong>Message épinglé</strong>
+            <small>
+              {conv.data.message_epingle.texte
+                || (conv.data.message_epingle.type === "image" ? "Photo" : null)
+                || (conv.data.message_epingle.type === "vocal" ? "Message vocal" : null)
+                || (conv.data.message_epingle.type === "fichier" ? "Pièce jointe" : "Message")}
+            </small>
+          </span>
+          <ChevronUp className="chat-epingle-fleche" size={16} />
+        </button>
+      )}
+
       <div className="chat-fil" ref={fil} role="log" aria-live="polite" aria-label="Messages">
         {msgs.hasNextPage && (
           <div className="chat-precedents">
@@ -1003,7 +1088,11 @@ export default function Conversation() {
           const moi = m.auteur === utilisateur.id;
           const vu = moi && typeof m.id === "number" && luAutre >= m.id;
           return (
-            <div className="message-groupe" key={m.cid ?? m.id}>
+            <div
+              className={`message-groupe${messageEpingleCible === m.id ? " message-epingle-cible" : ""}`}
+              key={m.cid ?? m.id}
+              data-message-id={typeof m.id === "number" ? m.id : undefined}
+            >
               {m.separateur && <div className="separateur-date"><span>{m.separateur}</span></div>}
               <div className={`message-ligne${moi ? " sortant" : ""}`}>
                 {!moi && (
@@ -1122,8 +1211,16 @@ export default function Conversation() {
                     )}
                   </div>
                   <div className="message-bas">
-                    {m.epingle && <span className="message-indicateur" title="Message épinglé"><Pin size={13} /></span>}
-                    {m.favori && <span className="message-indicateur" title="Dans vos favoris"><Star size={13} /></span>}
+                    {m.epingle && (
+                      <span className="message-indicateur epingle" title="Message épinglé dans cette conversation">
+                        <Pin size={13} /> Épinglé
+                      </span>
+                    )}
+                    {m.favori && (
+                      <span className="message-indicateur favori" title="Message enregistré dans vos favoris">
+                        <Star size={13} /> Favori
+                      </span>
+                    )}
                     {(m.reactions ?? []).map((reaction) => (
                       <button
                         key={reaction.emoji}

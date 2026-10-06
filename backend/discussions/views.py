@@ -261,12 +261,30 @@ class ConversationDetailView(APIView):
             peut = True
         except PermissionDenied:
             peut = False
+        message_epingle = (
+            Message.objects.filter(conversation_id=pk, epingle=True)
+            .exclude(masques__user=moi)
+            .select_related("en_reponse_a", "auteur")
+            .prefetch_related(
+                "reactions",
+                Prefetch(
+                    "favoris",
+                    queryset=MessageFavori.objects.filter(user=moi),
+                    to_attr="_favoris_moi",
+                ),
+            )
+            .first()
+        )
         return Response({
             "id": pk,
             "autre": resume(autre.user),
             "mon_dernier_lu": part.dernier_lu,
             "dernier_lu_autre": autre.dernier_lu,
             "peut_ecrire": peut,
+            "message_epingle": (
+                serialiser_message(message_epingle, user_id=moi.pk)
+                if message_epingle else None
+            ),
         })
 
 

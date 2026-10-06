@@ -1,0 +1,116 @@
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+x-api: &api
+  image: ghcr.io/${GHCR_OWNER:?Set GHCR_OWNER}/bakhita-api:${TAG:-latest}
+  restart: unless-stopped
+  logging: *logging
+  env_file:
+    - .env
+  environment:
+    DJANGO_DEBUG: "0"
+    DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL to the pooled production database URL}
+    REDIS_URL: redis://redis:6379/0
+    CELERY_BROKER_URL: redis://redis:6379/1
+    ALLOWED_HOSTS: ${ALLOWED_HOSTS:?Set ALLOWED_HOSTS to the production hostname}
+    CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:?Set CORS_ALLOWED_ORIGINS to the HTTPS app origin}
+    CSRF_TRUSTED_ORIGINS: ${CSRF_TRUSTED_ORIGINS:?Set CSRF_TRUSTED_ORIGINS to the HTTPS app origin}
+    SITE_URL: ${SITE_URL:?Set SITE_URL to the HTTPS app URL}
+    FRONTEND_URL: ${FRONTEND_URL:?Set FRONTEND_URL to the HTTPS app URL}
+    SECURE_SSL_REDIRECT: "1"
+  depends_on:
+    redis:
+      condition: service_healthy
+  volumes:
+    - media:/app/media
+  healthcheck:
+    test:
+      - CMD
+      - python
+      - -c
+      - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/vivant/', timeout=3)"
+    interval: 30s
+    timeout: 5s
+    retries: 3
+    start_period: 20s
+
+services:
+  caddy:
+    image: ghcr.io/${GHCR_OWNER:?Set GHCR_OWNER}/bakhita-web:${TAG:-latest}
+    restart: unless-stopped
+    logging: *logging
+    environment:
+      DOMAIN: ${DOMAIN:?Set DOMAIN to the public hostname}
+      ACME_EMAIL: ${ACME_EMAIL:?Set ACME_EMAIL for certificate notices}
+      ADMIN_URL: ${ADMIN_URL:?Set ADMIN_URL to the Django admin path}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - caddy_data:/data
+      - caddy_config:/config
+      - media:/app/media:ro
+    depends_on:
+      api:
+        condition: service_healthy
+
+  api:
+    <<: *api
+    command:
+      - daphne
+      - -b
+      - 0.0.0.0
+      - -p
+      - "8000"
+      - config.asgi:application
+
+  migration:
+    <<: *api
+    profiles: ["ops"]
+    environment:
+      DATABASE_URL: ${DIRECT_DATABASE_URL:?Set DIRECT_DATABASE_URL for migrations}
+    command: ["python", "manage.py", "migrate", "--noinput"]
+
+  worker:
+    <<: *api
+    command: celery -A config worker -l info --concurrency 2
+    healthcheck:
+      disable: true
+
+  beat:
+    <<: *api
+    command: celery -A config beat -l info
+    healthcheck:
+      disable: true
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    logging: *logging
+    command:
+      - redis-server
+      - --appendonly
+      - "yes"
+      - --appendfsync
+      - everysec
+      - --maxmemory
+      - ${REDIS_MAX_MEMORY:-256mb}
+      - --maxmemory-policy
+      - noeviction
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+volumes:
+  caddy_data:
+  caddy_config:
+  media:
+  redis_data:

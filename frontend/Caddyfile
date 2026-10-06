@@ -1,0 +1,50 @@
+{
+	email {$ACME_EMAIL}
+	admin off
+}
+
+{$DOMAIN} {
+	encode zstd gzip
+	request_body {
+		max_size 11MB
+	}
+
+	header {
+		X-Content-Type-Options nosniff
+		Referrer-Policy strict-origin-when-cross-origin
+		X-Frame-Options DENY
+		-Server
+	}
+
+	handle /api/* {
+		reverse_proxy api:8000
+	}
+
+	handle /ws/* {
+		reverse_proxy api:8000
+	}
+
+	handle /p/* {
+		reverse_proxy api:8000
+	}
+
+	handle /{$ADMIN_URL}* {
+		reverse_proxy api:8000
+	}
+
+	handle_path /media/* {
+		root * /app/media
+		header Cache-Control "private, max-age=3600"
+		file_server
+	}
+
+	handle /static/* {
+		reverse_proxy api:8000
+	}
+
+	handle {
+		root * /srv
+		try_files {path} /index.html
+		file_server
+	}
+}

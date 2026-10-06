@@ -132,6 +132,49 @@ Le Django admin est accessible sous la valeur `ADMIN_URL` definie dans `.env`.
 docker compose exec api pytest -q
 ```
 
+### Deploiement de production avec Caddy
+
+La pile de production est separee du Compose local : elle utilise Caddy pour HTTPS, Redis interne et une base PostgreSQL externe (aucun PostgreSQL local n'est demarre). Les deux endpoints de supervision sont `/api/vivant/` (liveness, sans acces aux dependances) et `/api/sante/` (readiness, base et Redis).
+
+1. Sur le serveur Linux, installez Docker Compose v2, configurez le DNS du domaine vers le serveur et ouvrez les ports TCP 80/443 et UDP 443. Creez `/opt/bakhita`, puis copiez-y `docker-compose.prod.yml` et `deploy/.env.production.example` sous les noms `docker-compose.prod.yml` et `.env`. Remplacez tous les exemples, utilisez les URLs PostgreSQL de production, et protegez `.env` (`chmod 600`). N'utilisez jamais les exemples comme secrets.
+2. Configurez le serveur pour tirer les images GHCR. Si les packages sont prives, connectez-vous une fois avec un compte de deploiement dedie ayant uniquement `read:packages` :
+```bash
+echo "$GHCR_READ_TOKEN" | docker login ghcr.io -u VOTRE_COMPTE --password-stdin
+```
+Ne stockez pas le token dans le depot ni dans l'historique shell.
+3. Dans les parametres GitHub du depot, configurez les secrets d'environnement `production` : `SSH_HOST`, `SSH_USER`, `SSH_KEY` et `SSH_FINGERPRINT` (empreinte de la cle d'hote SSH). Ajoutez les variables de build frontend `VITE_GOOGLE_CLIENT_ID`, `VITE_ADMIN_URL` et `VITE_CONTACT_EMAIL` si necessaires. Le compte SSH doit pouvoir executer Docker et deployer sous `/opt/bakhita`.
+4. Poussez un tag `v*` pour declencher les tests, la publication des images API/frontend dans GHCR et le deploiement. Le workflow migre la base avec `DIRECT_DATABASE_URL`, puis attend que l'API soit saine. Un lancement manuel est aussi disponible depuis Actions. Le serveur doit deja contenir le Compose et son `.env`.
+5. Au premier demarrage, lancez les commandes d'initialisation depuis `/opt/bakhita` :
+```bash
+docker compose -f docker-compose.prod.yml run --rm api python manage.py charger_referentiels
+docker compose -f docker-compose.prod.yml run --rm api python manage.py createsuperuser
+docker compose -f docker-compose.prod.yml ps
+```
+
+L'application et le worker utilisent `DATABASE_URL` (URL poollee), tandis que les migrations et les sauvegardes utilisent `DIRECT_DATABASE_URL`. Les fichiers media sont partages avec Caddy via un volume local ; si vous utilisez R2 pour les media, configurez aussi ses identifiants et son domaine public dans `.env`. Les volumes Redis, Caddy et media sont persistants. Ne lancez pas `docker compose down -v` en production.
+
+#### Sauvegardes PostgreSQL chiffrees
+
+Le script `deploy/sauvegarde.sh` effectue `pg_dump` avec l'image correspondant a la version majeure PostgreSQL, compresse puis chiffre le flux avec `age`, et envoie uniquement le fichier chiffre vers un bucket R2 prive. Creez des identifiants R2 dedies, copiez `deploy/.env.backup.example` vers `/opt/bakhita/.env.backup`, renseignez ses variables et limitez ses permissions (`chmod 600`). Ce fichier distinct utilise des valeurs shell entre guillemets ; ne sourcez pas le `.env` de Compose dans un shell. Gardez la cle privee Age hors du serveur et du bucket ; `HC_URL` peut notifier un service de supervision apres l'envoi reussi.
+
+Installez `age` et Docker sur l'hote ; AWS CLI n'est pas requis, car le script utilise son image Docker. Planifiez ensuite la sauvegarde avec cron, par exemple une fois par jour :
+```cron
+17 2 * * * /opt/bakhita/deploy/sauvegarde.sh >> /var/log/bakhita-backup.log 2>&1
+```
+Copiez egalement le script avec les permissions d'execution :
+```bash
+install -D -m 700 deploy/sauvegarde.sh /opt/bakhita/deploy/sauvegarde.sh
+```
+Configurez une regle de retention sur le bucket R2 et une alerte si la supervision ne recoit pas de succes. Avant mise en production, effectuez une restauration d'essai et repetez-la regulierement.
+
+Pour restaurer, telechargez un objet depuis le bucket, puis fournissez la cle Age privee et `DIRECT_DATABASE_URL` dans un shell securise. La commande ci-dessous importe la sauvegarde dans la base cible ; elle ne supprime pas son contenu au prealable :
+```bash
+age -d -i /chemin/hors-serveur/age-private-key.txt sauvegarde.sql.gz.age \
+  | docker run --rm -i -e DIRECT_DATABASE_URL="$DIRECT_DATABASE_URL" postgres:16-alpine \
+      sh -ec 'gzip -dc | psql "$DIRECT_DATABASE_URL"'
+```
+Adaptez `postgres:16-alpine` a la version majeure de la base. Testez la restauration dans une base vide ou dediee avant de l'utiliser pour une reprise apres incident.
+
 ### Recuperer l'historique SQLite local
 
 Le lancement Docker cree une base PostgreSQL distincte de `backend/db.sqlite3`. Les anciennes conversations et publications SQLite ne sont donc pas copiees automatiquement. Sur Windows, depuis la racine du depot, la procedure suivante exporte les donnees SQLite et les importe dans une base Compose vide. Elle ne remplace pas une procedure de fusion si PostgreSQL contient deja des comptes. Arretez d'abord le serveur de developpement local afin que la sauvegarde SQLite soit coherente.

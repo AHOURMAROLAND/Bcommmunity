@@ -284,7 +284,11 @@ def test_favorites_are_personal_and_pin_is_conversation_wide(discussion):
     assert next(item for item in bob_items if item["id"] == first.pk)["favori"] is True
 
     assert client(alice).post(f"{first_url}/epingler/").status_code == 200
+    detail = client(alice).get(f"/api/conversations/{conversation.pk}/").data
+    assert detail["message_epingle"]["id"] == first.pk
     assert client(bob).post(f"{second_url}/epingler/").status_code == 200
+    detail = client(alice).get(f"/api/conversations/{conversation.pk}/").data
+    assert detail["message_epingle"]["id"] == second.pk
     items = client(alice).get(
         f"/api/conversations/{conversation.pk}/messages/"
     ).data["results"]

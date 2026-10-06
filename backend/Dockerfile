@@ -6,6 +6,10 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 COPY --chown=app:app . .
 RUN mkdir -p /app/media && chown app:app /app/media
+RUN DJANGO_SECRET_KEY=build-only-secret-key-not-for-production \
+    DATABASE_URL=postgresql://build:build@127.0.0.1/build \
+    ALLOWED_HOSTS=localhost \
+    python manage.py collectstatic --noinput
 USER app
 EXPOSE 8000
-CMD ["gunicorn", "config.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "3", "--timeout", "30"]
+CMD ["daphne", "-b", "0.0.0.0", "-p", "8000", "config.asgi:application"]

@@ -171,6 +171,9 @@ export function TempsReelProvider({ children }) {
         d.type === "message.epingle"
       ) {
         qc.invalidateQueries({ queryKey: ["messages", String(d.conversation)] });
+        if (d.type !== "message.modifie") {
+          qc.invalidateQueries({ queryKey: ["conversation", String(d.conversation)] });
+        }
       } else if (d.type === "message.lu") {
         qc.invalidateQueries({ queryKey: ["conversation", String(d.conversation)] });
         invalider(qc, "conversations", "compteurs-disc");

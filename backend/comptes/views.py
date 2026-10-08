@@ -286,13 +286,6 @@ class VerifierOTPView(PublicView):
         return Response({"detail": "Code invalide ou expiré."}, status=status.HTTP_400_BAD_REQUEST)
 
 
-class MoiView(generics.RetrieveAPIView):
-    serializer_class = UtilisateurSerializer
-
-    def get_object(self):
-        return self.request.user
-
-
 class ChangerMotDePasseSerializer(serializers.Serializer):
     actuel = serializers.CharField(required=True)
     nouveau = serializers.CharField(min_length=8, required=True)

@@ -236,7 +236,7 @@ def test_delete_for_me_hides_message_from_conversation_preview_and_unread_count(
 @pytest.mark.django_db
 def test_conversation_preview_is_present_for_image_message_without_caption(discussion):
     conversation, (alice, bob) = discussion
-    image = Message.objects.create(
+    Message.objects.create(
         conversation=conversation,
         auteur=bob,
         type=Message.Type.IMAGE,

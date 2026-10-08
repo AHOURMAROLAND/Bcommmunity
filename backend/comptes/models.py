@@ -1,5 +1,8 @@
 from django.contrib.auth.base_user import AbstractBaseUser, BaseUserManager
-from django.contrib.auth.hashers import check_password, make_password  # noqa: F401 — re-exported for OTPEmail usage
+from django.contrib.auth.hashers import (  # noqa: F401 — re-exported for OTPEmail usage
+    check_password,
+    make_password,
+)
 from django.contrib.auth.models import PermissionsMixin
 from django.core.cache import cache
 from django.db import models

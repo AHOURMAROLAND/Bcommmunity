@@ -19,9 +19,8 @@ from rest_framework_simplejwt.serializers import TokenRefreshSerializer
 from rest_framework_simplejwt.token_blacklist.models import BlacklistedToken, OutstandingToken
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from . import brevo
+from . import brevo, journal
 from . import google as google_service
-from . import journal
 from .auth import verifier_acces
 from .models import OTPEmail, User
 from .serializers import (

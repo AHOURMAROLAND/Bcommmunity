@@ -282,6 +282,7 @@ npm run build
 ## 5. Administration
 
 L'interface d'administration Django est accessible sur l'URL definie par la variable d'environnement `ADMIN_URL` (par defaut `gestion-bakhita-x7/` ou `admin/`).
+Les liens et formulaires internes de l'administration chargent leur contenu sans recharger toute la page et affichent un indicateur de chargement. Les formulaires qui téléversent des fichiers restent soumis normalement.
 
 Fonctionnalites administratives implementees :
 - Acces a la plateforme des que l'adresse e-mail est verifiee, sans approbation prealable d'un administrateur.

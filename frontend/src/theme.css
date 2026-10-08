@@ -271,6 +271,14 @@ h1, h2, h3, .titre { font-weight: 700; }
   padding: 1.5rem; width: 100%; max-height: 90vh; overflow-y: auto;
   box-shadow: 0 20px 40px rgba(0,0,0,0.4);
 }
+.modale-boite, .modale, .recadrage, .recadrage-bas, .transfert-liste, .editeur-panneau {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.modale-boite::-webkit-scrollbar, .modale::-webkit-scrollbar, .recadrage::-webkit-scrollbar,
+.recadrage-bas::-webkit-scrollbar, .transfert-liste::-webkit-scrollbar, .editeur-panneau::-webkit-scrollbar {
+  display: none;
+}
 .champ-label {
   display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 0.35rem; color: var(--texte-doux);
 }

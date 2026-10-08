@@ -3,6 +3,7 @@ from urllib.parse import parse_qs, urlsplit
 
 import pytest
 from django.contrib import admin
+from django.contrib.staticfiles import finders
 from django.core.cache import cache
 from django.db import connection
 from django.test import RequestFactory, override_settings
@@ -60,6 +61,14 @@ def test_pages_admin_se_chargent(client, settings):
                 "profils_profil_changelist", "scolarite_scolarite_changelist"]:
         r = client.get(reverse(f"admin:{nom}"), follow=True)
         assert r.status_code == 200, nom
+        assert b"/static/comptes/admin/favicon.svg" in r.content
+        assert b"/static/comptes/admin/navigation.css" in r.content
+        assert b"/static/comptes/admin/navigation.js" in r.content
+        assert b'id="bk-admin-loading"' in r.content
+
+    assert finders.find("comptes/admin/favicon.svg")
+    assert finders.find("comptes/admin/navigation.css")
+    assert finders.find("comptes/admin/navigation.js")
 
 
 def test_etat_admin_signale_un_compte_desactive():

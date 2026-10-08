@@ -1,0 +1,62 @@
+.bk-admin-loading[hidden] {
+  display: none;
+}
+
+#modal-content [class~="overflow-auto"],
+#modal-content [class~="overflow-y-auto"] {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+#modal-content [class~="overflow-auto"]::-webkit-scrollbar,
+#modal-content [class~="overflow-y-auto"]::-webkit-scrollbar {
+  display: none;
+}
+
+.bk-admin-loading {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: grid;
+  place-items: center;
+  background: rgb(15 23 42 / 35%);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 150ms ease;
+}
+
+.bk-admin-loading.is-loading,
+.bk-admin-loading.htmx-request {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.bk-admin-loading__box {
+  display: inline-flex;
+  align-items: center;
+  gap: .6rem;
+  padding: .9rem 1.1rem;
+  border-radius: .75rem;
+  background: #fff;
+  color: #ea580c;
+  box-shadow: 0 8px 30px rgb(15 23 42 / 20%);
+  font-size: .95rem;
+  font-weight: 500;
+}
+
+.bk-admin-loading__box svg {
+  flex: 0 0 auto;
+  animation: bk-admin-spin 1.2s linear infinite;
+}
+
+@keyframes bk-admin-spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bk-admin-loading,
+  .bk-admin-loading__box svg {
+    animation-duration: 2.4s;
+    transition-duration: 0s;
+  }
+}

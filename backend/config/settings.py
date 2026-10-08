@@ -354,6 +354,13 @@ UNFOLD = {
     "SITE_TITLE": "Bakhita Community",
     "SITE_HEADER": "Bakhita Community",
     "SITE_SYMBOL": "school",
+    "SITE_FAVICONS": [
+        {
+            "rel": "icon",
+            "href": f"{STATIC_URL}comptes/admin/favicon.svg",
+            "type": "image/svg+xml",
+        },
+    ],
     "DASHBOARD_CALLBACK": "comptes.tableau_de_bord.contexte",
     "COLORS": {
         "primary": {

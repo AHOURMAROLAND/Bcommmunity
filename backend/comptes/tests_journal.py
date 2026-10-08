@@ -31,7 +31,12 @@ def test_inscription_et_publication_sont_journalisees():
     assert Activite.objects.filter(user=u, action="publication", detail__contains="Bonjour").exists()
 
 
-def test_pages_admin_se_chargent(client):
+def test_pages_admin_se_chargent(client, settings):
+    # Stockage statique simple : pas besoin de collectstatic pour afficher les pages
+    settings.STORAGES = {
+        "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
+        "staticfiles": {"BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"},
+    }
     admin = User.objects.create_superuser("root@example.com", MDP, prenom="R", nom="R")
     client.force_login(admin)
     for nom in ["index", "comptes_user_changelist", "comptes_suspension_changelist",

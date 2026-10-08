@@ -4,7 +4,7 @@ import pytest
 from django.core.cache import cache
 from rest_framework.test import APIClient
 
-from comptes.models import User
+from comptes.models import Activite, User
 
 
 @pytest.fixture(autouse=True)
@@ -29,6 +29,9 @@ def test_reinitialisation_complete_et_lien_a_usage_unique(client, awa, mailoutbo
     uid, token = re.search(r"uid=([^&\s]+)&token=(\S+)", mailoutbox[0].body).groups()
     corps = {"uid": uid, "token": token, "password": "Nouveau-mot-de-passe-77"}
     assert client.post("/api/auth/reinitialiser/", corps, format="json").status_code == 204
+    assert Activite.objects.filter(
+        user=awa, action="mot_de_passe", detail="Réinitialisation"
+    ).exists()
     r = client.post("/api/auth/connexion/",
                     {"email": "awa@example.com", "password": "Nouveau-mot-de-passe-77"}, format="json")
     assert r.status_code == 200

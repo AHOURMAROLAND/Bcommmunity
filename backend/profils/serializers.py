@@ -1,5 +1,5 @@
-from django.utils import timezone
 import phonenumbers
+from django.utils import timezone
 from rest_framework import serializers
 
 from scolarite.models import Classe, Cycle, Filiere, Scolarite

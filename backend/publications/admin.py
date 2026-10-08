@@ -1,16 +1,26 @@
 from django.contrib import admin
+from unfold.admin import ModelAdmin
+from unfold.decorators import display
 
 from .models import Commentaire, Publication
 
 
 @admin.register(Publication)
-class PublicationAdmin(admin.ModelAdmin):
-    list_display = ("titre", "auteur", "statut", "masquee", "publie_le", "nb_likes", "nb_commentaires")
+class PublicationAdmin(ModelAdmin):
+    list_display = ("titre", "auteur", "etat", "publie_le", "nb_likes", "nb_commentaires")
     list_filter = ("statut", "masquee")
     search_fields = ("titre", "auteur__email", "auteur__nom")
     readonly_fields = ("nb_likes", "nb_commentaires", "cree_le", "publie_le")
     raw_id_fields = ("auteur",)
+    list_select_related = ("auteur",)
+    date_hierarchy = "cree_le"
     actions = ["masquer", "reafficher"]
+
+    @display(description="État", label={"Publiée": "success", "Masquée": "danger", "Brouillon": "warning"})
+    def etat(self, p):
+        if p.masquee:
+            return "Masquée"
+        return "Publiée" if p.statut == "publie" else "Brouillon"
 
     @admin.action(description="Masquer les publications")
     def masquer(self, request, queryset):
@@ -22,12 +32,23 @@ class PublicationAdmin(admin.ModelAdmin):
 
 
 @admin.register(Commentaire)
-class CommentaireAdmin(admin.ModelAdmin):
-    list_display = ("texte", "auteur", "publication", "masque", "cree_le")
+class CommentaireAdmin(ModelAdmin):
+    list_display = ("texte", "auteur", "publication", "etat", "cree_le")
     list_filter = ("masque",)
+    search_fields = ("texte", "auteur__email")
     raw_id_fields = ("auteur", "publication")
-    actions = ["masquer"]
+    list_select_related = ("auteur", "publication")
+    date_hierarchy = "cree_le"
+    actions = ["masquer", "reafficher"]
+
+    @display(description="État", label={"Visible": "success", "Masqué": "danger"})
+    def etat(self, c):
+        return "Masqué" if c.masque else "Visible"
 
     @admin.action(description="Masquer les commentaires")
     def masquer(self, request, queryset):
-        queryset.update(masque=True)
+        self.message_user(request, f"{queryset.update(masque=True)} commentaire(s) masqué(s).")
+
+    @admin.action(description="Réafficher les commentaires")
+    def reafficher(self, request, queryset):
+        self.message_user(request, f"{queryset.update(masque=False)} commentaire(s) réaffiché(s).")

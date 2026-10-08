@@ -1,12 +1,14 @@
 from datetime import timedelta
 
 from django.core.cache import cache
+from django.db import transaction
 from django.utils import timezone
 from rest_framework_simplejwt.token_blacklist.models import BlacklistedToken, OutstandingToken
 
 from discussions.services import diffuser
 from notifications.services import evenement, lancer
 
+from . import journal
 from .models import Suspension
 from .taches import notifier_avertissement, notifier_suspension
 
@@ -40,10 +42,23 @@ def suspendre(user, motif, par, jours=None, definitive=False):
 
 def lever(user_ids):
     ids = list(user_ids)
-    n = Suspension.objects.filter(user_id__in=ids, active=True).update(active=False)
-    for uid in ids:
-        cache.delete(f"blocage:{uid}")
-    return n
+    return lever_suspensions(Suspension.objects.filter(user_id__in=ids))
+
+
+def lever_suspensions(queryset):
+    with transaction.atomic():
+        suspensions = list(queryset.filter(active=True).select_for_update().select_related("user"))
+        if not suspensions:
+            return 0
+        ids = [s.pk for s in suspensions]
+        n = Suspension.objects.filter(pk__in=ids, active=True).update(active=False)
+        if n:
+            membres = {s.user_id: s.user for s in suspensions}
+            for user in membres.values():
+                journal.enregistrer(user, "suspension", "Suspension levée")
+            for uid in membres:
+                cache.delete(f"blocage:{uid}")
+        return n
 
 
 def avertir(user, motif):

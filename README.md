@@ -110,8 +110,9 @@ SECURE_SSL_REDIRECT=1
 WEB_BIND_ADDRESS=127.0.0.1
 WEB_PORT=8080
 ```
-3. Configurez votre proxy TLS pour relayer vers `127.0.0.1:8080`, transmettre l'en-tete `X-Forwarded-Proto` avec la valeur `https`, et autoriser les connexions WebSocket pour `/ws/`. Le Nginx Compose conserve cet en-tete afin que Django reconnaisse la requete HTTPS.
-4. Construisez et demarrez les services :
+3. Si vous voulez journaliser l'adresse du visiteur, configurez `TRUSTED_PROXY_IPS` avec l'adresse IP ou le CIDR du proxy qui se connecte directement au backend; n'y incluez pas de clients non fiables. Sans proxy approuve, Django ignore `X-Forwarded-For` pour le journal et conserve `REMOTE_ADDR`.
+4. Configurez votre proxy TLS pour relayer vers `127.0.0.1:8080`, transmettre l'en-tete `X-Forwarded-Proto` avec la valeur `https`, et autoriser les connexions WebSocket pour `/ws/`. Le Nginx Compose conserve cet en-tete afin que Django reconnaisse la requete HTTPS.
+5. Construisez et demarrez les services :
 ```bash
 docker compose up -d --build
 docker compose ps

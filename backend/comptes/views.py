@@ -20,7 +20,7 @@ from rest_framework_simplejwt.serializers import TokenRefreshSerializer
 from rest_framework_simplejwt.token_blacklist.models import BlacklistedToken, OutstandingToken
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from . import brevo
+from . import brevo, journal
 from . import google as google_service
 from .auth import verifier_acces
 from .models import OTPEmail, User
@@ -86,7 +86,9 @@ class ConnexionView(PublicView):
     def post(self, request):
         ser = ConnexionSerializer(data=request.data)
         ser.is_valid(raise_exception=True)
-        return reponse_connexion(ser.validated_data["user"], natif(request))
+        user = ser.validated_data["user"]
+        journal.enregistrer(user, "connexion", "Mot de passe", request=request)
+        return reponse_connexion(user, natif(request))
 
 
 class GoogleView(PublicView):
@@ -136,6 +138,7 @@ class GoogleView(PublicView):
             user.save(update_fields=["google_sub", "email_verifie", "password", "valide"])
             cache.delete(f"blocage:{user.pk}")
         verifier_acces(user)
+        journal.enregistrer(user, "connexion", "Google", request=request)
         return reponse_connexion(user, natif(request))
 
 
@@ -173,6 +176,7 @@ class ReinitialisationView(PublicView):
         user.email_verifie = True  # l'accès à la boîte mail est prouvé
         user.valide = True
         user.save(update_fields=["password", "email_verifie", "valide"])
+        journal.enregistrer(user, "mot_de_passe", "Réinitialisation", request=request)
         cache.delete(f"blocage:{user.pk}")
         # Toutes les sessions existantes sont révoquées.
         for t in OutstandingToken.objects.filter(user=user):
@@ -291,15 +295,9 @@ class VerifierOTPView(PublicView):
                 user.save(update_fields=["email_verifie", "valide"])
                 cache.delete(f"blocage:{user.pk}")
                 verifier_acces(user)
+                journal.enregistrer(user, "connexion", "Code par e-mail", request=request)
                 return reponse_connexion(user)
         return Response({"detail": "Code invalide ou expiré."}, status=status.HTTP_400_BAD_REQUEST)
-
-
-class MoiView(generics.RetrieveAPIView):
-    serializer_class = UtilisateurSerializer
-
-    def get_object(self):
-        return self.request.user
 
 
 class ChangerMotDePasseSerializer(serializers.Serializer):
@@ -316,4 +314,5 @@ class ChangerMotDePasseView(APIView):
             return Response({"detail": "Le mot de passe actuel est incorrect."}, status=400)
         user.set_password(ser.validated_data["nouveau"])
         user.save(update_fields=["password"])
+        journal.enregistrer(user, "mot_de_passe", request=request)
         return Response({"detail": "Mot de passe modifié avec succès."})

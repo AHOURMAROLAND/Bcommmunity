@@ -5,6 +5,7 @@ from datetime import timedelta
 from django.conf import settings
 from django.contrib.auth.hashers import check_password, make_password
 from django.contrib.auth.tokens import default_token_generator
+from django.core.cache import cache
 from django.utils import timezone
 from django.utils.encoding import force_bytes
 from django.utils.http import urlsafe_base64_encode
@@ -75,7 +76,7 @@ class InscriptionView(generics.CreateAPIView):
         ser = self.get_serializer(data=request.data)
         ser.is_valid(raise_exception=True)
         self.perform_create(ser)
-        return Response({"detail": "Compte créé. Il sera activé après validation par l'école."},
+        return Response({"detail": "Compte créé. Vérifiez votre adresse e-mail avec le code reçu."},
                         status=status.HTTP_201_CREATED)
 
 
@@ -109,12 +110,18 @@ class GoogleView(PublicView):
                 return Response({"code": "inscription_requise", "email": email,
                                  "prenom": info.get("given_name", ""),
                                  "nom": info.get("family_name", "")}, status=404)
-            creer_compte(email=email,
-                         prenom=(info.get("given_name") or info.get("name") or "Membre")[:80],
-                         nom=(info.get("family_name") or "")[:80],
-                         statut=statut, google_sub=sub, email_verifie=True)
-            return Response({"detail": "Compte créé. Il sera activé après validation par l'école."},
-                             status=201)
+            user = creer_compte(
+                email=email,
+                prenom=(info.get("given_name") or info.get("name") or "Membre")[:80],
+                nom=(info.get("family_name") or "")[:80],
+                statut=statut,
+                google_sub=sub,
+                email_verifie=True,
+                valide=True,
+            )
+            reponse = reponse_connexion(user, natif(request))
+            reponse.status_code = status.HTTP_201_CREATED
+            return reponse
 
         if user.google_sub and user.google_sub != sub:
             raise PermissionDenied("Ce compte est lié à un autre compte Google.")
@@ -125,8 +132,10 @@ class GoogleView(PublicView):
                 # et un mot de passe qu'il connaît. On neutralise ce mot de passe.
                 user.set_unusable_password()
                 user.email_verifie = True
-            user.save(update_fields=["google_sub", "email_verifie", "password"])
-        verifier_acces(user)  # non validé, suspendu ou banni : 403 avec code
+            user.valide = True
+            user.save(update_fields=["google_sub", "email_verifie", "password", "valide"])
+            cache.delete(f"blocage:{user.pk}")
+        verifier_acces(user)
         return reponse_connexion(user, natif(request))
 
 
@@ -162,7 +171,9 @@ class ReinitialisationView(PublicView):
         user = ser.validated_data["user"]
         user.set_password(ser.validated_data["password"])
         user.email_verifie = True  # l'accès à la boîte mail est prouvé
-        user.save(update_fields=["password", "email_verifie"])
+        user.valide = True
+        user.save(update_fields=["password", "email_verifie", "valide"])
+        cache.delete(f"blocage:{user.pk}")
         # Toutes les sessions existantes sont révoquées.
         for t in OutstandingToken.objects.filter(user=user):
             BlacklistedToken.objects.get_or_create(token=t)
@@ -243,14 +254,14 @@ class EnvoyerOTPView(PublicView):
 
     def post(self, request):
         email = str(request.data.get("email") or "").strip().lower()
-        user = User.objects.filter(email__iexact=email, is_active=True).first()
+        user = User.objects.filter(email__iexact=email, is_active=True, email_verifie=False).first()
         if user:
             # Expire all pending (non-used, non-expired) OTPs for this user
             OTPEmail.objects.filter(
                 user=user, utilise=False, expire_le__gt=timezone.now()
             ).update(utilise=True)
-            # Generate a 6-digit code, store hashed
-            plain_code = str(secrets.randbelow(1_000_000)).zfill(6)
+            # Use a predictable code only in development; production always gets a random OTP.
+            plain_code = settings.DEV_OTP_CODE or str(secrets.randbelow(1_000_000)).zfill(6)
             OTPEmail.objects.create(
                 user=user,
                 code=make_password(plain_code),
@@ -267,7 +278,7 @@ class VerifierOTPView(PublicView):
     def post(self, request):
         email = str(request.data.get("email") or "").strip().lower()
         code = str(request.data.get("code") or "").strip()
-        user = User.objects.filter(email__iexact=email, is_active=True).first()
+        user = User.objects.filter(email__iexact=email, is_active=True, email_verifie=False).first()
         if user:
             otp = (OTPEmail.objects.filter(
                 user=user, utilise=False, expire_le__gt=timezone.now()
@@ -276,7 +287,9 @@ class VerifierOTPView(PublicView):
                 otp.utilise = True
                 otp.save(update_fields=["utilise"])
                 user.email_verifie = True
-                user.save(update_fields=["email_verifie"])
+                user.valide = True
+                user.save(update_fields=["email_verifie", "valide"])
+                cache.delete(f"blocage:{user.pk}")
                 verifier_acces(user)
                 return reponse_connexion(user)
         return Response({"detail": "Code invalide ou expiré."}, status=status.HTTP_400_BAD_REQUEST)
@@ -304,4 +317,3 @@ class ChangerMotDePasseView(APIView):
         user.set_password(ser.validated_data["nouveau"])
         user.save(update_fields=["password"])
         return Response({"detail": "Mot de passe modifié avec succès."})
-

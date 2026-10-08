@@ -1,7 +1,8 @@
 from django.utils import timezone
+import phonenumbers
 from rest_framework import serializers
 
-from scolarite.models import Classe, Cycle, Scolarite
+from scolarite.models import Classe, Cycle, Filiere, Scolarite
 
 from .models import Domaine, Profil, SituationActuelle
 
@@ -11,7 +12,7 @@ class ClasseSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Classe
-        fields = ("id", "nom", "filiere", "cycle")
+        fields = ("id", "nom", "filiere", "filiere_ref", "cycle")
 
 
 class CycleSerializer(serializers.ModelSerializer):
@@ -20,6 +21,12 @@ class CycleSerializer(serializers.ModelSerializer):
     class Meta:
         model = Cycle
         fields = ("id", "nom", "classes")
+
+
+class FiliereSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Filiere
+        fields = ("id", "type_lycee", "nom", "ordre")
 
 
 class DomaineSerializer(serializers.ModelSerializer):
@@ -64,10 +71,13 @@ class ScolariteSerializer(serializers.ModelSerializer):
     def validate(self, a):
         debut = a.get("annee_debut", getattr(self.instance, "annee_debut", None))
         fin = a.get("annee_fin", getattr(self.instance, "annee_fin", None))
-        if debut is not None and fin is not None:
-            if debut < 1950 or fin > timezone.now().year + 1:
+        if debut is not None:
+            if debut < 1950 or debut > timezone.now().year:
                 raise serializers.ValidationError("Années hors limites.")
-            if fin < debut:
+        if fin is not None:
+            if fin > timezone.now().year + 1:
+                raise serializers.ValidationError("Années hors limites.")
+            if debut is not None and fin < debut:
                 raise serializers.ValidationError("L'année de fin précède l'année de début.")
         return a
 
@@ -85,7 +95,8 @@ class ProfilSerializer(serializers.ModelSerializer):
         model = Profil
         fields = ("id", "prenom", "nom", "statut", "photo", "photo_mini", "bio", "ville", "annee_sortie",
                   "onboarding_termine", "visibilite_profil", "visibilite_parcours",
-                  "visibilite_situation", "qui_peut_inviter", "situation", "scolarites")
+                  "visibilite_situation", "qui_peut_inviter", "whatsapp", "whatsapp_visibilite",
+                  "situation", "scolarites")
 
     def get_photo(self, o):
         return o.photo.url if o.photo else None
@@ -97,3 +108,22 @@ class ProfilSerializer(serializers.ModelSerializer):
         if valeur and valeur > timezone.now().year + 1:
             raise serializers.ValidationError("Année invalide.")
         return valeur
+
+    def validate_whatsapp(self, valeur):
+        valeur = valeur.strip()
+        if not valeur:
+            return ""
+        if not valeur.startswith("+"):
+            raise serializers.ValidationError("Utilisez le format international, par exemple +2250700000000.")
+        try:
+            numero = phonenumbers.parse(valeur, None)
+        except phonenumbers.NumberParseException as erreur:
+            raise serializers.ValidationError("Numéro international invalide.") from erreur
+        if not phonenumbers.is_valid_number(numero):
+            raise serializers.ValidationError("Numéro international invalide.")
+        if phonenumbers.number_type(numero) not in (
+            phonenumbers.PhoneNumberType.MOBILE,
+            phonenumbers.PhoneNumberType.FIXED_LINE_OR_MOBILE,
+        ):
+            raise serializers.ValidationError("Saisissez un numéro mobile.")
+        return phonenumbers.format_number(numero, phonenumbers.PhoneNumberFormat.E164)

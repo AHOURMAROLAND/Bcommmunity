@@ -1,11 +1,14 @@
 from datetime import timedelta
+from unittest.mock import patch
 
 import pytest
+from django.contrib.auth.hashers import check_password
 from django.core.cache import cache
+from django.test import override_settings
 from django.utils import timezone
 from rest_framework.test import APIClient
 
-from comptes.models import Suspension, User
+from comptes.models import OTPEmail, Suspension, User
 from scolarite.models import Classe, Cycle
 
 DONNEES = {"email": "Awa@Example.com", "prenom": "Awa", "nom": "Diallo",
@@ -35,16 +38,35 @@ def test_inscription_cree_un_compte_non_valide(client):
 
 
 @pytest.mark.django_db
-def test_connexion_refusee_tant_que_non_valide(client):
+def test_connexion_refusee_tant_que_email_non_verifie(client):
     inscrire(client)
     r = client.post("/api/auth/connexion/", CONNEXION, format="json")
-    assert r.status_code == 403 and r.data["code"] == "non_valide"
+    assert r.status_code == 403 and r.data["code"] == "email_non_verifie"
+
+
+@pytest.mark.django_db
+def test_compte_verifie_peut_entrer_sans_validation_administrative(client):
+    user = User.objects.create_user(
+        "verified@example.com",
+        DONNEES["password"],
+        prenom="Awa",
+        nom="Diallo",
+        email_verifie=True,
+        valide=False,
+    )
+    reponse = client.post(
+        "/api/auth/connexion/",
+        {"email": user.email, "password": DONNEES["password"]},
+        format="json",
+    )
+    assert reponse.status_code == 200
+    assert "access" in reponse.data
 
 
 @pytest.mark.django_db
 def test_connexion_puis_suspension(client):
     inscrire(client)
-    User.objects.filter(email="awa@example.com").update(valide=True)
+    User.objects.filter(email="awa@example.com").update(valide=True, email_verifie=True)
     r = client.post("/api/auth/connexion/", CONNEXION, format="json")
     assert r.status_code == 200 and "bk_refresh" in r.cookies
     client.credentials(HTTP_AUTHORIZATION=f"Bearer {r.data['access']}")
@@ -59,6 +81,63 @@ def test_connexion_puis_suspension(client):
 @pytest.mark.django_db
 def test_routes_protegees_sans_jeton(client):
     assert client.get("/api/profils/me/").status_code == 401
+
+
+@pytest.mark.django_db
+def test_otp_developpement_est_123456_et_peut_etre_verifie(client):
+    user = User.objects.create_user("otp@example.com", "Un-mot-de-passe-solide-42",
+                                    prenom="Awa", nom="Diallo", valide=False)
+    with patch("comptes.views.brevo.envoyer_otp"):
+        envoi = client.post("/api/auth/otp/envoyer/", {"email": user.email}, format="json")
+    otp = OTPEmail.objects.get(user=user, utilise=False)
+    assert envoi.status_code == 200
+    assert check_password("123456", otp.code)
+
+    verification = client.post(
+        "/api/auth/otp/verifier/",
+        {"email": user.email, "code": "123456"},
+        format="json",
+    )
+    assert verification.status_code == 200
+    user.refresh_from_db()
+    otp.refresh_from_db()
+    assert user.email_verifie and user.valide and otp.utilise
+
+
+@pytest.mark.django_db
+def test_otp_ne_permet_pas_de_se_connecter_a_un_compte_deja_verifie(client):
+    user = User.objects.create_user(
+        "already-verified@example.com",
+        "Un-mot-de-passe-solide-42",
+        prenom="Awa",
+        nom="Diallo",
+        email_verifie=True,
+        valide=True,
+    )
+    envoi = client.post("/api/auth/otp/envoyer/", {"email": user.email}, format="json")
+    verification = client.post(
+        "/api/auth/otp/verifier/",
+        {"email": user.email, "code": "123456"},
+        format="json",
+    )
+    assert envoi.status_code == 200
+    assert verification.status_code == 400
+    assert not OTPEmail.objects.filter(user=user).exists()
+
+
+@pytest.mark.django_db
+@override_settings(DEBUG=False, DEV_OTP_CODE=None)
+def test_otp_en_production_reste_aleatoire(client):
+    user = User.objects.create_user("prod-otp@example.com", "Un-mot-de-passe-solide-42",
+                                    prenom="Awa", nom="Diallo", valide=False)
+    with patch("comptes.views.secrets.randbelow", return_value=12345), \
+         patch("comptes.views.brevo.envoyer_otp"):
+        reponse = client.post("/api/auth/otp/envoyer/", {"email": user.email}, format="json")
+
+    otp = OTPEmail.objects.get(user=user, utilise=False)
+    assert reponse.status_code == 200
+    assert check_password("012345", otp.code)
+    assert not check_password("123456", otp.code)
 
 
 @pytest.mark.django_db

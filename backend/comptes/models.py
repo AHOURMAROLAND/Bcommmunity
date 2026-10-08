@@ -57,9 +57,7 @@ class User(AbstractBaseUser, PermissionsMixin):
         return f"{self.prenom} {self.nom} <{self.email}>"
 
     def blocage(self):
-        """Retourne (code, fin, motif) avec code dans ok, non_valide, suspendu, banni."""
-        if not self.valide:
-            return ("non_valide", None, "")
+        """Retourne (code, fin, motif) avec code dans ok, suspendu ou banni."""
         s = (self.suspensions.filter(active=True)
              .filter(Q(definitive=True) | Q(fin__gt=timezone.now()))
              .order_by("-definitive", "-fin").first())
@@ -103,5 +101,4 @@ class OTPEmail(models.Model):
 
     def __str__(self):
         return f"OTP {self.user_id} — expire {self.expire_le} — utilisé {self.utilise}"
-
 

@@ -52,8 +52,14 @@ export default function ModifierProfil() {
   }
 
   async function envoyerPhoto(fichier) {
-    setARecadrer(null);
-    try { await photo.envoyer.mutateAsync(fichier); } catch (err) { setErreur(tousMessages(err)); }
+    try {
+      await photo.envoyer.mutateAsync(fichier);
+      setARecadrer(null);
+    } catch (err) {
+      const message = tousMessages(err);
+      setErreur(message);
+      throw new Error(message);
+    }
   }
 
   return (

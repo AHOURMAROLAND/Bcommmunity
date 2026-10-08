@@ -18,7 +18,8 @@ def isole():
 
 @pytest.fixture
 def awa(db):
-    return User.objects.create_user("awa@example.com", CONNEXION["password"], prenom="Awa", nom="D", valide=True)
+    return User.objects.create_user("awa@example.com", CONNEXION["password"], prenom="Awa", nom="D",
+                                    valide=True, email_verifie=True)
 
 
 def test_mode_natif_jeton_dans_le_corps_et_web_garde_le_cookie(awa):

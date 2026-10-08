@@ -4,6 +4,7 @@ from django.contrib.auth.tokens import default_token_generator
 from django.utils.encoding import force_str
 from django.utils.http import urlsafe_base64_decode
 from rest_framework import serializers
+from rest_framework.exceptions import PermissionDenied
 from rest_framework.validators import UniqueValidator
 
 from .auth import verifier_acces
@@ -53,6 +54,11 @@ class ConnexionSerializer(serializers.Serializer):
         user = authenticate(email=attrs["email"].strip().lower(), password=attrs["password"])
         if user is None:
             raise serializers.ValidationError({"detail": "Identifiants invalides."})
+        if not user.email_verifie:
+            raise PermissionDenied({
+                "code": "email_non_verifie",
+                "email": user.email,
+            })
         verifier_acces(user)
         attrs["user"] = user
         return attrs

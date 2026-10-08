@@ -8,7 +8,7 @@ L'application permet aux lyceens actuels et aux anciens eleves de :
 - Publier des articles et actualites visibles par la communaute avec partage Open Graph.
 - Echanger par messagerie instantanee apres acceptation d'une invitation, avec transfert vers jusqu'a cinq conversations et apercus Open Graph des liens.
 - Utiliser une barre de navigation mobile coherente avec les themes clair et sombre.
-- Garantir un environnement securise avec validation administrative des comptes et moderation via le Django admin.
+- Proteger l'accès par verification de l'adresse e-mail et moderation des comptes suspendus via le Django admin.
 
 ---
 
@@ -125,7 +125,15 @@ Les donnees PostgreSQL et les fichiers media utilisent des volumes Docker persis
 docker compose exec api python manage.py charger_referentiels
 docker compose exec api python manage.py createsuperuser
 ```
-Le Django admin est accessible sous la valeur `ADMIN_URL` definie dans `.env`.
+Le Django admin est accessible sous la valeur `ADMIN_URL` definie dans `.env` (par defaut : `http://localhost:8080/admin/`). Pour creer un compte sans assistant interactif, utilisez la commande `creer_utilisateur` :
+```bash
+docker compose exec api python manage.py creer_utilisateur \
+  --email admin@example.org --prenom Admin --nom Bakhita --admin
+
+docker compose exec api python manage.py creer_utilisateur \
+  --email eleve@example.org --prenom Awa --nom Bamba --valide --email-verifie
+```
+La commande demande le mot de passe deux fois sans l'afficher et le valide avec les regles Django. `--admin` cree un superutilisateur et active automatiquement la validation du compte et la verification de l'e-mail. Sans `--valide`, un compte standard reste en attente de validation. Remplacez les adresses et noms d'exemple. Un mot de passe peut etre fourni avec `--password` pour un usage automatise, mais cette option peut l'exposer dans l'historique du terminal.
 
 5. Lancer les tests unitaires backend dans le conteneur :
 ```bash
@@ -149,6 +157,11 @@ Ne stockez pas le token dans le depot ni dans l'historique shell.
 docker compose -f docker-compose.prod.yml run --rm api python manage.py charger_referentiels
 docker compose -f docker-compose.prod.yml run --rm api python manage.py createsuperuser
 docker compose -f docker-compose.prod.yml ps
+```
+Pour creer un compte utilisateur standard depuis cette pile, utilisez egalement la commande :
+```bash
+docker compose -f docker-compose.prod.yml run --rm api python manage.py creer_utilisateur \
+  --email eleve@example.org --prenom Awa --nom Bamba --valide --email-verifie
 ```
 
 L'application et le worker utilisent `DATABASE_URL` (URL poollee), tandis que les migrations et les sauvegardes utilisent `DIRECT_DATABASE_URL`. Les fichiers media sont partages avec Caddy via un volume local ; si vous utilisez R2 pour les media, configurez aussi ses identifiants et son domaine public dans `.env`. Les volumes Redis, Caddy et media sont persistants. Ne lancez pas `docker compose down -v` en production.
@@ -235,6 +248,7 @@ python manage.py migrate
 python manage.py charger_referentiels
 python manage.py runserver 0.0.0.0:8000
 ```
+Avec `DJANGO_DEBUG=1`, le code OTP de vérification d'e-mail est fixé à `123456` pour faciliter les essais locaux. Cette valeur est désactivée dès que `DJANGO_DEBUG=0` : les codes redeviennent aléatoires en production.
 
 4. Linter et tests :
 ```bash
@@ -269,7 +283,7 @@ npm run build
 L'interface d'administration Django est accessible sur l'URL definie par la variable d'environnement `ADMIN_URL` (par defaut `gestion-bakhita-x7/` ou `admin/`).
 
 Fonctionnalites administratives implementees :
-- Validation des comptes utilisateurs en attente avant leur premiere connexion.
+- Acces a la plateforme des que l'adresse e-mail est verifiee, sans approbation prealable d'un administrateur.
 - Actions de moderation en un clic : suspension 24 h, 7 jours, 30 jours, ou bannissement definitif.
 - Levee manuelle ou automatique des suspensions.
 - Gestion des referentiels de l'ecole : cycles, classes, filieres et domaines professionnels ou d'etudes.

@@ -32,6 +32,7 @@ def env(nom, defaut=None, requis=False):
 
 
 DEBUG = env("DJANGO_DEBUG", "0") == "1"
+DEV_OTP_CODE = "123456" if DEBUG else None
 SECRET_KEY = env("DJANGO_SECRET_KEY", "dev-only-insecure-key" if DEBUG else None, requis=True)
 ALLOWED_HOSTS = [h for h in env("ALLOWED_HOSTS", "localhost,127.0.0.1").split(",") if h]
 ADMIN_URL = env("ADMIN_URL", "admin/")

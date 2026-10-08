@@ -76,30 +76,23 @@ class UserAdmin(BaseUserAdmin):
     form = UserChangeForm
     add_form = UserCreationForm
     ordering = ("-date_inscription",)
-    list_display = ("email", "prenom", "nom", "statut", "valide", "email_verifie", "is_active", "date_inscription")
-    list_filter = ("valide", "statut", "is_active")
+    list_display = ("email", "prenom", "nom", "statut", "email_verifie", "is_active", "date_inscription")
+    list_filter = ("email_verifie", "statut", "is_active")
     search_fields = ("email", "prenom", "nom")
     inlines = [ProfilInline, SuspensionInline]
     fieldsets = (
         (None, {"fields": ("email", "password")}),
         ("Identité", {"fields": ("prenom", "nom", "statut")}),
-        ("Accès", {"fields": ("valide", "email_verifie", "is_active", "is_staff",
+        ("Accès", {"fields": ("email_verifie", "is_active", "is_staff",
                               "is_superuser", "groups", "user_permissions")}),
     )
     add_fieldsets = ((None, {"classes": ("wide",), "fields": (
         "email", "prenom", "nom", "statut", "password1", "password2")}),)
-    actions = ["valider", "suspendre_24h", "suspendre_7j", "suspendre_30j", "bannir", "lever_suspensions"]
+    actions = ["suspendre_24h", "suspendre_7j", "suspendre_30j", "bannir", "lever_suspensions"]
 
     def save_model(self, request, obj, form, change):
         super().save_model(request, obj, form, change)
         cache.delete(f"blocage:{obj.pk}")
-
-    @admin.action(description="Valider les comptes sélectionnés")
-    def valider(self, request, queryset):
-        n = queryset.update(valide=True, email_verifie=True)
-        for u in queryset:
-            cache.delete(f"blocage:{u.pk}")
-        self.message_user(request, f"{n} compte(s) validé(s).")
 
     @admin.action(description="Suspendre 24 heures")
     def suspendre_24h(self, request, queryset):

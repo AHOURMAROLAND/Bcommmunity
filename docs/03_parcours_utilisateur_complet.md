@@ -43,19 +43,19 @@ Fil ─► Publication ─► Profil auteur
 | Bouton « Créer mon compte » | clic | `POST /auth/register` → page « Vérifiez votre e-mail » ; erreur → message sous le champ |
 | Lien « J'ai déjà un compte » | clic | → `/connexion` |
 
-## 3. Vérification e-mail et attente `/en-attente`
+## 3. Vérification e-mail
 | Élément | Action | Résultat |
 |---|---|---|
-| Lien dans l'e-mail | clic | E-mail vérifié, message « en attente de validation par l'école » |
-| Bouton « Renvoyer l'e-mail » | clic | Nouvel e-mail |
-| Bouton « Se déconnecter » | clic | → accueil |
-Quand l'administrateur valide : e-mail reçu → connexion possible.
+| Code à 6 chiffres reçu par e-mail | saisie | E-mail vérifié, compte activé et connexion ouverte |
+| Bouton « Renvoyer le code » | clic | Nouveau code envoyé, le précédent est invalidé |
+| Retour puis connexion avec un compte non vérifié | clic | Renvoi vers la vérification e-mail avec un nouveau code |
+La validation manuelle par l'école n'est pas requise. Une adresse e-mail doit toutefois être vérifiée avant une connexion par mot de passe.
 
 ## 4. Connexion `/connexion`
 | Élément | Action | Résultat |
 |---|---|---|
 | E-mail + mot de passe | saisie | |
-| Bouton « Se connecter » | clic | `POST /auth/login` → tokens → `/fil` (ou `/onboarding` si profil vide) ; compte non validé → `/en-attente` ; erreur → alerte |
+| Bouton « Se connecter » | clic | `POST /auth/connexion/` → tokens → `/fil` (ou `/onboarding` si profil incomplet) ; e-mail non vérifié → code OTP ; compte suspendu/banni → `/en-attente` |
 | Lien « Mot de passe oublié ? » | clic | → `/mot-de-passe-oublie` |
 | Compte suspendu | connexion | Écran « Compte suspendu jusqu'au JJ/MM/AAAA » avec motif, aucun accès ; si bannissement : message « Accès retiré » |
 

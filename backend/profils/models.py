@@ -33,6 +33,10 @@ class Profil(models.Model):
         return f.url if f else None
     bio = models.CharField(max_length=500, blank=True)
     ville = models.CharField(max_length=100, blank=True)
+    whatsapp = models.CharField(max_length=16, blank=True)
+    whatsapp_visibilite = models.CharField(
+        max_length=10, choices=Visibilite.choices, default=Visibilite.AMIS
+    )
     annee_sortie = models.PositiveSmallIntegerField(null=True, blank=True,
                                                     validators=[MinValueValidator(1950)])
     onboarding_termine = models.BooleanField(default=False)
@@ -95,4 +99,3 @@ def supprimer_photos(sender, instance, **kwargs):
     for f in (instance.photo, instance.photo_s):
         if f:
             f.delete(save=False)
-

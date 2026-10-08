@@ -11,8 +11,8 @@ export default function EnAttente() {
   const code = state?.code ?? "non_valide";
 
   const variantes = {
-    non_valide: { Icone: Hourglass, titre: "Compte en attente de validation", sous: null,
-      texte: "Votre inscription est bien reçue. L'école doit la valider avant que vous puissiez vous connecter." },
+    non_valide: { Icone: Hourglass, titre: "Vérification nécessaire", sous: null,
+      texte: "La validation manuelle par l'école n'est plus requise. Reconnectez-vous ; si votre e-mail n'est pas encore vérifié, vous pourrez demander un nouveau code." },
     suspendu: { Icone: Pause, titre: "Compte suspendu", sous: state?.fin ? `Jusqu'au ${dateCourte(state.fin)}` : null,
       texte: "Votre accès sera rétabli automatiquement à cette date." },
     banni: { Icone: Ban, titre: "Accès retiré", sous: null,

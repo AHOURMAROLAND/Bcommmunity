@@ -31,6 +31,31 @@ export function useRetirerScolarite() {
   });
 }
 
+export const useParcoursBrouillon = () =>
+  useQuery({
+    queryKey: ["parcours-brouillon"],
+    queryFn: () => api("/onboarding/brouillon/"),
+  });
+
+export function useSauverParcoursBrouillon() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body) => api("/onboarding/brouillon/", { method: "PUT", body }),
+    onSuccess: (data) => qc.setQueryData(["parcours-brouillon"], data),
+  });
+}
+
+export function useValiderParcours() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body) => api("/onboarding/valider/", { method: "POST", body }),
+    onSuccess: () => {
+      qc.setQueryData(["parcours-brouillon"], { etape: 0, donnees: {} });
+      qc.invalidateQueries({ queryKey: ["profil"] });
+    },
+  });
+}
+
 export function useMajSituation() {
   const qc = useQueryClient();
   return useMutation({

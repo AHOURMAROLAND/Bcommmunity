@@ -1,4 +1,5 @@
 from datetime import timedelta
+from urllib.parse import urlencode
 
 from django.contrib import admin
 from django.contrib.auth.admin import GroupAdmin as BaseGroupAdmin
@@ -78,12 +79,12 @@ class UserAdmin(BaseUserAdmin, ModelAdmin):
     fieldsets = (
         (None, {"fields": ("email", "password")}),
         ("Identité", {"fields": ("prenom", "nom", "statut")}),
-        ("Accès", {"fields": ("valide", "email_verifie", "is_active", "is_staff",
+        ("Accès", {"fields": ("email_verifie", "is_active", "is_staff",
                               "is_superuser", "groups", "user_permissions")}),
     )
     add_fieldsets = ((None, {"classes": ("wide",), "fields": (
         "email", "prenom", "nom", "statut", "password1", "password2")}),)
-    actions = ["valider", "suspendre_24h", "suspendre_7j", "suspendre_30j", "bannir", "lever_suspensions"]
+    actions = ["suspendre_24h", "suspendre_7j", "suspendre_30j", "bannir", "lever_suspensions"]
 
     def get_queryset(self, request):
         # Un seul calcul SQL pour toute la liste (pas une requête par ligne)
@@ -94,8 +95,11 @@ class UserAdmin(BaseUserAdmin, ModelAdmin):
             _suspendu=Exists(actives.filter(definitive=False)))
 
     @display(description="État", label={
-        "Actif": "success", "En attente": "warning", "Suspendu": "danger", "Banni": "danger"})
+        "Actif": "success", "Désactivé": "danger", "En attente": "warning",
+        "Suspendu": "danger", "Banni": "danger"})
     def etat(self, u):
+        if not u.is_active:
+            return "Désactivé"
         if not u.valide:
             return "En attente"
         if u._banni:
@@ -106,19 +110,12 @@ class UserAdmin(BaseUserAdmin, ModelAdmin):
 
     @display(description="Activité")
     def journal(self, u):
-        return format_html('<a href="{}?q={}">Voir</a>', reverse("admin:comptes_activite_changelist"), u.email)
+        query = urlencode({"q": u.email})
+        return format_html('<a href="{}?{}">Voir</a>', reverse("admin:comptes_activite_changelist"), query)
 
     def save_model(self, request, obj, form, change):
         super().save_model(request, obj, form, change)
         cache.delete(f"blocage:{obj.pk}")
-
-    @admin.action(description="Valider les comptes sélectionnés")
-    def valider(self, request, queryset):
-        ids = list(queryset.values_list("pk", flat=True))
-        n = queryset.update(valide=True, email_verifie=True)
-        for pk in ids:
-            cache.delete(f"blocage:{pk}")
-        self.message_user(request, f"{n} compte(s) validé(s).")
 
     @admin.action(description="Suspendre 24 heures")
     def suspendre_24h(self, request, queryset):
@@ -146,10 +143,27 @@ class UserAdmin(BaseUserAdmin, ModelAdmin):
         self.message_user(request, f"{n} suspension(s) levée(s).")
 
 
+class SuspensionEtatFilter(admin.SimpleListFilter):
+    title = "État"
+    parameter_name = "etat"
+
+    def lookups(self, request, model_admin):
+        return (("en_cours", "En cours"), ("terminee", "Terminée"))
+
+    def queryset(self, request, queryset):
+        maintenant = timezone.now()
+        en_cours = Q(active=True) & (Q(definitive=True) | Q(fin__gt=maintenant))
+        if self.value() == "en_cours":
+            return queryset.filter(en_cours)
+        if self.value() == "terminee":
+            return queryset.exclude(en_cours)
+        return queryset
+
+
 @admin.register(Suspension)
 class SuspensionAdmin(ModelAdmin):
     list_display = ("user", "motif", "debut", "fin", "definitive", "etat")
-    list_filter = ("active", "definitive")
+    list_filter = ("active", "definitive", SuspensionEtatFilter)
     search_fields = ("user__email", "user__nom", "motif")
     raw_id_fields = ("user",)
     readonly_fields = ("debut", "cree_par")
@@ -169,11 +183,7 @@ class SuspensionAdmin(ModelAdmin):
 
     @admin.action(description="Lever les suspensions sélectionnées")
     def lever(self, request, queryset):
-        # Uniquement les lignes cochées (et non toutes celles des membres concernés)
-        membres = set(queryset.values_list("user_id", flat=True))
-        n = queryset.filter(active=True).update(active=False)
-        for uid in membres:
-            cache.delete(f"blocage:{uid}")
+        n = moderation.lever_suspensions(queryset)
         self.message_user(request, f"{n} suspension(s) levée(s).")
 
     @admin.action(description="Prolonger de 7 jours")
@@ -182,8 +192,6 @@ class SuspensionAdmin(ModelAdmin):
             s.fin = max(s.fin or timezone.now(), timezone.now()) + timedelta(days=7)
             s.active = True
             s.save(update_fields=["fin", "active"])
-
-
 @admin.register(Activite)
 class ActiviteAdmin(ModelAdmin):
     list_display = ("cree_le", "user", "type_action", "detail", "ip")

@@ -15,10 +15,23 @@ from .models import Signalement
 OUVERTS = ["nouveau", "en_cours"]
 
 
+class SignalementTraitementFilter(admin.SimpleListFilter):
+    title = "Traitement"
+    parameter_name = "traitement"
+
+    def lookups(self, request, model_admin):
+        return (("ouvert", "Nouveau et en cours"),)
+
+    def queryset(self, request, queryset):
+        if self.value() == "ouvert":
+            return queryset.filter(statut__in=OUVERTS)
+        return queryset
+
+
 @admin.register(Signalement)
 class SignalementAdmin(ModelAdmin):
     list_display = ("id", "type_cible", "cible", "motif", "etat", "nb_sur_cible", "auteur", "cree_le")
-    list_filter = ("statut", "type_cible", "motif")
+    list_filter = ("statut", SignalementTraitementFilter, "type_cible", "motif")
     list_select_related = ("auteur", "utilisateur_cible", "publication_cible", "traite_par")
     date_hierarchy = "cree_le"
     search_fields = ("auteur__email", "utilisateur_cible__email", "publication_cible__titre", "commentaire")

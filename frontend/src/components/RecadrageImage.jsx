@@ -52,9 +52,11 @@ export default function RecadrageImage({
     try {
       const blob = await rogner(src, zone, coteMax);
       const ext = blob.type === "image/webp" ? "webp" : "jpg";
-      onValider(new File([blob], `image.${ext}`, { type: blob.type }));
-    } catch {
-      setErreur("Impossible de traiter cette image. Essayez une autre photo.");
+      await onValider(new File([blob], `image.${ext}`, { type: blob.type }));
+    } catch (cause) {
+      setErreur(cause instanceof Error && cause.message
+        ? cause.message
+        : "Impossible de traiter cette image. Essayez une autre photo.");
       setEnvoi(false);
     }
   }
@@ -86,7 +88,7 @@ export default function RecadrageImage({
           </div>
         )}
         {erreur && <p role="alert" className="erreur" style={{ margin: 0 }}>{erreur}</p>}
-        <div className="duo">
+        <div className="duo recadrage-actions">
           <Bouton secondaire onClick={onAnnuler}>Annuler</Bouton>
           <Bouton chargement={envoi} disabled={!zone} onClick={valider}>Valider le recadrage</Bouton>
         </div>

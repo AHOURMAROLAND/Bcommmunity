@@ -24,7 +24,7 @@ class ScolariteInline(TabularInline):
 
 @admin.register(Profil)
 class ProfilAdmin(ModelAdmin):
-    list_display = ("user", "annee_sortie", "ville", "onboarding_termine")
+    list_display = ("user", "annee_sortie", "ville", "whatsapp", "whatsapp_visibilite", "onboarding_termine")
     list_filter = ("onboarding_termine",)
     search_fields = ("user__email", "user__nom", "user__prenom", "ville")
     raw_id_fields = ("user",)

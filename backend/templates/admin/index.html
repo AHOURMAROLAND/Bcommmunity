@@ -41,28 +41,45 @@
   <p class="bk-sous">Bienvenue{% if request.user.prenom %}, {{ request.user.prenom }}{% endif %}. Voici l'activité de la communauté.</p>
 
   <div class="bk-grille4">
-    <a class="bk-card" href="{% url 'admin:comptes_user_changelist' %}?valide__exact=0">
-      <div class="bk-label">Comptes à valider</div>
+    {% if can_comptes %}
+    <a class="bk-card" href="{% url 'admin:comptes_user_changelist' %}?email_verifie__exact=0&amp;is_active__exact=1">
+      <div class="bk-label">E-mails à vérifier</div>
       <div class="bk-num {% if stats.attente %}alerte{% endif %}">{{ stats.attente }}</div>
-      <div class="bk-note">en attente de l'école</div>
+      <div class="bk-note">en attente du code de confirmation</div>
     </a>
-    <a class="bk-card" href="{% url 'admin:signalements_signalement_changelist' %}?statut__exact=nouveau">
+    {% endif %}
+    {% if can_signalements %}
+    <a class="bk-card" href="{% url 'admin:signalements_signalement_changelist' %}?traitement=ouvert">
       <div class="bk-label">Signalements ouverts</div>
       <div class="bk-num {% if stats.signalements %}alerte{% endif %}">{{ stats.signalements }}</div>
-      <div class="bk-note">à traiter</div>
+      <div class="bk-note">nouveaux ou en cours</div>
     </a>
-    <a class="bk-card" href="{% url 'admin:comptes_user_changelist' %}?valide__exact=1">
+    {% endif %}
+    {% if can_comptes %}
+    <a class="bk-card" href="{% url 'admin:comptes_user_changelist' %}?valide__exact=1&amp;is_active__exact=1">
       <div class="bk-label">Membres actifs</div>
       <div class="bk-num">{{ stats.membres }}</div>
       <div class="bk-note">comptes validés</div>
     </a>
-    <a class="bk-card" href="{% url 'admin:comptes_suspension_changelist' %}?active__exact=1">
+    {% endif %}
+    {% if can_suspensions %}
+    <a class="bk-card" href="{% url 'admin:comptes_suspension_changelist' %}?etat=en_cours">
       <div class="bk-label">Suspensions en cours</div>
       <div class="bk-num">{{ stats.suspendus }}</div>
-      <div class="bk-note">{{ stats.publications_7j }} publication(s) cette semaine</div>
+      <div class="bk-note">suspensions actives et non expirées</div>
     </a>
+    {% endif %}
   </div>
 
+  {% if can_publications %}
+  <div class="bk-card">
+    <p class="bk-titre">Publications</p>
+    <div class="bk-num">{{ stats.publications_7j }}</div>
+    <div class="bk-note">publiée(s) ces 7 derniers jours</div>
+  </div>
+  {% endif %}
+
+  {% if can_comptes %}
   <div class="bk-grille2">
     <div class="bk-card">
       <p class="bk-titre">Inscriptions</p>
@@ -87,10 +104,12 @@
       <div class="bk-leg"><span><i class="bk-pt" style="background:#fdba74"></i>Anciens élèves</span><b>{{ repartition.anciens }}</b></div>
     </div>
   </div>
+  {% endif %}
 
   <div class="bk-grille3">
+    {% if can_comptes %}
     <div class="bk-card">
-      <p class="bk-titre">Derniers comptes à valider</p>
+      <p class="bk-titre">Derniers e-mails à vérifier</p>
       {% if en_attente %}
       <ul class="bk-liste">
         {% for u in en_attente %}
@@ -99,6 +118,8 @@
       </ul>
       {% else %}<p class="bk-vide">Aucun compte en attente.</p>{% endif %}
     </div>
+    {% endif %}
+    {% if can_signalements %}
     <div class="bk-card">
       <p class="bk-titre">Nouveaux signalements</p>
       {% if derniers_signalements %}
@@ -109,6 +130,8 @@
       </ul>
       {% else %}<p class="bk-vide">Aucun signalement à traiter.</p>{% endif %}
     </div>
+    {% endif %}
+    {% if can_actions_admin %}
     <div class="bk-card">
       <p class="bk-titre">Dernières actions de l'équipe</p>
       {% if dernieres_actions %}
@@ -119,7 +142,9 @@
       </ul>
       {% else %}<p class="bk-vide">Aucune action récente.</p>{% endif %}
     </div>
+    {% endif %}
   </div>
+  {% if can_activite %}
   <div class="bk-card">
     <p class="bk-titre">Activité des membres</p>
     <div class="bk-note">{{ connexions_24h }} connexion(s) ces dernières 24 h · <a href="{% url 'admin:comptes_activite_changelist' %}" style="color:var(--acc)">Voir tout le journal</a></div>
@@ -131,5 +156,6 @@
     </ul>
     {% else %}<p class="bk-vide">Aucune activité enregistrée pour l'instant.</p>{% endif %}
   </div>
+  {% endif %}
 </div>
 {% endblock %}

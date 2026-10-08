@@ -32,9 +32,13 @@ def env(nom, defaut=None, requis=False):
 
 
 DEBUG = env("DJANGO_DEBUG", "0") == "1"
+DEV_OTP_CODE = "123456" if DEBUG else None
 SECRET_KEY = env("DJANGO_SECRET_KEY", "dev-only-insecure-key" if DEBUG else None, requis=True)
 ALLOWED_HOSTS = [h for h in env("ALLOWED_HOSTS", "localhost,127.0.0.1").split(",") if h]
 ADMIN_URL = env("ADMIN_URL", "admin/")
+TRUSTED_PROXY_IPS = [
+    ip.strip() for ip in env("TRUSTED_PROXY_IPS", "").split(",") if ip.strip()
+]
 
 INSTALLED_APPS = [
     # Daphne doit etre en premiere position pour les WebSockets ASGI
@@ -338,6 +342,14 @@ def _lien(nom):
     return reverse_lazy(f"admin:{nom}_changelist")
 
 
+def _permission(code):
+    app, codename = code.split(".", 1)
+    modification = f"{app}.change_{codename[5:]}" if codename.startswith("view_") else None
+    return lambda request: request.user.has_perm(code) or (
+        modification is not None and request.user.has_perm(modification)
+    )
+
+
 UNFOLD = {
     "SITE_TITLE": "Bakhita Community",
     "SITE_HEADER": "Bakhita Community",
@@ -366,44 +378,58 @@ UNFOLD = {
                 "title": "Membres",
                 "separator": True,
                 "items": [
-                    {"title": "Comptes", "icon": "group", "link": _lien("comptes_user")},
-                    {"title": "Profils", "icon": "badge", "link": _lien("profils_profil")},
-                    {"title": "Groupes", "icon": "groups", "link": _lien("auth_group")},
+                    {"title": "Comptes", "icon": "group", "link": _lien("comptes_user"),
+                     "permission": _permission("comptes.view_user")},
+                    {"title": "Profils", "icon": "badge", "link": _lien("profils_profil"),
+                     "permission": _permission("profils.view_profil")},
+                    {"title": "Groupes", "icon": "groups", "link": _lien("auth_group"),
+                     "permission": _permission("auth.view_group")},
                 ],
             },
             {
                 "title": "Modération",
                 "separator": True,
                 "items": [
-                    {"title": "Signalements", "icon": "flag", "link": _lien("signalements_signalement")},
-                    {"title": "Suspensions", "icon": "gavel", "link": _lien("comptes_suspension")},
-                    {"title": "Journal d'activité", "icon": "history", "link": _lien("comptes_activite")},
+                    {"title": "Signalements", "icon": "flag", "link": _lien("signalements_signalement"),
+                     "permission": _permission("signalements.view_signalement")},
+                    {"title": "Suspensions", "icon": "gavel", "link": _lien("comptes_suspension"),
+                     "permission": _permission("comptes.view_suspension")},
+                    {"title": "Journal d'activité", "icon": "history", "link": _lien("comptes_activite"),
+                     "permission": _permission("comptes.view_activite")},
                 ],
             },
             {
                 "title": "Contenu",
                 "separator": True,
                 "items": [
-                    {"title": "Publications", "icon": "article", "link": _lien("publications_publication")},
-                    {"title": "Commentaires", "icon": "chat", "link": _lien("publications_commentaire")},
+                    {"title": "Publications", "icon": "article", "link": _lien("publications_publication"),
+                     "permission": _permission("publications.view_publication")},
+                    {"title": "Commentaires", "icon": "chat", "link": _lien("publications_commentaire"),
+                     "permission": _permission("publications.view_commentaire")},
                 ],
             },
             {
                 "title": "Scolarité",
                 "separator": True,
                 "items": [
-                    {"title": "Cycles", "icon": "layers", "link": _lien("scolarite_cycle")},
-                    {"title": "Classes", "icon": "class", "link": _lien("scolarite_classe")},
-                    {"title": "Parcours des membres", "icon": "history_edu", "link": _lien("scolarite_scolarite")},
-                    {"title": "Domaines d'études", "icon": "science", "link": _lien("profils_domaine")},
+                    {"title": "Cycles", "icon": "layers", "link": _lien("scolarite_cycle"),
+                     "permission": _permission("scolarite.view_cycle")},
+                    {"title": "Classes", "icon": "class", "link": _lien("scolarite_classe"),
+                     "permission": _permission("scolarite.view_classe")},
+                    {"title": "Parcours des membres", "icon": "history_edu", "link": _lien("scolarite_scolarite"),
+                     "permission": _permission("scolarite.view_scolarite")},
+                    {"title": "Domaines d'études", "icon": "science", "link": _lien("profils_domaine"),
+                     "permission": _permission("profils.view_domaine")},
                 ],
             },
             {
                 "title": "Sécurité",
                 "separator": True,
                 "items": [
-                    {"title": "Sessions actives", "icon": "key", "link": _lien("token_blacklist_outstandingtoken")},
-                    {"title": "Sessions révoquées", "icon": "block", "link": _lien("token_blacklist_blacklistedtoken")},
+                    {"title": "Sessions actives", "icon": "key", "link": _lien("token_blacklist_outstandingtoken"),
+                     "permission": _permission("token_blacklist.view_outstandingtoken")},
+                    {"title": "Sessions révoquées", "icon": "block", "link": _lien("token_blacklist_blacklistedtoken"),
+                     "permission": _permission("token_blacklist.view_blacklistedtoken")},
                 ],
             },
         ],

@@ -24,7 +24,7 @@
 
 ## 3. Ordre de développement conseillé (backlog MVP)
 1. Auth + profil + scolarité (`V1-V4`, `E1`, `E2`, `A1`)
-2. Admin : validation des comptes (`AD1`, `AD2`, `AD13`)
+2. Admin : moderation et gestion des comptes (`AD1`, `AD2`, `AD13`) ; l'inscription ne requiert pas d'approbation manuelle
 3. Annuaire, suggestions, amis (`E3-E6`, `E12`, `E13`, `A5`)
 4. Publications, likes, commentaires (`E9-E11`)
 5. Partage et aperçu (`E21`, `E22`, `V5`)

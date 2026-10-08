@@ -3,12 +3,13 @@ import { Navigate, useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 import {
   useAjouterScolarite, useMajProfil, useMajSituation, useProfil,
-  useReferentiels, useRetirerScolarite,
+  useParcoursBrouillon, useReferentiels, useRetirerScolarite,
 } from "../api/hooks";
 import { Bouton, Champ, Marque, Selecteur } from "../components/ui";
 import { SqCentree } from "../components/Squelettes";
 import { erreursChamps, tousMessages } from "../api/erreurs";
 import ChargementLong from "@/components/ChargementLong";
+import EtapeParcours from "./EtapeParcours";
 
 const ANNEE_MAX = new Date().getFullYear() + 1;
 const num = (v) => (v === "" || v == null ? null : Number(v));
@@ -18,11 +19,19 @@ export default function Onboarding() {
   const ancien = utilisateur.statut === "ancien";
   const total = ancien ? 3 : 2;
   const [etape, setEtape] = useState(1);
+  const [brouillonCharge, setBrouillonCharge] = useState(false);
   const profil = useProfil();
+  const brouillon = useParcoursBrouillon();
   const maj = useMajProfil();
   const navigate = useNavigate();
 
-  if (profil.isPending) return <SqCentree />;
+  useEffect(() => {
+    if (brouillonCharge || (brouillon.isPending && !brouillon.isError)) return;
+    if (brouillon.data?.etape === 2) setEtape(2);
+    setBrouillonCharge(true);
+  }, [brouillon.data, brouillon.isError, brouillon.isPending, brouillonCharge]);
+
+  if (profil.isPending || !brouillonCharge) return <SqCentree />;
   if (profil.data?.onboarding_termine) return <Navigate to="/fil" replace />;
 
   async function terminer(extra = {}) {
@@ -37,10 +46,10 @@ export default function Onboarding() {
       <ChargementLong actif={maj.isPending} label="Enregistrement..." />
       <div className="carte">
         {etape === 1 && <Etape1 profil={profil.data} onSuivant={() => setEtape(2)} />}
-        {etape === 2 && (
-          <Etape2 profil={profil.data} onRetour={() => setEtape(1)}
-            onSuivant={() => (ancien ? setEtape(3) : terminer())} dernier={!ancien} />
-        )}
+        {etape === 2 && <EtapeParcours
+          onRetour={() => setEtape(1)}
+          onSuivant={() => (ancien ? setEtape(3) : terminer())}
+        />}
         {etape === 3 && <Etape3 profil={profil.data} onRetour={() => setEtape(2)} onTerminer={terminer} />}
       </div>
     </div></main>

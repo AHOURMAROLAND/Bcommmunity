@@ -2,13 +2,23 @@ from django.core.cache import cache
 from django.core.management.base import BaseCommand
 
 from profils.models import Domaine
-from scolarite.models import Classe, Cycle
+from scolarite.models import Classe, Cycle, Filiere
 
 
 class Command(BaseCommand):
     help = "Charge les référentiels de base (cycles, classes, domaines)."
 
     def handle(self, *args, **options):
+        filieres = {}
+        for type_lycee, noms in (
+            ("moderne", ("Générale", "Littéraire", "Scientifique")),
+            ("technique", ("Électrotechnique", "Comptabilité", "Mécanique")),
+        ):
+            for ordre, nom in enumerate(noms, start=1):
+                filieres[(type_lycee, nom)], _ = Filiere.objects.get_or_create(
+                    type_lycee=type_lycee, nom=nom,
+                    defaults={"ordre": ordre, "active": True},
+                )
         cycles_data = [
             ("Maternelle", 1, [
                 ("Petite Section", "", 1),
@@ -50,6 +60,18 @@ class Command(BaseCommand):
                 Classe.objects.get_or_create(
                     cycle=cycle, nom=nom_c, filiere=filiere_c, defaults={"ordre": ordre_c}
                 )
+        lycee = Cycle.objects.get(nom="Lycée")
+        for (_, nom_filiere), filiere in filieres.items():
+            for ordre, nom_classe in enumerate(("2nde", "1ère", "Terminale"), start=1):
+                classe, _ = Classe.objects.get_or_create(
+                    cycle=lycee,
+                    nom=nom_classe,
+                    filiere=nom_filiere,
+                    defaults={"ordre": ordre, "filiere_ref": filiere},
+                )
+                if classe.filiere_ref_id != filiere.pk:
+                    classe.filiere_ref = filiere
+                    classe.save(update_fields=["filiere_ref"])
 
         domaines = [
             "Santé et médecine",

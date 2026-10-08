@@ -62,7 +62,7 @@ export async function api(chemin, options = {}, dejaRetente = false) {
   }
   if (!r.ok) {
     const data = await lire(r);
-    if (r.status === 403 && ["non_valide", "suspendu", "banni"].includes(data?.code)) {
+    if (r.status === 403 && ["suspendu", "banni"].includes(data?.code)) {
       window.dispatchEvent(new CustomEvent("acces-bloque", { detail: data }));
     }
     throw new ApiError(r.status, data);

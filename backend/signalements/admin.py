@@ -3,6 +3,8 @@ from django.db.models import Q
 from django.shortcuts import redirect
 from django.utils import timezone
 from django.utils.html import format_html, format_html_join
+from unfold.admin import ModelAdmin
+from unfold.decorators import display
 
 from comptes import moderation
 from comptes.moderation import MOTIFS_PUBLICS
@@ -14,8 +16,8 @@ OUVERTS = ["nouveau", "en_cours"]
 
 
 @admin.register(Signalement)
-class SignalementAdmin(admin.ModelAdmin):
-    list_display = ("id", "type_cible", "cible", "motif", "statut", "nb_sur_cible", "auteur", "cree_le")
+class SignalementAdmin(ModelAdmin):
+    list_display = ("id", "type_cible", "cible", "motif", "etat", "nb_sur_cible", "auteur", "cree_le")
     list_filter = ("statut", "type_cible", "motif")
     list_select_related = ("auteur", "utilisateur_cible", "publication_cible", "traite_par")
     date_hierarchy = "cree_le"
@@ -35,6 +37,11 @@ class SignalementAdmin(admin.ModelAdmin):
         return super().changelist_view(request, extra_context)
 
     # --- affichage ---
+    @display(description="Statut", label={
+        "Nouveau": "danger", "En cours": "warning", "Traité": "success", "Ignoré": "info"})
+    def etat(self, s):
+        return s.get_statut_display()
+
     @admin.display(description="Cible")
     def cible(self, s):
         if s.type_cible == "publication":

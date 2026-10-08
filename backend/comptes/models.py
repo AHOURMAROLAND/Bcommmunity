@@ -105,3 +105,33 @@ class OTPEmail(models.Model):
         return f"OTP {self.user_id} — expire {self.expire_le} — utilisé {self.utilise}"
 
 
+class Activite(models.Model):
+    """Journal d'activité des membres : actions uniquement, jamais le contenu des messages privés."""
+
+    class Action(models.TextChoices):
+        CONNEXION = "connexion", "Connexion"
+        INSCRIPTION = "inscription", "Inscription"
+        PUBLICATION = "publication", "Publication créée"
+        COMMENTAIRE = "commentaire", "Commentaire"
+        SIGNALEMENT = "signalement", "Signalement envoyé"
+        SUSPENSION = "suspension", "Suspension / bannissement"
+        MOT_DE_PASSE = "mot_de_passe", "Mot de passe modifié"
+
+    user = models.ForeignKey(User, null=True, blank=True, related_name="activites",
+                             on_delete=models.CASCADE)  # compte supprimé : son journal l'est aussi
+    action = models.CharField(max_length=20, choices=Action.choices)
+    detail = models.CharField(max_length=255, blank=True)
+    ip = models.GenericIPAddressField(null=True, blank=True)
+    appareil = models.CharField(max_length=200, blank=True)
+    cree_le = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ["-cree_le"]
+        verbose_name = "activité"
+        verbose_name_plural = "journal d'activité"
+        indexes = [models.Index(fields=["user", "-cree_le"]),
+                   models.Index(fields=["action", "-cree_le"]),
+                   models.Index(fields=["-cree_le"])]
+
+    def __str__(self):
+        return f"{self.get_action_display()} - {self.user_id} - {self.cree_le:%d/%m/%Y %H:%M}"

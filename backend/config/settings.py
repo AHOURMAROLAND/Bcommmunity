@@ -39,6 +39,7 @@ ADMIN_URL = env("ADMIN_URL", "admin/")
 INSTALLED_APPS = [
     # Daphne doit etre en premiere position pour les WebSockets ASGI
     "daphne",
+    "unfold",
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
@@ -78,7 +79,7 @@ WSGI_APPLICATION = "config.wsgi.application"
 
 TEMPLATES = [{
     "BACKEND": "django.template.backends.django.DjangoTemplates",
-    "DIRS": [],
+    "DIRS": [__import__("pathlib").Path(__file__).resolve().parent.parent / "templates"],
     "APP_DIRS": True,
     "OPTIONS": {"context_processors": [
         "django.template.context_processors.request",
@@ -327,3 +328,84 @@ CORS_ALLOWED_ORIGINS = [
     ).split(",") if o
 ]
 CORS_ALLOW_CREDENTIALS = True
+
+
+# --- Interface d'administration (Unfold) ---
+from django.urls import reverse_lazy  # noqa: E402
+
+
+def _lien(nom):
+    return reverse_lazy(f"admin:{nom}_changelist")
+
+
+UNFOLD = {
+    "SITE_TITLE": "Bakhita Community",
+    "SITE_HEADER": "Bakhita Community",
+    "SITE_SYMBOL": "school",
+    "DASHBOARD_CALLBACK": "comptes.tableau_de_bord.contexte",
+    "COLORS": {
+        "primary": {
+            "50": "oklch(98% 0.016 73.684)",
+            "100": "oklch(95.4% 0.038 75.164)",
+            "200": "oklch(90.1% 0.076 70.697)",
+            "300": "oklch(83.7% 0.128 66.29)",
+            "400": "oklch(75% 0.183 55.934)",
+            "500": "oklch(70.5% 0.213 47.604)",
+            "600": "oklch(64.6% 0.222 41.116)",
+            "700": "oklch(55.3% 0.195 38.402)",
+            "800": "oklch(47% 0.157 37.304)",
+            "900": "oklch(40.8% 0.123 38.172)",
+            "950": "oklch(26.6% 0.079 36.259)",
+        },
+    },
+    "SIDEBAR": {
+        "show_search": True,
+        "show_all_applications": False,
+        "navigation": [
+            {
+                "title": "Membres",
+                "separator": True,
+                "items": [
+                    {"title": "Comptes", "icon": "group", "link": _lien("comptes_user")},
+                    {"title": "Profils", "icon": "badge", "link": _lien("profils_profil")},
+                    {"title": "Groupes", "icon": "groups", "link": _lien("auth_group")},
+                ],
+            },
+            {
+                "title": "Modération",
+                "separator": True,
+                "items": [
+                    {"title": "Signalements", "icon": "flag", "link": _lien("signalements_signalement")},
+                    {"title": "Suspensions", "icon": "gavel", "link": _lien("comptes_suspension")},
+                    {"title": "Journal d'activité", "icon": "history", "link": _lien("comptes_activite")},
+                ],
+            },
+            {
+                "title": "Contenu",
+                "separator": True,
+                "items": [
+                    {"title": "Publications", "icon": "article", "link": _lien("publications_publication")},
+                    {"title": "Commentaires", "icon": "chat", "link": _lien("publications_commentaire")},
+                ],
+            },
+            {
+                "title": "Scolarité",
+                "separator": True,
+                "items": [
+                    {"title": "Cycles", "icon": "layers", "link": _lien("scolarite_cycle")},
+                    {"title": "Classes", "icon": "class", "link": _lien("scolarite_classe")},
+                    {"title": "Parcours des membres", "icon": "history_edu", "link": _lien("scolarite_scolarite")},
+                    {"title": "Domaines d'études", "icon": "science", "link": _lien("profils_domaine")},
+                ],
+            },
+            {
+                "title": "Sécurité",
+                "separator": True,
+                "items": [
+                    {"title": "Sessions actives", "icon": "key", "link": _lien("token_blacklist_outstandingtoken")},
+                    {"title": "Sessions révoquées", "icon": "block", "link": _lien("token_blacklist_blacklistedtoken")},
+                ],
+            },
+        ],
+    },
+}

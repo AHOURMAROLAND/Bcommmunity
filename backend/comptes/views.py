@@ -21,6 +21,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 
 from . import brevo
 from . import google as google_service
+from . import journal
 from .auth import verifier_acces
 from .models import OTPEmail, User
 from .serializers import (
@@ -85,7 +86,9 @@ class ConnexionView(PublicView):
     def post(self, request):
         ser = ConnexionSerializer(data=request.data)
         ser.is_valid(raise_exception=True)
-        return reponse_connexion(ser.validated_data["user"], natif(request))
+        user = ser.validated_data["user"]
+        journal.enregistrer(user, "connexion", "Mot de passe", request=request)
+        return reponse_connexion(user, natif(request))
 
 
 class GoogleView(PublicView):
@@ -127,6 +130,7 @@ class GoogleView(PublicView):
                 user.email_verifie = True
             user.save(update_fields=["google_sub", "email_verifie", "password"])
         verifier_acces(user)  # non validé, suspendu ou banni : 403 avec code
+        journal.enregistrer(user, "connexion", "Google", request=request)
         return reponse_connexion(user, natif(request))
 
 
@@ -278,6 +282,7 @@ class VerifierOTPView(PublicView):
                 user.email_verifie = True
                 user.save(update_fields=["email_verifie"])
                 verifier_acces(user)
+                journal.enregistrer(user, "connexion", "Code par e-mail", request=request)
                 return reponse_connexion(user)
         return Response({"detail": "Code invalide ou expiré."}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -303,5 +308,6 @@ class ChangerMotDePasseView(APIView):
             return Response({"detail": "Le mot de passe actuel est incorrect."}, status=400)
         user.set_password(ser.validated_data["nouveau"])
         user.save(update_fields=["password"])
+        journal.enregistrer(user, "mot_de_passe", request=request)
         return Response({"detail": "Mot de passe modifié avec succès."})
 

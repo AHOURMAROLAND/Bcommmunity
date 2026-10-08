@@ -110,3 +110,5 @@ zope.interface==8.6
 celery
 pywebpush
 firebase-admin
+
+django-unfold==0.108.0

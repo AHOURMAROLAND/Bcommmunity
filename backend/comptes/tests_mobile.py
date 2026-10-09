@@ -1,4 +1,5 @@
 import pytest
+from django.conf import settings
 from django.core.cache import cache
 from rest_framework.test import APIClient
 
@@ -27,7 +28,13 @@ def test_mode_natif_jeton_dans_le_corps_et_web_garde_le_cookie(awa):
     r = c.post("/api/auth/connexion/", CONNEXION, format="json", HTTP_X_CLIENT="natif")
     assert "refresh" in r.data and "bk_refresh" not in r.cookies
     r2 = c.post("/api/auth/rafraichir/", {"refresh": r.data["refresh"]}, format="json", HTTP_X_CLIENT="natif")
-    assert r2.status_code == 200 and "access" in r2.data and "refresh" in r2.data
+    assert r2.status_code == 200 and "access" in r2.data
+    if "sqlite" in settings.DATABASES["default"]["ENGINE"]:
+        assert "refresh" not in r2.data
+        r3 = c.post("/api/auth/rafraichir/", {"refresh": r.data["refresh"]}, format="json", HTTP_X_CLIENT="natif")
+        assert r3.status_code == 200 and "access" in r3.data
+    else:
+        assert "refresh" in r2.data
     web = APIClient().post("/api/auth/connexion/", CONNEXION, format="json")
     assert "bk_refresh" in web.cookies and "refresh" not in web.data
 

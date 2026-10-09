@@ -14,7 +14,7 @@ L'application permet aux lyceens actuels et aux anciens eleves de :
 
 ## 1. Architecture technique
 
-- **Backend** : Django 5.2, Django REST Framework, SimpleJWT (access token en memoire, refresh token en cookie HttpOnly / SameSite / Secure avec rotation et liste noire), Argon2 pour le hachage des mots de passe.
+- **Backend** : Django 5.2, Django REST Framework, SimpleJWT (access token en memoire, refresh token en cookie HttpOnly / SameSite / Secure ; rotation et liste noire avec PostgreSQL, sans rotation sur SQLite local), Argon2 pour le hachage des mots de passe.
 - **Base de donnees et cache** : PostgreSQL 16, Redis 7 (mise en cache des referentiels et du controle d'acces en 15 secondes).
 - **Frontend Web et PWA** : React 19, Vite, Tailwind CSS, TanStack Query, React Router, typographie Quicksand en local (@fontsource/quicksand).
 - **Mobile** : PWA installable et packaging APK Android via Capacitor.

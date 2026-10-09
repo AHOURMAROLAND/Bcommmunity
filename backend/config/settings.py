@@ -291,6 +291,11 @@ SIMPLE_JWT = {
     "AUTH_HEADER_TYPES": ("Bearer",),
 }
 
+if "sqlite" in DATABASES["default"].get("ENGINE", ""):
+    # SQLite's single-writer locking makes concurrent refresh-token rotation unreliable.
+    SIMPLE_JWT["ROTATE_REFRESH_TOKENS"] = False
+    SIMPLE_JWT["BLACKLIST_AFTER_ROTATION"] = False
+
 LOGGING = {
     "version": 1, "disable_existing_loggers": False,
     "handlers": {"console": {"class": "logging.StreamHandler"}},

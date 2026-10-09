@@ -65,11 +65,17 @@ function Portail({ children }) {
 
 function Plein() {
   const location = useLocation();
+  const { utilisateur } = useAuth();
   return (
     <main className="contenu">
       <BandeauHorsLigne />
       <BandeauSynchronisation />
       <BoutonSupport />
+      {utilisateur?.lecture_seule && (
+        <div className="bandeau-lecture-seule" role="status">
+          Compte en lecture seule : la consultation est disponible, mais les modifications sont désactivées.
+        </div>
+      )}
       {!location.pathname.startsWith("/messages/") && <BoutonRetour />}
       <Outlet />
     </main>

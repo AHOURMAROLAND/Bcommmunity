@@ -3,6 +3,8 @@ from django.conf.urls.static import static
 from django.contrib import admin
 from django.urls import include, path
 
+from comptes.admin_views import rechercher_globale
+from profils.views import partage_profil
 from publications.views import partage
 
 from .sante import sante, vivant
@@ -14,6 +16,12 @@ admin.site.index_title = "Administration"
 urlpatterns = [
     path("api/vivant/", vivant),
     path("api/sante/", sante),
+    path("profil-partage/<int:user_id>/", partage_profil),
+    path(
+        f"{settings.ADMIN_URL}recherche/",
+        admin.site.admin_view(rechercher_globale),
+        name="admin-global-search",
+    ),
     path(settings.ADMIN_URL, admin.site.urls),
     path("p/<int:pk>/", partage),
     path("api/", include("comptes.urls")),

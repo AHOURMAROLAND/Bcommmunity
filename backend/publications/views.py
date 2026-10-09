@@ -220,18 +220,34 @@ class CommentaireDetailView(APIView):
 def partage(request, pk):
     """Page légère avec balises Open Graph pour les aperçus WhatsApp. Inconnue, masquée ou non
     publique : même page générique, donc aucune fuite sur l'existence de la publication."""
-    pub = Publication.objects.filter(pk=pk, statut="publie", masquee=False, apercu_public=True,
-                                     auteur__valide=True, auteur__is_active=True).first()
-    ctx = {"ouvert": pub is not None, "url": f"{settings.SITE_URL}/p/{pk}", "lien_app": f"/publications/{pk}"}
+    base_site = settings.SITE_URL.rstrip("/")
+    pub = Publication.objects.select_related("auteur__profil").filter(
+        pk=pk, statut="publie", masquee=False, apercu_public=True,
+        auteur__valide=True, auteur__is_active=True,
+    ).first()
+    ctx = {
+        "ouvert": pub is not None,
+        "url": f"{base_site}/p/{pk}/",
+        "lien_app": f"{base_site}/publications/{pk}",
+        "type_og": "article",
+        "image_alt": "Image de la publication Bakhita Community",
+    }
     if pub:
         img = (pub.image_m or pub.image) if pub.image else None
+        profil_auteur = getattr(pub.auteur, "profil", None)
+        if not img and profil_auteur and profil_auteur.photo:
+            img = profil_auteur.photo
         if img:
             url_img = img.url
-            # Avec R2, l'URL est deja absolue (https://cdn...)
-            image_abs = url_img if url_img.startswith("http") else f"{settings.SITE_URL}{url_img}"
+            image_abs = url_img if url_img.startswith("http") else f"{base_site}{url_img}"
         else:
             image_abs = None
-        ctx.update(titre=pub.titre, description=pub.extrait[:160], image=image_abs)
+        ctx.update(
+            titre=pub.titre,
+            description=pub.extrait[:160] or pub.contenu[:160],
+            image=image_abs,
+            image_alt=f"Image de la publication {pub.titre}",
+        )
     rep = render(request, "publications/partage.html", ctx)
     rep["Cache-Control"] = "public, max-age=300" if pub else "no-store"
     return rep

@@ -6,6 +6,12 @@ public class MainActivity extends BridgeActivity {
     private static volatile boolean appVisible;
 
     @Override
+    public void onCreate(android.os.Bundle savedInstanceState) {
+        registerPlugin(ScreenshotProtectionPlugin.class);
+        super.onCreate(savedInstanceState);
+    }
+
+    @Override
     public void onResume() {
         super.onResume();
         appVisible = true;

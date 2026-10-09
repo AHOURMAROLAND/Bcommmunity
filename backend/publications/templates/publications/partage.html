@@ -6,11 +6,15 @@
   <meta name="robots" content="noindex">
   <title>{% if ouvert %}{{ titre }} - {% endif %}Bakhita Community</title>
   <meta property="og:site_name" content="Bakhita Community">
-  <meta property="og:type" content="article">
+  <meta property="og:type" content="{{ type_og|default:'article' }}">
   <meta property="og:url" content="{{ url }}">
   <meta property="og:title" content="{% if ouvert %}{{ titre }}{% else %}Bakhita Community{% endif %}">
   <meta property="og:description" content="{% if ouvert %}{{ description }}{% else %}Le réseau des élèves et anciens élèves de l'école.{% endif %}">
-  {% if ouvert and image %}<meta property="og:image" content="{{ image }}">{% endif %}
+  {% if ouvert and image %}
+    <meta property="og:image" content="{{ image }}">
+    <meta property="og:image:alt" content="{{ image_alt }}">
+    <meta name="twitter:image" content="{{ image }}">
+  {% endif %}
   <meta name="twitter:card" content="{% if ouvert and image %}summary_large_image{% else %}summary{% endif %}">
   <style>
     :root { --bg:#fff; --texte:#0b1f4b; --doux:#5b6785; }
@@ -28,11 +32,11 @@
   <p class="doux"><strong>Bakhita</strong> Community</p>
   {% if ouvert %}
     <h1>{{ titre }}</h1>
-    {% if image %}<img src="{{ image }}" alt="">{% endif %}
+    {% if image %}<img src="{{ image }}" alt="{{ image_alt|default:'Aperçu Bakhita Community' }}">{% endif %}
     <p>{{ description }}</p>
     <a class="btn" href="{{ lien_app }}">Se connecter pour lire la suite</a>
   {% else %}
-    <h1>Publication réservée aux membres</h1>
+    <h1>Contenu réservé aux membres</h1>
     <p class="doux">Connectez-vous pour retrouver les publications de votre école.</p>
     <a class="btn" href="/connexion">Se connecter</a>
   {% endif %}

@@ -8,6 +8,7 @@ import {
   MessageCircle,
   MoreHorizontal,
   Images,
+  Share2,
   UserCheck,
   UserPlus,
   Users,
@@ -21,6 +22,8 @@ import ModaleSignalement from "../components/ModaleSignalement";
 import PublicationCard from "../components/PublicationCard";
 import { Bouton } from "../components/ui";
 import { SqCartes, SqProfil } from "../components/Squelettes";
+import { partagerProfil } from "../utils/partager";
+import { afficherToast } from "../utils/toast";
 
 function PublicationsDe({ id }) {
   const q = useFil(id);
@@ -76,6 +79,11 @@ export default function ProfilPublic() {
     if (!window.confirm(`Bloquer ${d.prenom} ${d.nom} ? Vous ne vous verrez plus mutuellement.`)) return;
     await bloquer.mutateAsync(d.id);
     navigate("/annuaire", { replace: true });
+  }
+
+  async function partagerCeProfil() {
+    const resultat = await partagerProfil(d);
+    if (resultat === "copie") afficherToast("Lien du profil copié.", "succes");
   }
 
   return (
@@ -154,6 +162,11 @@ export default function ProfilPublic() {
             {d.statut === "ancien" ? "Ancienne élève" : "Élève actuel"}
             {d.annee_sortie ? ` · promo ${d.annee_sortie}` : ""}
           </p>
+          {d.badges?.length > 0 && (
+            <div className="profil-badges">
+              {d.badges.map((badge) => <span key={badge.type}>{badge.libelle}</span>)}
+            </div>
+          )}
           {d.situation?.texte ? (
             <p className="profil-hero-situation">{d.situation.texte}</p>
           ) : d.ville ? (
@@ -173,6 +186,9 @@ export default function ProfilPublic() {
             <Images size={18} /> Galerie ({d.galerie.length})
           </Link>
         )}
+        <button type="button" className="puce" onClick={partagerCeProfil}>
+          <Share2 size={16} /> Partager le profil
+        </button>
         {/* Rangée des deux boutons d'action (Ajouter en ami + Message) */}
         <div className="profil-actions-row">
           {/* Bouton Relation */}

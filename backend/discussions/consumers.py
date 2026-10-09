@@ -128,8 +128,17 @@ class HubConsumer(AsyncJsonWebsocketConsumer):
             await presence(self.user.pk, self.channel_name)
             return await self.send_json({"type": "pong"})
         if t == "message.send":
+            if self.user.lecture_seule:
+                return await self.send_json({
+                    "type": "erreur",
+                    "cid": str(c.get("cid") or "")[:40],
+                    "conversation": c.get("conversation"),
+                    "detail": "Ce compte est en lecture seule : l’envoi de messages est désactivé.",
+                })
             return await self._envoyer(c)
         if t == "typing":
+            if self.user.lecture_seule:
+                return
             return await self._typing(c)
         if t == "read":
             return await self._lu(c)

@@ -12,6 +12,7 @@ import {
   BookOpen,
   Compass,
   Images,
+  Share2,
 } from "lucide-react";
 import { useMesPublications } from "../api/publications";
 import { useProfil } from "../api/hooks";
@@ -21,6 +22,8 @@ import { LIBELLES_SITUATION, resumeSituation } from "../utils/situation";
 import { Bouton } from "../components/ui";
 import { SqListe, SqProfil } from "../components/Squelettes";
 import { MesAmis } from "./Amis";
+import { partagerProfil } from "../utils/partager";
+import { afficherToast } from "../utils/toast";
 
 function MesPublications() {
   const q = useMesPublications();
@@ -90,7 +93,7 @@ function MesPublications() {
 }
 
 export default function MonProfil() {
-  const { deconnexion } = useAuth();
+  const { deconnexion, utilisateur } = useAuth();
   const navigate = useNavigate();
   const { data } = useProfil();
   const [onglet, setOnglet] = useState("publications");
@@ -111,6 +114,11 @@ export default function MonProfil() {
       : type === "etudes" && diplome && etablissement
       ? `${diplome} · ${etablissement}`
       : resume ?? "Non renseignée";
+
+  async function partagerMonProfil() {
+    const resultat = await partagerProfil({ ...data, id: utilisateur.id });
+    if (resultat === "copie") afficherToast("Lien du profil copié.", "succes");
+  }
 
   return (
     <div className="page-mon-profil">
@@ -185,6 +193,11 @@ export default function MonProfil() {
             {data.statut === "ancien" ? "Ancienne élève" : "Élève"}
             {data.annee_sortie ? ` • promo ${data.annee_sortie}` : ""}
           </p>
+          {data.badges?.length > 0 && (
+            <div className="profil-badges">
+              {data.badges.map((badge) => <span key={badge.type}>{badge.libelle}</span>)}
+            </div>
+          )}
           {(poste || diplome || resume) && (
             <p className="poste-hero-profil">
               {poste || diplome || resume}
@@ -199,6 +212,9 @@ export default function MonProfil() {
       >
         <Images size={18} /> Galerie ({data.galerie?.length ?? 0})
       </Link>
+      <button type="button" className="puce" onClick={partagerMonProfil}>
+        <Share2 size={16} /> Partager mon profil
+      </button>
 
       {/* 3. Bouton Modifier le profil avec bordure dorée/ambrée */}
       <Link to="/profil/modifier" className="bouton-modifier-profil-dore">

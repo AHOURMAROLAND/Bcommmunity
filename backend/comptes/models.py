@@ -48,6 +48,10 @@ class User(AbstractBaseUser, PermissionsMixin):
     valide = models.BooleanField(default=False)
     is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=False)
+    lecture_seule = models.BooleanField(
+        default=False,
+        help_text="Le compte peut consulter le contenu, mais pas créer ni modifier de données.",
+    )
     date_inscription = models.DateTimeField(default=timezone.now)
     google_sub = models.CharField(max_length=64, unique=True, null=True, blank=True)
 
@@ -86,6 +90,42 @@ class Suspension(models.Model):
         constraints = [models.CheckConstraint(
             condition=Q(definitive=True) | Q(fin__isnull=False),
             name="suspension_fin_ou_definitive")]
+
+
+class BadgeUtilisateur(models.Model):
+    class Type(models.TextChoices):
+        ANCIEN_VERIFIE = "ancien_verifie", "Ancien vérifié"
+        DELEGUE = "delegue", "Délégué de classe"
+        ADMINISTRATION = "administration", "Administration"
+
+    user = models.ForeignKey(User, related_name="badges", on_delete=models.CASCADE)
+    type = models.CharField(max_length=24, choices=Type.choices)
+    attribue_par = models.ForeignKey(
+        User, null=True, on_delete=models.SET_NULL, related_name="badges_attribues"
+    )
+    attribue_le = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ["type", "pk"]
+        constraints = [
+            models.UniqueConstraint(fields=["user", "type"], name="badge_utilisateur_unique")
+        ]
+
+    def __str__(self):
+        return self.get_type_display()
+
+
+class NoteInterne(models.Model):
+    user = models.ForeignKey(User, related_name="notes_internes", on_delete=models.CASCADE)
+    auteur = models.ForeignKey(User, null=True, on_delete=models.SET_NULL, related_name="+")
+    texte = models.TextField(max_length=2000)
+    cree_le = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ["-cree_le", "-pk"]
+
+    def __str__(self):
+        return f"Note interne sur {self.user}"
 
 
 @receiver([post_save, post_delete], sender=Suspension)

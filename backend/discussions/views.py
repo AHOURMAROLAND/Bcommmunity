@@ -14,6 +14,7 @@ from amis.services import ids_bloques
 
 from .apercu_lien import lire_apercu
 from .models import (
+    ConfigurationDiscussion,
     InvitationDiscussion,
     Message,
     MessageFavori,
@@ -51,6 +52,16 @@ class ApercuLienView(APIView):
             return Response(lire_apercu(url))
         except (OSError, TimeoutError, urllib3.exceptions.HTTPError) as erreur:
             raise ApercuIndisponible() from erreur
+
+
+class ConfigurationSecuriteView(APIView):
+    def get(self, request):
+        configuration = ConfigurationDiscussion.objects.filter(pk=1).first()
+        return Response({
+            "bloquer_captures_ecran": bool(
+                configuration and configuration.bloquer_captures_ecran
+            )
+        })
 
 
 class ApercuIndisponible(APIException):

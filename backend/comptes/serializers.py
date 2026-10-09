@@ -16,7 +16,7 @@ class UtilisateurSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ("id", "email", "prenom", "nom", "statut", "a_mot_de_passe")
+        fields = ("id", "email", "prenom", "nom", "statut", "a_mot_de_passe", "lecture_seule")
         read_only_fields = fields
 
     def get_a_mot_de_passe(self, o):

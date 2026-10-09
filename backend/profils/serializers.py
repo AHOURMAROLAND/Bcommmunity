@@ -92,13 +92,15 @@ class ProfilSerializer(serializers.ModelSerializer):
     scolarites = ScolariteSerializer(many=True, read_only=True)
     galerie = serializers.SerializerMethodField()
     cadeaux_anniversaire = serializers.SerializerMethodField()
+    badges = serializers.SerializerMethodField()
 
     class Meta:
         model = Profil
         fields = ("id", "prenom", "nom", "statut", "photo", "photo_mini", "bio", "ville", "annee_sortie",
                   "onboarding_termine", "visibilite_profil", "visibilite_parcours",
                   "visibilite_situation", "qui_peut_inviter", "whatsapp", "whatsapp_visibilite",
-                  "situation", "scolarites", "date_anniversaire", "galerie", "cadeaux_anniversaire")
+                  "situation", "scolarites", "date_anniversaire", "galerie",
+                  "cadeaux_anniversaire", "badges")
 
     def get_photo(self, o):
         return o.photo.url if o.photo else None
@@ -116,6 +118,9 @@ class ProfilSerializer(serializers.ModelSerializer):
             "message": cadeau.message,
             "cree_le": cadeau.cree_le,
         } for cadeau in o.cadeaux_anniversaire.all()]
+
+    def get_badges(self, o):
+        return [{"type": badge.type, "libelle": badge.get_type_display()} for badge in o.user.badges.all()]
 
     def validate_date_anniversaire(self, valeur):
         if valeur and valeur > timezone.localdate():

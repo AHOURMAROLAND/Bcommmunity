@@ -1,6 +1,9 @@
+import csv
+
 from django.contrib import admin, messages
 from django.db import transaction
 from django.db.models import Q
+from django.http import HttpResponse
 from django.shortcuts import redirect
 from django.utils import timezone
 from django.utils.html import format_html, format_html_join
@@ -56,8 +59,38 @@ class SignalementAdmin(ModelAdmin):
     readonly_fields = ("type_cible", "cible", "motif", "commentaire", "auteur", "cree_le", "traite_par",
                        "traite_le", "apercu", "contexte", "adresse_ip")
     inlines = (PieceJointeInline, MessageSupportInline)
-    actions = ["en_cours", "ignorer", "masquer_publication", "supprimer_publication", "avertir",
-               "suspendre_24h", "suspendre_7j", "suspendre_30j", "bannir"]
+    actions = ["exporter_csv", "en_cours", "ignorer", "masquer_publication", "supprimer_publication",
+               "avertir", "suspendre_24h", "suspendre_7j", "suspendre_30j", "bannir"]
+
+    @admin.action(description="Exporter les signalements sélectionnés en CSV")
+    def exporter_csv(self, request, queryset):
+        response = HttpResponse(content_type="text/csv; charset=utf-8")
+        response["Content-Disposition"] = 'attachment; filename="signalements-bakhita.csv"'
+        response.write("\ufeff")
+        writer = csv.writer(response)
+        writer.writerow([
+            "id", "type_cible", "motif", "statut", "commentaire", "auteur_email",
+            "utilisateur_cible_email", "publication_id", "decision", "cree_le",
+            "traite_le", "traite_par_email",
+        ])
+        for signalement in queryset.select_related(
+            "auteur", "utilisateur_cible", "traite_par"
+        ).order_by("pk").iterator():
+            writer.writerow([
+                signalement.pk,
+                signalement.type_cible,
+                signalement.motif,
+                signalement.statut,
+                signalement.commentaire,
+                signalement.auteur.email if signalement.auteur else "",
+                signalement.utilisateur_cible.email if signalement.utilisateur_cible else "",
+                signalement.publication_cible_id or "",
+                signalement.decision,
+                signalement.cree_le.isoformat(),
+                signalement.traite_le.isoformat() if signalement.traite_le else "",
+                signalement.traite_par.email if signalement.traite_par else "",
+            ])
+        return response
 
     def has_add_permission(self, request):
         return False

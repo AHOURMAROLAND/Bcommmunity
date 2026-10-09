@@ -1,3 +1,4 @@
+import csv
 from datetime import timedelta
 from urllib.parse import urlencode
 
@@ -7,6 +8,7 @@ from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.contrib.auth.models import Group
 from django.core.cache import cache
 from django.db.models import Exists, OuterRef, Q
+from django.http import HttpResponse
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.html import format_html
@@ -19,7 +21,7 @@ from unfold.forms import UserCreationForm as BaseUserCreationForm
 from profils.models import Profil
 
 from . import moderation
-from .models import Activite, Suspension, User
+from .models import Activite, BadgeUtilisateur, NoteInterne, Suspension, User
 
 # --- Groupes : même style que le reste de l'interface ---
 admin.site.unregister(Group)
@@ -57,6 +59,22 @@ class ProfilInline(StackedInline):
     extra = 0
 
 
+class BadgeUtilisateurInline(TabularInline):
+    model = BadgeUtilisateur
+    fk_name = "user"
+    extra = 0
+    fields = ("type", "attribue_par", "attribue_le")
+    readonly_fields = ("attribue_par", "attribue_le")
+
+
+class NoteInterneInline(TabularInline):
+    model = NoteInterne
+    fk_name = "user"
+    extra = 0
+    fields = ("texte", "auteur", "cree_le")
+    readonly_fields = ("auteur", "cree_le")
+
+
 def _suspendre(modeladmin, request, queryset, jours):
     n = 0
     for u in queryset.exclude(pk=request.user.pk).exclude(is_staff=True):
@@ -71,20 +89,50 @@ class UserAdmin(BaseUserAdmin, ModelAdmin):
     add_form = UserCreationForm
     change_password_form = AdminPasswordChangeForm
     ordering = ("-date_inscription",)
-    list_display = ("email", "prenom", "nom", "statut", "etat", "email_verifie", "date_inscription", "journal")
-    list_filter = ("valide", "statut", "is_active", "email_verifie", "is_staff")
+    list_display = (
+        "email", "prenom", "nom", "statut", "etat", "email_verifie", "lecture_seule",
+        "date_inscription", "journal",
+    )
+    list_filter = ("valide", "statut", "is_active", "email_verifie", "is_staff", "lecture_seule")
     search_fields = ("email", "prenom", "nom")
     date_hierarchy = "date_inscription"
-    inlines = [ProfilInline, SuspensionInline]
+    inlines = [ProfilInline, SuspensionInline, BadgeUtilisateurInline, NoteInterneInline]
     fieldsets = (
         (None, {"fields": ("email", "password")}),
         ("Identité", {"fields": ("prenom", "nom", "statut")}),
         ("Accès", {"fields": ("email_verifie", "is_active", "is_staff",
-                              "is_superuser", "groups", "user_permissions")}),
+                              "lecture_seule", "is_superuser", "groups", "user_permissions")}),
     )
     add_fieldsets = ((None, {"classes": ("wide",), "fields": (
         "email", "prenom", "nom", "statut", "password1", "password2")}),)
-    actions = ["suspendre_24h", "suspendre_7j", "suspendre_30j", "bannir", "lever_suspensions"]
+    actions = [
+        "exporter_csv", "suspendre_24h", "suspendre_7j", "suspendre_30j", "bannir",
+        "lever_suspensions",
+    ]
+
+    @admin.action(description="Exporter les comptes sélectionnés en CSV")
+    def exporter_csv(self, request, queryset):
+        response = HttpResponse(content_type="text/csv; charset=utf-8")
+        response["Content-Disposition"] = 'attachment; filename="comptes-bakhita.csv"'
+        response.write("\ufeff")
+        writer = csv.writer(response)
+        writer.writerow([
+            "id", "email", "prenom", "nom", "statut", "email_verifie", "valide",
+            "actif", "date_inscription",
+        ])
+        for user in queryset.order_by("pk").iterator():
+            writer.writerow([
+                user.pk,
+                user.email,
+                user.prenom,
+                user.nom,
+                user.statut,
+                user.email_verifie,
+                user.valide,
+                user.is_active,
+                user.date_inscription.isoformat(),
+            ])
+        return response
 
     def get_queryset(self, request):
         # Un seul calcul SQL pour toute la liste (pas une requête par ligne)
@@ -116,6 +164,18 @@ class UserAdmin(BaseUserAdmin, ModelAdmin):
     def save_model(self, request, obj, form, change):
         super().save_model(request, obj, form, change)
         cache.delete(f"blocage:{obj.pk}")
+
+    def save_formset(self, request, form, formset, change):
+        instances = formset.save(commit=False)
+        for instance in formset.deleted_objects:
+            instance.delete()
+        for instance in instances:
+            if isinstance(instance, BadgeUtilisateur):
+                instance.attribue_par = request.user
+            elif isinstance(instance, NoteInterne):
+                instance.auteur = request.user
+            instance.save()
+        formset.save_m2m()
 
     @admin.action(description="Suspendre 24 heures")
     def suspendre_24h(self, request, queryset):

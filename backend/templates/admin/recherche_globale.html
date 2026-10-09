@@ -1,0 +1,42 @@
+{% extends "admin/base.html" %}
+
+{% block title %}Recherche globale | Bakhita Community{% endblock %}
+{% block content %}
+<div class="mx-auto max-w-5xl">
+  <h1 class="mb-2 text-2xl font-semibold">Recherche globale</h1>
+  <p class="mb-6 text-sm text-base-500">Comptes, publications et signalements accessibles selon vos permissions.</p>
+  <form method="get" role="search" class="mb-6 flex flex-col gap-3 sm:flex-row">
+    <label class="sr-only" for="recherche-globale">Nom, e-mail ou identifiant</label>
+    <input
+      id="recherche-globale"
+      name="q"
+      value="{{ terme }}"
+      minlength="2"
+      maxlength="100"
+      required
+      autofocus
+      class="min-w-0 grow rounded-lg border border-base-200 bg-white px-4 py-3 text-base-900 dark:border-base-700 dark:bg-base-900 dark:text-white"
+      placeholder="Nom, e-mail, publication ou identifiant"
+    >
+    <button type="submit" class="rounded-lg bg-primary-600 px-5 py-3 font-semibold text-white">Rechercher</button>
+  </form>
+  {% if terme %}
+    {% if resultats %}
+      <ul class="divide-y divide-base-200 rounded-xl border border-base-200 bg-white dark:divide-base-800 dark:border-base-800 dark:bg-base-900">
+        {% for resultat in resultats %}
+          <li class="flex flex-col gap-1 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <span class="text-xs font-semibold uppercase tracking-wide text-base-500">{{ resultat.type }}</span>
+              <p class="font-semibold text-base-900 dark:text-white">{{ resultat.titre }}</p>
+              <p class="text-sm text-base-500">{{ resultat.detail }}</p>
+            </div>
+            <a class="font-semibold text-primary-600 hover:underline" href="{{ resultat.url }}">Ouvrir</a>
+          </li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <p class="rounded-xl border border-base-200 p-5 text-base-500 dark:border-base-800">Aucun résultat accessible pour cette recherche.</p>
+    {% endif %}
+  {% endif %}
+</div>
+{% endblock %}

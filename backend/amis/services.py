@@ -65,7 +65,8 @@ def profils_actifs():
     return (Profil.objects
             .filter(user__valide=True, user__is_active=True, onboarding_termine=True)
             .filter(~Exists(suspendus))
-            .select_related("user", "situation__domaine"))
+            .select_related("user", "situation__domaine")
+            .prefetch_related("user__badges"))
 
 
 def profils_visibles(user, rel, bloques):
@@ -161,6 +162,8 @@ def carte(p, rel, communes=None):
     data = {"id": u.pk, "prenom": u.prenom, "nom": u.nom, "statut": u.statut,
             "photo": p.url_mini,
             "annee_sortie": p.annee_sortie, "ville": p.ville,
+            "badges": [{"type": badge.type, "libelle": badge.get_type_display()}
+                       for badge in u.badges.all()],
             "relation": relation, "demande_id": demande_id,
             "situation": resume_situation(p, u.pk in rel.amis)}
     if communes is not None:

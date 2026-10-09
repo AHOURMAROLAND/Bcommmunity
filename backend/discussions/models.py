@@ -117,6 +117,17 @@ class Message(models.Model):
         return f"Msg {self.pk} de {self.auteur} dans {self.conversation}"
 
 
+class ConfigurationDiscussion(models.Model):
+    bloquer_captures_ecran = models.BooleanField(
+        default=False,
+        help_text="Dans l’application Android, bloque les captures et l’enregistrement d’écran pendant une discussion.",
+    )
+    modifie_le = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return "Protection des captures d’écran des discussions"
+
+
 class ReactionMessage(models.Model):
     message = models.ForeignKey(Message, related_name="reactions", on_delete=models.CASCADE)
     user = models.ForeignKey(U, on_delete=models.CASCADE)

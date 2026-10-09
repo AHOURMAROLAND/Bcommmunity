@@ -8,7 +8,7 @@ const chemin = (p) => fileURLToPath(new URL(p, import.meta.url));
 
 export default defineConfig(({ mode }) => {
   const natif = mode === "native"; // l'application Android embarque déjà tout : pas de service worker
-  const variables = loadEnv(mode, "..", ["VITE_", "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_IDS"]);
+  const variables = loadEnv(mode, "..", ["VITE_", "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_IDS", "SITE_URL"]);
   const googleClientId = variables.VITE_GOOGLE_CLIENT_ID
     || variables.GOOGLE_CLIENT_ID
     || variables.GOOGLE_CLIENT_IDS?.split(",")[0]?.trim()
@@ -17,6 +17,7 @@ export default defineConfig(({ mode }) => {
     envDir: "..",
     define: {
       "import.meta.env.VITE_GOOGLE_CLIENT_ID": JSON.stringify(googleClientId),
+      "import.meta.env.VITE_SITE_URL": JSON.stringify(variables.VITE_SITE_URL || variables.SITE_URL || ""),
     },
     plugins: [react(), tailwindcss(), VitePWA({
       disable: natif,
@@ -59,6 +60,7 @@ export default defineConfig(({ mode }) => {
         "/media": "http://127.0.0.1:8000",
         "/ws": { target: "ws://127.0.0.1:8000", ws: true },
         "^/p/\\d+": "http://127.0.0.1:8000",
+        "^/profil-partage/\\d+": "http://127.0.0.1:8000",
       },
     },
   };

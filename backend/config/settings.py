@@ -253,7 +253,10 @@ if BREVO_SMTP_LOGIN:
 
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": ["comptes.auth.ReseauJWTAuthentication"],
-    "DEFAULT_PERMISSION_CLASSES": ["rest_framework.permissions.IsAuthenticated"],
+    "DEFAULT_PERMISSION_CLASSES": [
+        "rest_framework.permissions.IsAuthenticated",
+        "comptes.permissions.PasLectureSeule",
+    ],
     "DEFAULT_RENDERER_CLASSES": ["rest_framework.renderers.JSONRenderer"],
     "DEFAULT_PARSER_CLASSES": [
         "rest_framework.parsers.JSONParser",
@@ -326,6 +329,10 @@ CELERY_BEAT_SCHEDULE = {
     "suspensions": {
         "task": "comptes.taches.lever_suspensions_expirees",
         "schedule": crontab(minute="*/5"),
+    },
+    "rapport-hebdomadaire": {
+        "task": "comptes.taches.envoyer_rapport_hebdomadaire",
+        "schedule": crontab(day_of_week="monday", hour=8, minute=0),
     },
 }
 

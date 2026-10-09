@@ -13,8 +13,10 @@
   .bk-grille4{display:grid;gap:1rem;grid-template-columns:repeat(4,minmax(0,1fr));margin-bottom:1rem}
   .bk-grille2{display:grid;gap:1rem;grid-template-columns:2fr 1fr;margin-bottom:1rem}
   .bk-grille3{display:grid;gap:1rem;grid-template-columns:repeat(3,minmax(0,1fr));margin-bottom:1rem}
+  .bk-grille5{display:grid;gap:1rem;grid-template-columns:repeat(5,minmax(0,1fr));margin-bottom:1rem}
   @media (max-width:1100px){.bk-grille4{grid-template-columns:repeat(2,minmax(0,1fr))}.bk-grille2,.bk-grille3{grid-template-columns:1fr}}
-  @media (max-width:560px){.bk-grille4{grid-template-columns:1fr}}
+  @media (max-width:1100px){.bk-grille5{grid-template-columns:repeat(2,minmax(0,1fr))}}
+  @media (max-width:560px){.bk-grille4,.bk-grille5{grid-template-columns:1fr}}
   .bk-label{color:var(--mut);font-size:.85rem}
   .bk-num{font-size:2rem;font-weight:700;line-height:1.2;margin:.15rem 0}
   .bk-num.alerte{color:var(--acc)}
@@ -34,11 +36,74 @@
   .bk-liste a:hover{color:var(--acc)}
   .bk-liste small{color:var(--mut);white-space:nowrap}
   .bk-vide{color:var(--mut);font-size:.9rem;margin-top:.75rem}
+  .bk-cta{display:inline-flex;align-items:center;gap:.4rem;margin:.25rem 0 1rem;padding:.6rem .9rem;border-radius:.55rem;background:var(--acc);color:#fff;text-decoration:none;font-weight:600}
+  .bk-table-wrap{overflow-x:auto}
+  .bk-table{width:100%;border-collapse:collapse;margin-top:.75rem;font-size:.875rem}
+  .bk-table th,.bk-table td{padding:.65rem .5rem;border-top:1px solid var(--bd);text-align:right;white-space:nowrap}
+  .bk-table th:first-child,.bk-table td:first-child{text-align:left}
+  .bk-table th{color:var(--mut);font-weight:500}
 </style>
 
 <div class="bk">
   <h1>Tableau de bord</h1>
   <p class="bk-sous">Bienvenue{% if request.user.prenom %}, {{ request.user.prenom }}{% endif %}. Voici l'activité de la communauté.</p>
+  <a class="bk-cta" href="{% url 'admin-global-search' %}">Recherche globale</a>
+
+  <div class="bk-grille5">
+    {% if can_comptes %}<div class="bk-card"><div class="bk-label">Inscriptions · 24 h</div><div class="bk-num">{{ stats.inscriptions_24h }}</div></div>{% endif %}
+    {% if can_activite %}<div class="bk-card"><div class="bk-label">Connexions · 24 h</div><div class="bk-num">{{ stats.connexions_24h }}</div></div>{% endif %}
+    {% if can_signalements %}<div class="bk-card"><div class="bk-label">Signalements · 24 h</div><div class="bk-num {% if stats.signalements_24h %}alerte{% endif %}">{{ stats.signalements_24h }}</div></div>{% endif %}
+    {% if can_publications %}<div class="bk-card"><div class="bk-label">Publications · 24 h</div><div class="bk-num">{{ stats.publications_24h }}</div></div>{% endif %}
+    {% if can_messages %}<div class="bk-card"><div class="bk-label">Messages · 24 h</div><div class="bk-num">{{ stats.messages_24h }}</div></div>{% endif %}
+  </div>
+
+  {% if actions_prioritaires %}
+  <div class="bk-card" style="margin-bottom:1rem">
+    <p class="bk-titre">Centre d’actions · décisions en attente</p>
+    <ul class="bk-liste">
+      {% for action in actions_prioritaires %}
+      <li><a href="{{ action.href }}">{{ action.titre }}</a><small>À traiter</small></li>
+      {% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+
+  {% if alertes_adultes_mineurs %}
+  <div class="bk-card" style="margin-bottom:1rem;border-color:#dc2626">
+    <p class="bk-titre" style="color:#dc2626">Vigilance · invitations vers des élèves mineurs</p>
+    <p class="bk-note">Comptes d’anciens élèves adultes ayant envoyé au moins 5 invitations en 7 jours.</p>
+    <ul class="bk-liste">
+      {% for alerte in alertes_adultes_mineurs %}
+      <li><a href="{{ alerte.href }}">{{ alerte.nom }}</a><small>{{ alerte.total }} invitation(s)</small></li>
+      {% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+
+  {% if can_comptes or can_activite or can_publications or can_messages %}
+  <div class="bk-card" style="margin-bottom:1rem">
+    <p class="bk-titre">Statistiques d’usage · 7 derniers jours</p>
+    {% if can_activite or can_messages %}<p class="bk-note">{{ stats.actifs_7j }} utilisateur(s) avec une activité enregistrée sur la période</p>{% endif %}
+    <div class="bk-table-wrap">
+      <table class="bk-table">
+        <thead><tr>
+          <th>Jour</th>
+          {% if can_comptes %}<th>Inscriptions</th>{% endif %}
+          {% if can_activite or can_messages %}<th>Actifs</th>{% endif %}
+          {% if can_publications %}<th>Publications</th>{% endif %}
+          {% if can_messages %}<th>Messages</th>{% endif %}
+        </tr></thead>
+        <tbody>{% for jour in usage_7j %}<tr>
+          <td>{{ jour.label }}</td>
+          {% if can_comptes %}<td>{{ jour.inscriptions }}</td>{% endif %}
+          {% if can_activite or can_messages %}<td>{{ jour.actifs }}</td>{% endif %}
+          {% if can_publications %}<td>{{ jour.publications }}</td>{% endif %}
+          {% if can_messages %}<td>{{ jour.messages }}</td>{% endif %}
+        </tr>{% endfor %}</tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
 
   <div class="bk-grille4">
     {% if can_comptes %}
@@ -102,6 +167,16 @@
       </div>
       <div class="bk-leg"><span><i class="bk-pt" style="background:#ea580c"></i>Élèves actuels</span><b>{{ repartition.eleves }}</b></div>
       <div class="bk-leg"><span><i class="bk-pt" style="background:#fdba74"></i>Anciens élèves</span><b>{{ repartition.anciens }}</b></div>
+    </div>
+  </div>
+  <div class="bk-card" style="margin-bottom:1rem">
+    <p class="bk-titre">Entonnoir d’inscription · 30 derniers jours</p>
+    <div class="bk-note">Progression des comptes jusqu’à la fin du parcours scolaire</div>
+    <div class="bk-grille4" style="margin-top:.75rem">
+      <div><div class="bk-label">Comptes créés</div><strong>{{ entonnoir_inscription.crees }}</strong></div>
+      <div><div class="bk-label">E-mails vérifiés</div><strong>{{ entonnoir_inscription.emails_verifies }}</strong></div>
+      <div><div class="bk-label">Parcours commencés</div><strong>{{ entonnoir_inscription.parcours_commences }}</strong></div>
+      <div><div class="bk-label">Parcours terminés</div><strong>{{ entonnoir_inscription.parcours_termines }}</strong></div>
     </div>
   </div>
   {% endif %}

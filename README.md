@@ -289,6 +289,21 @@ Fonctionnalites administratives implementees :
 - Actions de moderation en un clic : suspension 24 h, 7 jours, 30 jours, ou bannissement definitif.
 - Levee manuelle ou automatique des suspensions.
 - Gestion des referentiels de l'ecole : cycles, classes, filieres et domaines professionnels ou d'etudes.
+- Tableau de bord avec indicateurs des dernieres 24 h, centre des decisions en attente, usage sur 7 jours et entonnoir d'inscription sur 30 jours. Les utilisateurs actifs sont dedupliques a partir du journal d'activite et des messages envoyes.
+- Recherche globale des comptes, publications et signalements, selon les permissions de consultation de l'administrateur.
+- Export CSV des comptes et signalements selectionnes dans leurs listes d'administration.
+- Rapport hebdomadaire envoye aux administrateurs actifs disposant d'une adresse e-mail, chaque lundi a 08:00 UTC. Celery Beat et le worker doivent etre en fonctionnement pour l'envoi.
+- Mise en lecture seule d'un compte depuis sa fiche : le membre peut consulter, mais les ecritures API et l'envoi de messages WebSocket sont refuses. Les administrateurs restent operationnels.
+- Badges de profil attribues manuellement (ancien verifie, delegue, administration) et notes internes visibles uniquement dans l'administration.
+- Alerte de vigilance lorsqu'un ancien ayant une date de naissance indiquant 18 ans ou plus envoie au moins 5 invitations en attente ou acceptees a des eleves mineurs connus sur 7 jours. Les dates de naissance non renseignees ne sont pas estimees.
+- Apercus Open Graph/Twitter pour les liens partageables de publications et de profils publics. La photo de profil est utilisee pour l'aperçu d'une publication sans image.
+- Le blocage des captures est desactive par defaut et activable dans l'administration > Discussions > Configuration des captures. Dans l'APK Android, Android `FLAG_SECURE` masque alors l'ecran pendant les captures, enregistrement d'ecran et apercus des applications recentes. Cette protection native ne peut pas etre imposee au navigateur/PWA ni a iOS.
+
+### APK Android et mises a jour en ligne
+
+La commande `cd frontend; npm run build:natif` produit les ressources web et les synchronise avec Capacitor. Configurez `SITE_URL` avec le domaine public avant de fabriquer un APK distribue : les liens partages embarquent cette origine. Pour generer un APK de test, ouvrez `frontend/android` et lancez `.\gradlew assembleDebug`; le fichier est produit dans `frontend/android/app/build/outputs/apk/debug/`. Les modifications de code natif ou de plugins necessitent une nouvelle version de l'APK.
+
+Pour actualiser a distance les ecrans et la logique web sans reinstaller l'APK, une solution de mises a jour live Capacitor telle que Capgo peut distribuer un bundle web signe apres publication. Elle doit etre configuree dans le projet; elle n'est pas active dans cette version. Les mises a jour natives (plugins, permissions, Android) continueront de passer par une nouvelle version publiee, idealement via Google Play avec les mises a jour In-App.
 
 ---
 

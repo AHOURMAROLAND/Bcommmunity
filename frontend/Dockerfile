@@ -7,7 +7,9 @@ RUN --mount=type=cache,target=/root/.npm \
       --fetch-timeout=300000 --ignore-scripts
 COPY . .
 ARG VITE_GOOGLE_CLIENT_ID
+ARG VITE_SITE_URL
 ENV VITE_GOOGLE_CLIENT_ID=$VITE_GOOGLE_CLIENT_ID
+ENV VITE_SITE_URL=$VITE_SITE_URL
 RUN npm run build
 
 FROM nginx:stable-alpine

@@ -16,6 +16,8 @@ import ModaleSignalement from "../components/ModaleSignalement";
 import { Bouton } from "../components/ui";
 import { Sq } from "../components/Squelettes";
 import { afficherToast } from "../utils/toast";
+import { estNatif } from "../utils/plateforme";
+import { definirBlocageCaptures } from "../utils/protectionCaptures";
 
 const HEURE = new Intl.DateTimeFormat("fr-FR", { hour: "2-digit", minute: "2-digit" });
 const DATE = new Intl.DateTimeFormat("fr-FR", { weekday: "long", day: "numeric", month: "long" });
@@ -194,6 +196,44 @@ export default function Conversation() {
   const conv = useConversation(id);
   const conversations = useConversations();
   const msgs = useMessages(id);
+  const configurationSecurite = useQuery({
+    queryKey: ["configuration-securite-discussions"],
+    queryFn: () => api("/discussions/configuration-securite/"),
+    staleTime: 30_000,
+    refetchInterval: 60_000,
+    retry: 1,
+  });
+  const erreurSecuriteSignalee = useRef(false);
+
+  useEffect(() => {
+    if (!estNatif()) return;
+    if (configurationSecurite.isError) {
+      definirBlocageCaptures(true).catch((erreur) => {
+        console.error("Impossible d’activer la protection des captures d’écran.", erreur);
+      });
+      if (!erreurSecuriteSignalee.current) {
+        erreurSecuriteSignalee.current = true;
+        afficherToast(
+          "Impossible de vérifier le réglage de sécurité. Les captures sont bloquées par précaution.",
+          "erreur",
+        );
+      }
+      return;
+    }
+    if (configurationSecurite.data) {
+      erreurSecuriteSignalee.current = false;
+      definirBlocageCaptures(configurationSecurite.data.bloquer_captures_ecran).catch((erreur) => {
+        afficherToast("Impossible d’appliquer la protection des captures d’écran.", "erreur");
+        console.error("Erreur du module Android de protection des captures.", erreur);
+      });
+    }
+  }, [configurationSecurite.data, configurationSecurite.isError]);
+
+  useEffect(() => () => {
+    definirBlocageCaptures(false).catch((erreur) => {
+      console.error("Impossible de rétablir les captures en quittant la discussion.", erreur);
+    });
+  }, []);
 
   const [texte, setTexte] = useState("");
   const [ecrit, setEcrit] = useState(null);

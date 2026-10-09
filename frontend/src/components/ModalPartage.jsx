@@ -7,7 +7,7 @@ export function ModalPartage({ publication, onClose }) {
   if (!publication) return null;
 
   // URL publique vers la vue Open Graph Django (/p/{id})
-  const urlPartage = `${window.location.origin}/p/${publication.id}/`;
+  const urlPartage = `${import.meta.env.VITE_SITE_URL || window.location.origin}/p/${publication.id}/`;
   const textePartage = `${publication.titre} - Bakhita Community\n${urlPartage}`;
 
   const copierLien = async () => {

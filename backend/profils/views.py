@@ -1,8 +1,9 @@
+from django.conf import settings
 from django.core.cache import cache
 from django.core.files.storage import default_storage
 from django.db import IntegrityError, transaction
 from django.db.models import Max
-from django.shortcuts import get_object_or_404
+from django.shortcuts import get_object_or_404, render
 from django.utils import timezone
 from rest_framework import generics, viewsets
 from rest_framework.exceptions import NotFound, ValidationError
@@ -31,6 +32,37 @@ MAX_LIGNES_PARCOURS = 40
 def profil_de(user):
     profil, _ = Profil.objects.get_or_create(user=user)
     return profil
+
+
+def partage_profil(request, user_id):
+    profil = (
+        profils_actifs()
+        .filter(user_id=user_id, visibilite_profil="tous", onboarding_termine=True)
+        .first()
+    )
+    base_site = settings.SITE_URL.rstrip("/")
+    ctx = {
+        "ouvert": profil is not None,
+        "url": f"{base_site}/profil-partage/{user_id}/",
+        "lien_app": f"{base_site}/profil/{user_id}",
+        "type_og": "profile",
+        "image_alt": "Photo de profil Bakhita Community",
+    }
+    if profil:
+        image = profil.photo.url if profil.photo else None
+        if image and not image.startswith("http"):
+            image = f"{base_site}{image}"
+        ctx.update(
+            titre=f"{profil.user.prenom} {profil.user.nom}",
+            description=profil.bio[:160] or (
+                "Ancien élève" if profil.user.statut == "ancien" else "Élève"
+            ) + " · Bakhita Community",
+            image=image,
+            image_alt=f"Photo de {profil.user.prenom} {profil.user.nom}",
+        )
+    reponse = render(request, "publications/partage.html", ctx)
+    reponse["Cache-Control"] = "public, max-age=300" if profil else "no-store"
+    return reponse
 
 
 class ProfilMoiView(generics.RetrieveUpdateAPIView):

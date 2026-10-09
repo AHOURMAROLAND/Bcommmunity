@@ -121,6 +121,34 @@ docker compose logs --tail=100 api web
 
 Les donnees PostgreSQL et les fichiers media utilisent des volumes Docker persistants. Mettez-les dans une strategie de sauvegarde adaptee avant toute mise a jour; ne lancez pas `docker compose down -v` sur une instance qui contient des donnees.
 
+### Deployer le frontend sur Vercel
+
+Vercel heberge ici uniquement le frontend React/Vite. Le backend Django doit rester deploye sur un hote Docker public disposant de PostgreSQL et Redis persistants, ainsi que des processus Daphne, Celery worker et Celery Beat. Cela conserve les WebSockets de discussion et les taches planifiees ; ne configurez pas le backend comme une fonction serverless Vercel.
+
+Pour que le cookie de renouvellement `SameSite=Lax` fonctionne entre le navigateur et l'API, utilisez en production un domaine personnalise Vercel et un domaine backend sous le meme domaine racine (par exemple `community.example.org` et `api.example.org`). Un frontend sur `*.vercel.app` et une API sur un autre domaine racine sont cross-site et peuvent empecher l'envoi du cookie lors des appels API.
+
+1. Deployez d'abord la pile de production Docker decrite ci-dessus, avec un domaine HTTPS pour son Nginx/Caddy. Verifiez que `/api/vivant/`, `/ws/` (WebSocket) et `/p/<id>/` sont servis par ce domaine.
+2. Dans Vercel, importez le depot GitHub et choisissez `frontend` comme **Root Directory**. Gardez le repertoire frontend configure comme racine du projet Vercel. La configuration `frontend/vercel.json` lance `npm ci`, construit Vite et publie `dist`, avec un fallback SPA pour les routes React.
+3. Ajoutez les variables d'environnement Vercel pour les environnements Preview et Production. Remplacez les exemples par les domaines reels ; `VITE_SITE_URL` est le domaine public du backend afin que les apercus Open Graph de profils et publications atteignent Django :
+```dotenv
+VITE_API_URL=https://api.example.org/api
+VITE_WS_URL=wss://api.example.org/ws/
+VITE_SITE_URL=https://api.example.org
+VITE_GOOGLE_CLIENT_ID=
+VITE_CONTACT_EMAIL=
+```
+Le client ajoute les chemins des endpoints a `VITE_API_URL` ; ne mettez pas de barre oblique finale apres `/api`. Ces trois premieres variables sont requises pour le build de production Vercel. `VITE_GOOGLE_CLIENT_ID` et `VITE_CONTACT_EMAIL` sont facultatifs si ces fonctions ne sont pas configurees.
+4. Dans l'environnement de production du backend (`/opt/bakhita/.env`), autorisez le domaine Vercel (et le domaine personnalise du frontend, s'il existe) dans `CORS_ALLOWED_ORIGINS` et `CSRF_TRUSTED_ORIGINS`. Ajoutez aussi ces noms d'hote a `ALLOWED_HOSTS` : Channels valide l'origine WebSocket contre cette liste. Definissez `FRONTEND_URL` sur l'origine du frontend, `SITE_URL` sur l'origine du backend et conservez `SECURE_SSL_REDIRECT=1`. Pour l'envoi des courriels, ajoutez les variables suivantes dans ce meme fichier backend, et non dans Vercel :
+```dotenv
+BREVO_SMTP_LOGIN=<login SMTP fourni par Brevo>
+BREVO_SMTP_PASSWORD=<cle SMTP complete creee dans Brevo>
+DEFAULT_FROM_EMAIL=Bakhita Community <adresse expediteur verifiee>
+```
+Le backend utilise alors `smtp-relay.brevo.com`, le port `587` et TLS. La cle SMTP est differente de la cle API Brevo ; la capture masque sa valeur complete, il faut donc la copier depuis Brevo et ne pas l'envoyer dans le depot ou dans le chat. Redemarrez les services backend apres la mise a jour de `.env`.
+5. Si Google OAuth est active, ajoutez l'origine du frontend a la configuration OAuth Google. Dans Vercel, choisissez `main` comme branche de production ; les pushs ulterieurs declencheront alors automatiquement les builds et deployments du frontend.
+
+Vercel ne reverse-proxy pas ici les API, les WebSockets ni les medias. Le navigateur contacte directement le domaine backend configure dans les variables `VITE_*`. Les televersements et medias doivent donc utiliser le stockage durable deja configure pour le backend (par exemple Cloudflare R2), et non le systeme de fichiers ephemere de Vercel. Les modifications Django, migrations, Celery ou infrastructure continuent a se deployer sur l'hote backend, independamment du build frontend Vercel.
+
 4. Charger les referentiels de base et creer un compte administrateur :
 ```bash
 docker compose exec api python manage.py charger_referentiels

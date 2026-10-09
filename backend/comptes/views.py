@@ -23,7 +23,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from . import brevo, journal
 from . import google as google_service
 from .auth import verifier_acces
-from .models import OTPEmail, User
+from .models import OTPEmail, SessionCompte, User
 from .serializers import (
     ConnexionSerializer,
     GoogleSerializer,
@@ -33,6 +33,7 @@ from .serializers import (
     UtilisateurSerializer,
 )
 from .services import creer_compte
+from .sessions import creer_session, obtenir_session, revoquer_sessions
 
 logger = logging.getLogger(__name__)
 
@@ -52,9 +53,13 @@ def natif(request):
     return request.headers.get("X-Client") == "natif"
 
 
-def reponse_connexion(user, nat=False):
+def reponse_connexion(user, request, nat=False):
     refresh = RefreshToken.for_user(user)
-    corps = {"access": str(refresh.access_token), "utilisateur": UtilisateurSerializer(user).data}
+    creer_session(user, refresh, request)
+    corps = {
+        "access": str(refresh.access_token),
+        "utilisateur": UtilisateurSerializer(user).data,
+    }
     if nat:  # application Android : le jeton de session est stocké dans le Keystore, pas dans un cookie
         return Response({**corps, "refresh": str(refresh)})
     rep = Response(corps)
@@ -88,7 +93,7 @@ class ConnexionView(PublicView):
         ser.is_valid(raise_exception=True)
         user = ser.validated_data["user"]
         journal.enregistrer(user, "connexion", "Mot de passe", request=request)
-        return reponse_connexion(user, natif(request))
+        return reponse_connexion(user, request, natif(request))
 
 
 class GoogleView(PublicView):
@@ -121,7 +126,7 @@ class GoogleView(PublicView):
                 email_verifie=True,
                 valide=True,
             )
-            reponse = reponse_connexion(user, natif(request))
+            reponse = reponse_connexion(user, request, natif(request))
             reponse.status_code = status.HTTP_201_CREATED
             return reponse
 
@@ -139,7 +144,7 @@ class GoogleView(PublicView):
             cache.delete(f"blocage:{user.pk}")
         verifier_acces(user)
         journal.enregistrer(user, "connexion", "Google", request=request)
-        return reponse_connexion(user, natif(request))
+        return reponse_connexion(user, request, natif(request))
 
 
 def envoyer_lien_reinitialisation(user):
@@ -178,6 +183,7 @@ class ReinitialisationView(PublicView):
         user.save(update_fields=["password", "email_verifie", "valide"])
         journal.enregistrer(user, "mot_de_passe", "Réinitialisation", request=request)
         cache.delete(f"blocage:{user.pk}")
+        revoquer_sessions(user)
         # Toutes les sessions existantes sont révoquées.
         for t in OutstandingToken.objects.filter(user=user):
             BlacklistedToken.objects.get_or_create(token=t)
@@ -193,16 +199,40 @@ class RafraichirView(PublicView):
         if not isinstance(brut, str) or not brut:
             raise AuthenticationFailed("Session expirée.")
         try:
-            user = User.objects.get(pk=RefreshToken(brut)["user_id"])
+            refresh = RefreshToken(brut)
+            user = User.objects.get(pk=refresh["user_id"])
             verifier_acces(user)
+            sid = refresh.get("sid")
+            if sid:
+                session = obtenir_session(user.pk, sid)
+            else:
+                # Les sessions émises avant l'ajout du suivi sont renouvelées une fois.
+                refresh.blacklist()
+                nouveau = RefreshToken.for_user(user)
+                creer_session(user, nouveau, request)
+                corps = {
+                    "access": str(nouveau.access_token),
+                    **({"refresh": str(nouveau)} if nat else {}),
+                }
+                rep = Response(corps)
+                if not nat:
+                    poser_cookie(rep, nouveau)
+                return rep
             ser = TokenRefreshSerializer(data={"refresh": brut})
             ser.is_valid(raise_exception=True)
         except (TokenError, User.DoesNotExist):
             raise AuthenticationFailed("Session expirée.")
+        session.derniere_activite = timezone.now()
         corps = {"access": ser.validated_data["access"]}
         nouveau = ser.validated_data.get("refresh")
-        if nouveau and nat:
-            corps["refresh"] = nouveau
+        if nouveau:
+            refresh_renouvele = RefreshToken(nouveau)
+            session.refresh_jti = str(refresh_renouvele["jti"])
+            session.save(update_fields=["refresh_jti", "derniere_activite"])
+            if nat:
+                corps["refresh"] = nouveau
+        else:
+            session.save(update_fields=["derniere_activite"])
         rep = Response(corps)
         if nouveau and not nat:
             poser_cookie(rep, nouveau)
@@ -214,7 +244,14 @@ class DeconnexionView(PublicView):
         brut = request.data.get("refresh") if natif(request) else request.COOKIES.get(COOKIE)
         if isinstance(brut, str) and brut:
             try:
-                RefreshToken(brut).blacklist()
+                refresh = RefreshToken(brut)
+                sid = refresh.get("sid")
+                if sid:
+                    SessionCompte.objects.filter(
+                        pk=sid, user_id=refresh.get("user_id"), active=True
+                    ).update(active=False)
+                else:
+                    refresh.blacklist()
             except TokenError:
                 pass
         rep = Response(status=status.HTTP_204_NO_CONTENT)
@@ -251,6 +288,46 @@ class MoiView(generics.RetrieveAPIView):
 
     def get_object(self):
         return self.request.user
+
+
+class SessionsView(APIView):
+    def get(self, request):
+        maintenant = timezone.now()
+        SessionCompte.objects.filter(
+            user=request.user,
+            active=True,
+            derniere_activite__lte=maintenant - timedelta(days=7),
+        ).update(active=False)
+        sid = request.auth.get("sid") if request.auth else None
+        sessions = SessionCompte.objects.filter(user=request.user, active=True)
+        return Response([
+            {
+                "id": str(session.pk),
+                "appareil": session.appareil or "Appareil inconnu",
+                "adresse_ip": session.adresse_ip,
+                "cree_le": session.cree_le,
+                "derniere_activite": session.derniere_activite,
+                "actuelle": str(session.pk) == str(sid),
+            }
+            for session in sessions
+        ])
+
+
+class RevoquerSessionView(APIView):
+    def delete(self, request, session_id):
+        session = SessionCompte.objects.filter(
+            pk=session_id, user=request.user, active=True
+        ).first()
+        if session is None:
+            raise ValidationError({"detail": "Cette session n’est plus active."})
+        sid = request.auth.get("sid") if request.auth else None
+        if str(session.pk) == str(sid):
+            raise ValidationError({
+                "detail": "Pour fermer cette session, utilisez le bouton de déconnexion."
+            })
+        session.active = False
+        session.save(update_fields=["active"])
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class EnvoyerOTPView(PublicView):
@@ -296,7 +373,7 @@ class VerifierOTPView(PublicView):
                 cache.delete(f"blocage:{user.pk}")
                 verifier_acces(user)
                 journal.enregistrer(user, "connexion", "Code par e-mail", request=request)
-                return reponse_connexion(user)
+                return reponse_connexion(user, request)
         return Response({"detail": "Code invalide ou expiré."}, status=status.HTTP_400_BAD_REQUEST)
 
 
@@ -315,4 +392,6 @@ class ChangerMotDePasseView(APIView):
         user.set_password(ser.validated_data["nouveau"])
         user.save(update_fields=["password"])
         journal.enregistrer(user, "mot_de_passe", request=request)
+        sid = request.auth.get("sid") if request.auth else None
+        revoquer_sessions(user, sauf=sid)
         return Response({"detail": "Mot de passe modifié avec succès."})

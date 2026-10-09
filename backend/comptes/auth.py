@@ -2,6 +2,8 @@ from django.core.cache import cache
 from rest_framework.exceptions import PermissionDenied
 from rest_framework_simplejwt.authentication import JWTAuthentication
 
+from .sessions import obtenir_session
+
 TTL_BLOCAGE = 15  # secondes : délai maximal avant qu'une suspension prenne effet
 
 
@@ -17,5 +19,8 @@ class ReseauJWTAuthentication(JWTAuthentication):
         resultat = super().authenticate(request)
         if resultat is None:
             return None
+        sid = resultat[1].get("sid")
+        if sid:
+            obtenir_session(resultat[0].pk, sid)
         verifier_acces(resultat[0])
         return resultat

@@ -10,6 +10,7 @@ from notifications.services import evenement, lancer
 
 from . import journal
 from .models import Suspension
+from .sessions import revoquer_sessions
 from .taches import notifier_avertissement, notifier_suspension
 
 MOTIFS_PUBLICS = {
@@ -24,6 +25,7 @@ MOTIFS_PUBLICS = {
 def appliquer_effets(s):
     """Rend la suspension effective tout de suite : sessions coupées, temps réel fermé, e-mail."""
     cache.delete(f"blocage:{s.user_id}")
+    revoquer_sessions(s.user)
     for t in OutstandingToken.objects.filter(user_id=s.user_id):
         BlacklistedToken.objects.get_or_create(token=t)
     diffuser([s.user_id], {"type": "compte.suspendu"})

@@ -11,6 +11,8 @@ urlpatterns = [
     path("auth/rafraichir/", views.RafraichirView.as_view()),
     path("auth/deconnexion/", views.DeconnexionView.as_view()),
     path("auth/moi/", views.MoiView.as_view()),
+    path("auth/sessions/", views.SessionsView.as_view()),
+    path("auth/sessions/<uuid:session_id>/", views.RevoquerSessionView.as_view()),
     path("auth/compte/", views.SupprimerCompteView.as_view()),
     path("auth/mot-de-passe/", views.ChangerMotDePasseView.as_view()),
     path("auth/otp/envoyer/", views.EnvoyerOTPView.as_view()),

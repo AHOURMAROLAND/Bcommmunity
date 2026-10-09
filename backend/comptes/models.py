@@ -1,3 +1,5 @@
+import uuid
+
 from django.contrib.auth.base_user import AbstractBaseUser, BaseUserManager
 from django.contrib.auth.hashers import (  # noqa: F401 — re-exported for OTPEmail usage
     check_password,
@@ -135,3 +137,21 @@ class Activite(models.Model):
 
     def __str__(self):
         return f"{self.get_action_display()} - {self.user_id} - {self.cree_le:%d/%m/%Y %H:%M}"
+
+
+class SessionCompte(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(User, related_name="sessions_compte", on_delete=models.CASCADE)
+    refresh_jti = models.CharField(max_length=255, unique=True)
+    appareil = models.CharField(max_length=200, blank=True)
+    adresse_ip = models.GenericIPAddressField(null=True, blank=True)
+    cree_le = models.DateTimeField(default=timezone.now)
+    derniere_activite = models.DateTimeField(default=timezone.now, db_index=True)
+    active = models.BooleanField(default=True, db_index=True)
+
+    class Meta:
+        ordering = ["-derniere_activite", "-cree_le"]
+        indexes = [models.Index(fields=["user", "active", "-derniere_activite"])]
+
+    def __str__(self):
+        return f"Session de {self.user} ({self.cree_le:%d/%m/%Y %H:%M})"

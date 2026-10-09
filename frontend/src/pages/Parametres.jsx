@@ -11,7 +11,10 @@ import {
 import { appliquerTheme, themeActuel } from "../utils/theme";
 import { Bouton, Selecteur } from "../components/ui";
 import { SqFormulaire } from "../components/Squelettes";
-import { ImagePlus, Trash2 } from "lucide-react";
+import {
+  Bell, ChevronRight, CircleHelp, ImagePlus, Images, Laptop, LockKeyhole,
+  LogOut, Palette, Shield, Trash2, UserRound, Users, X,
+} from "lucide-react";
 import DiscussionsSupport from "../components/DiscussionsSupport";
 import { TYPES_IMAGE, verifierFichier } from "../utils/image";
 
@@ -39,8 +42,40 @@ function Interrupteur({ label, valeur, onChange }) {
   );
 }
 
+function GroupeParametres({ titre, Icon, children }) {
+  return (
+    <section className="parametres-groupe">
+      <h2 className="parametres-groupe-titre"><Icon size={17} />{titre}</h2>
+      <div className="parametres-groupe-liste">{children}</div>
+    </section>
+  );
+}
+
+function OptionParametres({ titre, description, Icon, children }) {
+  return (
+    <details className="parametres-option">
+      <summary className="parametres-option-resume">
+        <span className="parametres-option-icone"><Icon size={22} /></span>
+        <span className="parametres-option-texte">
+          <strong>{titre}</strong>
+          <span>{description}</span>
+        </span>
+        <ChevronRight className="parametres-option-chevron" size={21} />
+      </summary>
+      <div className="parametres-option-contenu">{children}</div>
+    </details>
+  );
+}
+
+function dateLisible(valeur) {
+  return new Intl.DateTimeFormat("fr-FR", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(new Date(valeur));
+}
+
 export default function Parametres() {
-  const { deconnexion } = useAuth();
+  const { deconnexion, utilisateur } = useAuth();
   const qc = useQueryClient();
   const prefs = usePreferences();
   const majPref = useMajPreferences();
@@ -98,6 +133,27 @@ export default function Parametres() {
     onSuccess: () =>
       ["bloques", "annuaire", "suggestions"].forEach((k) =>
         qc.invalidateQueries({ queryKey: [k] })),
+  });
+  const sessions = useQuery({
+    queryKey: ["sessions-compte"],
+    queryFn: () => api("/auth/sessions/"),
+  });
+  const fermerSession = useMutation({
+    mutationFn: (id) => api(`/auth/sessions/${id}/`, { method: "DELETE" }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["sessions-compte"] }),
+  });
+  const [motDePasseActuel, setMotDePasseActuel] = useState("");
+  const [nouveauMotDePasse, setNouveauMotDePasse] = useState("");
+  const changerMotDePasse = useMutation({
+    mutationFn: () => api("/auth/mot-de-passe/", {
+      method: "POST",
+      body: { actuel: motDePasseActuel, nouveau: nouveauMotDePasse },
+    }),
+    onSuccess: () => {
+      setMotDePasseActuel("");
+      setNouveauMotDePasse("");
+      qc.invalidateQueries({ queryKey: ["sessions-compte"] });
+    },
   });
 
   useEffect(() => {
@@ -165,8 +221,11 @@ export default function Parametres() {
   const ios = estIOS() && !estInstalle();
 
   return (
-    <div>
-      <h1 style={{ marginTop: 0 }}>Paramètres</h1>
+    <div className="page-parametres">
+      <header className="parametres-entete">
+        <h1>Menu principal</h1>
+        <p>Gérez votre compte, votre confidentialité et vos préférences.</p>
+      </header>
       {editeurGalerieOuvert && photoOriginale && (
         <Suspense fallback={<div className="editeur"><SqFormulaire champs={5} /></div>}>
           <EditeurImage
@@ -182,33 +241,31 @@ export default function Parametres() {
         </Suspense>
       )}
 
-      <div className="carte" style={{ marginBottom: "1rem" }}>
-        <h2 style={{ fontSize: "1.05rem", marginTop: 0 }}>Apparence</h2>
-        <div className="puces" role="group" aria-label="Theme">
-          {[['auto', 'Automatique'], ['light', 'Clair'], ['dark', 'Sombre']].map(([k, l]) => (
-            <button
-              key={k}
-              type="button"
-              className="puce"
-              aria-pressed={theme === k}
-              onClick={() => { setTheme(k); appliquerTheme(k); }}
-            >
-              {l}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div className="carte" style={{ marginBottom: "1rem" }}>
-        <h2 style={{ fontSize: "1.05rem", marginTop: 0 }}>Assistance et retours de test</h2>
-        <p className="doux" style={{ marginTop: 0 }}>
-          Retrouvez ici vos signalements, suggestions et réponses de l’équipe « admin ».
-        </p>
-        <DiscussionsSupport />
-      </div>
-
-      <div className="carte" style={{ marginBottom: "1rem" }}>
-        <h2 style={{ fontSize: "1.05rem", marginTop: 0 }}>Anniversaire et galerie</h2>
+      <GroupeParametres titre="Compte et personnalisation" Icon={UserRound}>
+        <OptionParametres
+          titre="Apparence"
+          description="Choisir le thème clair, sombre ou automatique"
+          Icon={Palette}
+        >
+          <div className="puces" role="group" aria-label="Thème">
+            {[["auto", "Automatique"], ["light", "Clair"], ["dark", "Sombre"]].map(([k, l]) => (
+              <button
+                key={k}
+                type="button"
+                className="puce"
+                aria-pressed={theme === k}
+                onClick={() => { setTheme(k); appliquerTheme(k); }}
+              >
+                {l}
+              </button>
+            ))}
+          </div>
+        </OptionParametres>
+        <OptionParametres
+          titre="Anniversaire et galerie"
+          description="Votre date d’anniversaire et vos photos"
+          Icon={Images}
+        >
         <label htmlFor="date-anniversaire" style={{ display: "block", fontWeight: 600, marginBottom: ".35rem" }}>
           Ma date d’anniversaire
         </label>
@@ -283,10 +340,25 @@ export default function Parametres() {
             </div>
           ))}
         </div>
-      </div>
+        </OptionParametres>
+        <OptionParametres
+          titre="Assistance et retours de test"
+          description="Signaler un problème ou contacter l’équipe"
+          Icon={CircleHelp}
+        >
+          <p className="doux" style={{ marginTop: 0 }}>
+            Retrouvez ici vos signalements, suggestions et réponses de l’équipe « admin ».
+          </p>
+          <DiscussionsSupport />
+        </OptionParametres>
+      </GroupeParametres>
 
-      <div className="carte" style={{ marginBottom: "1rem" }}>
-        <h2 style={{ fontSize: "1.05rem", marginTop: 0 }}>Notifications</h2>
+      <GroupeParametres titre="Notifications et confidentialité" Icon={Shield}>
+        <OptionParametres
+          titre="Notifications"
+          description="Choisir les alertes reçues dans l’application"
+          Icon={Bell}
+        >
         <div style={{ marginBottom: "0.75rem" }}>
           <label htmlFor="pref-pub" style={{ display: "block", fontWeight: 600, marginBottom: "0.3rem" }}>
             Nouvelles publications
@@ -307,10 +379,13 @@ export default function Parametres() {
         <Interrupteur label="Demandes d'ami" valeur={p.amis} onChange={(v) => majPref.mutate({ amis: v })} />
         <Interrupteur label="Messages et invitations" valeur={p.discussions} onChange={(v) => majPref.mutate({ discussions: v })} />
         <Interrupteur label="Alertes sur cet appareil (application fermée)" valeur={p.push} onChange={(v) => majPref.mutate({ push: v })} />
-      </div>
+        </OptionParametres>
 
-      <div className="carte" style={{ marginBottom: "1rem" }}>
-        <h2 style={{ fontSize: "1.05rem", marginTop: 0 }}>Confidentialité</h2>
+        <OptionParametres
+          titre="Confidentialité et WhatsApp"
+          description="Définir qui peut voir vos informations"
+          Icon={LockKeyhole}
+        >
         <div style={{ display: "grid", gap: "0.75rem" }}>
           <Selecteur label="Qui peut voir mon profil" value={profil.data.visibilite_profil ?? "tous"} onChange={(e) => majProfil.mutate({ visibilite_profil: e.target.value })}>
             <option value="tous">Tout le monde</option>
@@ -349,10 +424,13 @@ export default function Parametres() {
             <Bouton secondaire type="button" chargement={majProfil.isPending} onClick={enregistrerWhatsapp}>Enregistrer WhatsApp</Bouton>
           </div>
         </div>
-      </div>
+        </OptionParametres>
 
-      <div className="carte" style={{ marginBottom: "1rem" }}>
-        <strong>Alertes sur cet appareil</strong>
+        <OptionParametres
+          titre="Alertes sur cet appareil"
+          description="Activer les notifications même application fermée"
+          Icon={Laptop}
+        >
         {!pushSupporte() && !ios ? (
           <p className="doux" style={{ margin: "0.4rem 0 0" }}>Non disponibles sur ce navigateur.</p>
         ) : (
@@ -367,9 +445,13 @@ export default function Parametres() {
           </>
         )}
         {erreurPush && <p role="alert" className="erreur" style={{ marginTop: "0.5rem" }}>{erreurPush}</p>}
-      </div>
+        </OptionParametres>
 
-      <h2 style={{ fontSize: "1.05rem", marginTop: "1.5rem" }}>Utilisateurs bloqués</h2>
+        <OptionParametres
+          titre="Utilisateurs bloqués"
+          description="Consulter les comptes bloqués et les débloquer"
+          Icon={Users}
+        >
       {bloques.isPending ? (
         <SqFormulaire champs={1} />
       ) : !(bloques.data ?? []).length ? (
@@ -387,11 +469,107 @@ export default function Parametres() {
             </li>
           ))}
         </ul>
-      )}
+        )}
+        </OptionParametres>
+      </GroupeParametres>
 
-      <div style={{ marginTop: "1.5rem" }}>
-        <Bouton secondaire onClick={deconnexion}>Se déconnecter</Bouton>
-      </div>
+      <GroupeParametres titre="Sécurité du compte" Icon={Shield}>
+        <OptionParametres
+          titre="Modifier le mot de passe"
+          description="Sécuriser l’accès avec un nouveau mot de passe"
+          Icon={LockKeyhole}
+        >
+          {utilisateur?.a_mot_de_passe ? (
+            <form
+              className="parametres-formulaire-mot-de-passe"
+              onSubmit={(event) => {
+                event.preventDefault();
+                changerMotDePasse.mutate();
+              }}
+            >
+              <label>
+                Mot de passe actuel
+                <input
+                  className="champ"
+                  type="password"
+                  autoComplete="current-password"
+                  value={motDePasseActuel}
+                  onChange={(event) => setMotDePasseActuel(event.target.value)}
+                  required
+                />
+              </label>
+              <label>
+                Nouveau mot de passe
+                <input
+                  className="champ"
+                  type="password"
+                  autoComplete="new-password"
+                  minLength={8}
+                  value={nouveauMotDePasse}
+                  onChange={(event) => setNouveauMotDePasse(event.target.value)}
+                  required
+                />
+              </label>
+              <Bouton chargement={changerMotDePasse.isPending}>Modifier le mot de passe</Bouton>
+              {changerMotDePasse.isSuccess && (
+                <p role="status" className="doux">Mot de passe modifié. Les autres sessions ont été déconnectées.</p>
+              )}
+              {changerMotDePasse.isError && (
+                <p role="alert" className="erreur">{changerMotDePasse.error.message}</p>
+              )}
+            </form>
+          ) : (
+            <p className="doux">Ce compte utilise la connexion Google et n’a pas de mot de passe local.</p>
+          )}
+        </OptionParametres>
+        <OptionParametres
+          titre="Appareils et sessions"
+          description="Jusqu’à 4 sessions ; fermeture après 7 jours d’inactivité"
+          Icon={Laptop}
+        >
+          {sessions.isPending ? (
+            <SqFormulaire champs={2} />
+          ) : sessions.isError ? (
+            <p role="alert" className="erreur">Impossible de charger les sessions actives.</p>
+          ) : (
+            <>
+              <p className="doux">Sessions actives : {sessions.data.length}/4. Une session inactive pendant 7 jours expire automatiquement.</p>
+              <ul className="parametres-sessions">
+                {sessions.data.map((session) => (
+                  <li key={session.id}>
+                    <div>
+                      <strong>{session.appareil}</strong>
+                      <span>{session.adresse_ip || "Adresse inconnue"} · activité {dateLisible(session.derniere_activite)}</span>
+                      {session.actuelle && <em>Session actuelle</em>}
+                    </div>
+                    {!session.actuelle && (
+                      <button
+                        type="button"
+                        className="parametres-session-fermer"
+                        aria-label={`Déconnecter ${session.appareil}`}
+                        disabled={fermerSession.isPending}
+                        onClick={() => fermerSession.mutate(session.id)}
+                      >
+                        <X size={18} />
+                      </button>
+                    )}
+                  </li>
+                ))}
+              </ul>
+              {fermerSession.isError && (
+                <p role="alert" className="erreur">{fermerSession.error.message}</p>
+              )}
+            </>
+          )}
+        </OptionParametres>
+        <OptionParametres
+          titre="Se déconnecter"
+          description="Fermer la session sur cet appareil"
+          Icon={LogOut}
+        >
+          <Bouton secondaire onClick={deconnexion}>Se déconnecter</Bouton>
+        </OptionParametres>
+      </GroupeParametres>
 
       <ChargementLong actif={occupe} label="Activation des notifications..." />
     </div>

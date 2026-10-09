@@ -3,7 +3,7 @@ import { api } from "./client";
 
 const curseur = (url) => (url ? new URL(url, window.location.origin).searchParams.get("cursor") : undefined);
 
-function useCurseur(cle, chemin, params = "") {
+function useCurseur(cle, chemin, params = "", actif = true) {
   return useInfiniteQuery({
     queryKey: [cle, chemin, params],
     queryFn: ({ pageParam }) => {
@@ -13,10 +13,16 @@ function useCurseur(cle, chemin, params = "") {
     },
     initialPageParam: null,
     getNextPageParam: (d) => curseur(d.next),
+    enabled: actif,
   });
 }
 
-export const useFil = (auteur) => useCurseur("fil", "/publications/", auteur ? `auteur=${auteur}` : "");
+export const useFil = (auteur, recherche = "", actif = true) => {
+  const params = new URLSearchParams();
+  if (auteur) params.set("auteur", auteur);
+  if (recherche) params.set("q", recherche);
+  return useCurseur("fil", "/publications/", params.toString(), actif);
+};
 export const useMesPublications = () => useCurseur("mes-publications", "/publications/mes/");
 export const useCommentaires = (id) => useCurseur("commentaires", `/publications/${id}/commentaires/`);
 

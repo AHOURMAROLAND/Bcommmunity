@@ -55,8 +55,31 @@ class AnnuaireView(APIView):
         vis_situation = Q(visibilite_situation="tous") | Q(visibilite_situation="amis", user_id__in=amis)
         vis_parcours = Q(visibilite_parcours="tous") | Q(visibilite_parcours="amis", user_id__in=amis)
 
-        for mot in (p.get("q") or "").strip()[:80].split()[:3]:
-            qs = qs.filter(Q(user__prenom__icontains=mot) | Q(user__nom__icontains=mot))
+        for mot in (p.get("q") or "").strip()[:120].split()[:8]:
+            membres = Q(user__prenom__icontains=mot) | Q(user__nom__icontains=mot)
+            public = Q(bio__icontains=mot) | Q(ville__icontains=mot)
+            situation = (
+                Q(situation__poste__icontains=mot)
+                | Q(situation__entreprise__icontains=mot)
+                | Q(situation__secteur__icontains=mot)
+                | Q(situation__ville_emploi__icontains=mot)
+                | Q(situation__etablissement__icontains=mot)
+                | Q(situation__faculte__icontains=mot)
+                | Q(situation__domaine__nom__icontains=mot)
+                | Q(situation__diplome__icontains=mot)
+                | Q(situation__niveau__icontains=mot)
+            )
+            parcours = Exists(
+                Scolarite.objects.filter(profil=OuterRef("pk")).filter(
+                    Q(classe__nom__icontains=mot)
+                    | Q(classe__cycle__nom__icontains=mot)
+                    | Q(classe__filiere__icontains=mot)
+                    | Q(classe__filiere_ref__nom__icontains=mot)
+                )
+            )
+            qs = qs.filter(
+                membres | public | (vis_situation & situation) | (vis_parcours & parcours)
+            )
         if (promo := _int(p.get("promo"))):
             qs = qs.filter(annee_sortie=promo)
         if p.get("statut") in ("eleve", "ancien"):

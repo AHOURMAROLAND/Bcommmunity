@@ -10,6 +10,7 @@ import { useAuth } from "../auth/AuthContext";
 import { useTempsReel } from "../temps-reel/TempsReel";
 import Avatar from "./Avatar";
 import BoutonRetour from "./BoutonRetour";
+import BoutonSupport from "./BoutonSupport";
 import { BandeauHorsLigne, BandeauInstallation, BandeauSynchronisation, MiseAJour } from "./Bandeaux";
 import { SqRoute } from "./Squelettes";
 import { LogoApp } from "./ui";
@@ -115,7 +116,14 @@ export default function Coque() {
 
       {/* ======= Contenu principal ======= */}
       <main className="contenu">
-        {location.pathname !== "/fil" && <BoutonRetour />}
+        {![
+          "/fil",
+          "/profil/modifier",
+          "/profil/galerie",
+        ].includes(location.pathname)
+          && !/^\/profil\/\d+(\/galerie)?$/.test(location.pathname)
+          && !/^\/publications\/\d+$/.test(location.pathname)
+          && <BoutonRetour />}
         <Suspense fallback={<SqRoute />}>
           <Outlet />
         </Suspense>
@@ -141,6 +149,7 @@ export default function Coque() {
           </NavLink>
         ))}
       </nav>
+      <BoutonSupport />
     </div>
   );
 }

@@ -27,7 +27,12 @@ function Suggestions() {
       vide="Aucune suggestion pour le moment. Complétez votre parcours scolaire pour retrouver vos camarades."
       rendu={(c) => (
         <LigneMembre key={c.id} c={c}
-          sous={`${c.classes_communes} classe${c.classes_communes > 1 ? "s" : ""} en commun`}>
+          sous={[
+            c.meme_promo && `Même promotion`,
+            c.meme_domaine && `Même domaine`,
+            c.amis_communs > 0 && `${c.amis_communs} ami${c.amis_communs > 1 ? "s" : ""} en commun`,
+            c.classes_communes > 0 && `${c.classes_communes} classe${c.classes_communes > 1 ? "s" : ""} en commun`,
+          ].filter(Boolean).join(" · ")}>
           <BoutonRelation c={c} />
         </LigneMembre>
       )} />

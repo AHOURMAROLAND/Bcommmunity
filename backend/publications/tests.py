@@ -47,6 +47,50 @@ def test_brouillon_invisible_puis_visible_apres_publication():
     assert api(a).patch(f"/api/publications/{pid}/", {"statut": "publie"}, format="multipart").status_code == 200
     assert ids(api(b).get("/api/publications/")) == [pid]
 
+def test_publication_programmee_devient_visible_a_echeance(monkeypatch):
+    from publications import taches
+
+    a, b = membre("Alice"), membre("Bob")
+    date = timezone.now() + timedelta(minutes=3)
+    reponse = publier(a, statut="programmee", date_programmee=date.isoformat(), titre="Fête scolaire")
+    assert reponse.status_code == 201
+    pid = reponse.data["id"]
+    assert reponse.data["statut"] == "programmee"
+    assert ids(api(b).get("/api/publications/")) == []
+
+    annoncees = []
+    monkeypatch.setattr(taches, "lancer", lambda _tache, pk: annoncees.append(pk))
+    monkeypatch.setattr(taches.transaction, "on_commit", lambda callback: callback())
+    Publication.objects.filter(pk=pid).update(date_programmee=timezone.now() - timedelta(seconds=1))
+    assert taches.publier_programmees.run() == 1
+    publication = Publication.objects.get(pk=pid)
+    assert publication.statut == "publie"
+    assert publication.date_programmee is None
+    assert publication.publie_le is not None
+    assert ids(api(b).get("/api/publications/")) == [pid]
+    assert annoncees == [pid]
+
+def test_publication_programmee_refuse_une_date_passee():
+    a = membre("Alice")
+    reponse = publier(
+        a,
+        statut="programmee",
+        date_programmee=(timezone.now() - timedelta(minutes=1)).isoformat(),
+    )
+    assert reponse.status_code == 400
+
+def test_recherche_publications_et_profils():
+    from profils.models import Profil
+
+    a, b = membre("Alice"), membre("Bob")
+    Profil.objects.filter(user=a).update(bio="Passionnée d'astronomie")
+    publication = publier(a, titre="Nuit étoilée", contenu="<p>Observer les étoiles</p>")
+
+    assert publication.status_code == 201
+    assert ids(api(b).get("/api/publications/?q=étoiles")) == [publication.data["id"]]
+    resultat = api(b).get("/api/annuaire/?q=astronomie")
+    assert [membre["id"] for membre in resultat.data["results"]] == [a.pk]
+
 
 def test_html_nettoye():
     a = membre("Alice")

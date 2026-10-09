@@ -38,10 +38,11 @@ def test_inscription_cree_un_compte_non_valide(client):
 
 
 @pytest.mark.django_db
-def test_connexion_refusee_tant_que_email_non_verifie(client):
+def test_connexion_ne_demande_pas_otp_pour_un_compte_existant(client):
     inscrire(client)
     r = client.post("/api/auth/connexion/", CONNEXION, format="json")
-    assert r.status_code == 403 and r.data["code"] == "email_non_verifie"
+    assert r.status_code == 200 and "access" in r.data
+    assert User.objects.get(email="awa@example.com").email_verifie is False
 
 
 @pytest.mark.django_db

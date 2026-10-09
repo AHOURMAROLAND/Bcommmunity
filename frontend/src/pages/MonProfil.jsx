@@ -11,6 +11,7 @@ import {
   Building2,
   BookOpen,
   Compass,
+  Images,
 } from "lucide-react";
 import { useMesPublications } from "../api/publications";
 import { useProfil } from "../api/hooks";
@@ -65,6 +66,9 @@ function MesPublications() {
               </div>
               {p.statut === "brouillon" && (
                 <span className="badge-statut-brouillon">Brouillon</span>
+              )}
+              {p.statut === "programmee" && (
+                <span className="badge-statut-brouillon">Programmée</span>
               )}
               <ChevronRight size={18} className="chevron-publication-profil" />
             </Link>
@@ -188,6 +192,13 @@ export default function MonProfil() {
           )}
         </div>
       </div>
+      <Link
+        to="/profil/galerie"
+        className="puce"
+        style={{ display: "inline-flex", alignItems: "center", gap: ".5rem", margin: "1rem 0" }}
+      >
+        <Images size={18} /> Galerie ({data.galerie?.length ?? 0})
+      </Link>
 
       {/* 3. Bouton Modifier le profil avec bordure dorée/ambrée */}
       <Link to="/profil/modifier" className="bouton-modifier-profil-dore">

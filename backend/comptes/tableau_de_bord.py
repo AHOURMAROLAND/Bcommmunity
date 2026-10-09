@@ -2,10 +2,11 @@ from datetime import datetime, timedelta
 from datetime import timezone as dt_tz
 
 from django.contrib.admin.models import LogEntry
-from django.db.models import Count, Q
-from django.db.models.functions import TruncMonth
+from django.db.models import Case, Count, IntegerField, Q, When
+from django.db.models.functions import ExtractDay, ExtractMonth, TruncMonth
 from django.utils import timezone
 
+from profils.models import Profil
 from publications.models import Publication
 from signalements.models import Signalement
 
@@ -39,6 +40,7 @@ def contexte(request, context):
     user = request.user
     permissions = {
         "can_comptes": _a_le_permission_de_lecture(user, "comptes.view_user"),
+        "can_profils": _a_le_permission_de_lecture(user, "profils.view_profil"),
         "can_signalements": _a_le_permission_de_lecture(user, "signalements.view_signalement"),
         "can_suspensions": _a_le_permission_de_lecture(user, "comptes.view_suspension"),
         "can_publications": _a_le_permission_de_lecture(user, "publications.view_publication"),
@@ -77,6 +79,37 @@ def contexte(request, context):
             "en_attente": User.objects.filter(email_verifie=False, is_active=True)
             .order_by("-date_inscription")[:5],
         })
+
+    if permissions["can_comptes"] and permissions["can_profils"]:
+        jours = [timezone.localdate() + timedelta(days=i) for i in range(8)]
+        correspondances = Q()
+        rang = []
+        for index, jour in enumerate(jours):
+            correspondances |= Q(mois_anniversaire=jour.month, jour_anniversaire=jour.day)
+            rang.append(When(
+                mois_anniversaire=jour.month,
+                jour_anniversaire=jour.day,
+                then=index,
+            ))
+        donnees["anniversaires_semaine"] = (
+            Profil.objects.filter(
+                user__valide=True,
+                user__is_active=True,
+                date_anniversaire__isnull=False,
+            )
+            .annotate(
+                mois_anniversaire=ExtractMonth("date_anniversaire"),
+                jour_anniversaire=ExtractDay("date_anniversaire"),
+            )
+            .filter(correspondances)
+            .annotate(rang_anniversaire=Case(
+                *rang,
+                default=len(jours),
+                output_field=IntegerField(),
+            ))
+            .select_related("user")
+            .order_by("rang_anniversaire", "user__prenom", "user__nom")[:10]
+        )
 
     if permissions["can_signalements"]:
         stats["signalements"] = Signalement.objects.filter(

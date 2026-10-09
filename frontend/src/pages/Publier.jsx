@@ -14,6 +14,13 @@ import { estErreurReseau } from "../api/stockage-hors-ligne";
 // Chargement paresseux de l'editeur d'image (lourd)
 const EditeurImage = lazy(() => import("../editeur/EditeurImage"));
 
+function dateLocalePourChamp(valeur) {
+  if (!valeur) return "";
+  const date = new Date(valeur);
+  date.setMinutes(date.getMinutes() - date.getTimezoneOffset());
+  return date.toISOString().slice(0, 16);
+}
+
 export default function Publier() {
   const { id } = useParams();
   const existante = usePublication(id, !!id);
@@ -31,6 +38,7 @@ function Formulaire({ id, pub }) {
   const [html, setHtml] = useState(pub?.contenu ?? "");
   const [longueur, setLongueur] = useState(pub ? 1 : 0);
   const [apercu, setApercu] = useState(pub?.apercu_public ?? true);
+  const [dateProgrammee, setDateProgrammee] = useState(() => dateLocalePourChamp(pub?.date_programmee));
   const [original, setOriginal] = useState(null);       // fichier choisi, avant edition
   const [image, setImage] = useState(null);              // fichier final pret a envoyer
   const [etatEdition, setEtatEdition] = useState(null);  // etat de l'editeur pour re-entree
@@ -75,10 +83,20 @@ function Formulaire({ id, pub }) {
     setErreurs({}); setGeneral("");
     if (titre.trim().length < 3) { setErreurs({ titre: "Le titre doit contenir au moins 3 caracteres." }); return; }
     if (statut === "publie" && longueur === 0) { setErreurs({ contenu: "Ecrivez du contenu avant de publier." }); return; }
+    if (statut === "programmee") {
+      if (!dateProgrammee || new Date(dateProgrammee).getTime() <= Date.now()) {
+        setErreurs({ date_programmee: "Choisissez une date et une heure dans le futur." });
+        return;
+      }
+      if (longueur === 0) { setErreurs({ contenu: "Ecrivez du contenu avant de programmer." }); return; }
+    }
     const fd = new FormData();
     fd.append("titre", titre.trim());
     fd.append("contenu", html);
     fd.append("statut", statut);
+    if (statut === "programmee") {
+      fd.append("date_programmee", new Date(dateProgrammee).toISOString());
+    }
     fd.append("apercu_public", apercu ? "true" : "false");
     if (!id) fd.append("client_id", clientId.current);
     if (image) fd.append("image", image);
@@ -207,6 +225,25 @@ function Formulaire({ id, pub }) {
           : "Seuls les membres connectes pourront voir cette publication."}
       </p>
 
+      {!dejaPublie && (
+        <div className="carte" style={{ marginTop: ".75rem" }}>
+          <label htmlFor="date-publication-programmee" style={{ display: "block", fontWeight: 600, marginBottom: ".4rem" }}>
+            Programmer la publication
+          </label>
+          <input
+            id="date-publication-programmee"
+            className="champ"
+            type="datetime-local"
+            value={dateProgrammee}
+            onChange={(event) => setDateProgrammee(event.target.value)}
+          />
+          <p className="doux" style={{ marginBottom: 0, fontSize: ".85rem" }}>
+            La publication apparaîtra dans le fil à la date choisie.
+          </p>
+          {erreurs.date_programmee && <p role="alert" className="erreur">{erreurs.date_programmee}</p>}
+        </div>
+      )}
+
       {general && <p role="alert" className="erreur">{general}</p>}
       <div style={{ display: "grid", gap: "0.5rem", marginTop: "1rem" }}>
         {!dejaPublie && (
@@ -214,8 +251,13 @@ function Formulaire({ id, pub }) {
             Enregistrer en brouillon
           </Bouton>
         )}
+        {!dejaPublie && (
+          <Bouton secondaire chargement={enregistrer.isPending} onClick={() => envoyer("programmee")}>
+            Programmer
+          </Bouton>
+        )}
         <Bouton chargement={enregistrer.isPending} onClick={() => envoyer("publie")}>
-          {dejaPublie ? "Enregistrer" : "Publier"}
+          {dejaPublie ? "Enregistrer" : pub?.statut === "programmee" ? "Publier maintenant" : "Publier"}
         </Bouton>
       </div>
     </div>

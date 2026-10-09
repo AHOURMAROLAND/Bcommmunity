@@ -66,7 +66,7 @@ class PublicationSerializer(serializers.ModelSerializer):
     class Meta:
         model = Publication
         fields = ("id", "titre", "extrait", "image", "auteur", "statut", "masquee", "apercu_public",
-                  "publie_le", "cree_le", "nb_likes", "nb_commentaires", "a_aime", "est_auteur")
+                  "publie_le", "date_programmee", "cree_le", "nb_likes", "nb_commentaires", "a_aime", "est_auteur")
 
     def get_auteur(self, o):
         return resume_auteur(o.auteur)
@@ -90,7 +90,8 @@ class PublicationEcritureSerializer(serializers.Serializer):
     client_id = serializers.CharField(max_length=40, required=False, allow_blank=False, write_only=True)
     titre = serializers.CharField(min_length=3, max_length=150)
     contenu = serializers.CharField(max_length=20000, allow_blank=True, trim_whitespace=False)
-    statut = serializers.ChoiceField(choices=["brouillon", "publie"], default="brouillon")
+    statut = serializers.ChoiceField(choices=["brouillon", "programmee", "publie"], default="brouillon")
+    date_programmee = serializers.DateTimeField(required=False, allow_null=True)
     apercu_public = serializers.BooleanField(default=True)
     image = serializers.FileField(required=False, allow_null=True)
     supprimer_image = serializers.BooleanField(default=False)
@@ -106,17 +107,30 @@ class PublicationEcritureSerializer(serializers.Serializer):
         except ImageInvalide as e:
             raise serializers.ValidationError(str(e))
 
-    @staticmethod
-    def _pret(statut, contenu):
-        if statut == "publie" and not texte_brut(contenu):
+    def validate(self, attrs):
+        statut = attrs.get("statut", self.instance.statut if self.instance else "brouillon")
+        date_programmee = attrs.get(
+            "date_programmee",
+            self.instance.date_programmee if self.instance else None,
+        )
+        contenu = attrs.get("contenu", self.instance.contenu if self.instance else "")
+        if statut in ("publie", "programmee") and not texte_brut(contenu):
             raise serializers.ValidationError({"contenu": "Écrivez du contenu avant de publier."})
+        if statut == "programmee":
+            if date_programmee is None:
+                raise serializers.ValidationError({"date_programmee": "Choisissez la date de publication."})
+            if date_programmee <= timezone.now():
+                raise serializers.ValidationError({"date_programmee": "La date doit être dans le futur."})
+        elif attrs.get("date_programmee") is not None:
+            raise serializers.ValidationError({"date_programmee": "La date n'est autorisée que pour une publication programmée."})
+        return attrs
 
     def creer(self, auteur):
         d = self.validated_data
-        self._pret(d["statut"], d["contenu"])
         pub = Publication(auteur=auteur, client_id=d.get("client_id", ""),
                           titre=d["titre"], contenu=d["contenu"], extrait=extrait(d["contenu"]),
-                          apercu_public=d["apercu_public"], statut=d["statut"])
+                          apercu_public=d["apercu_public"], statut=d["statut"],
+                          date_programmee=d.get("date_programmee"))
         if d["statut"] == "publie":
             pub.publie_le = timezone.now()
         if d.get("image"):
@@ -126,12 +140,13 @@ class PublicationEcritureSerializer(serializers.Serializer):
 
     def modifier(self, pub):
         d = self.validated_data
-        if d.get("statut") == "brouillon" and pub.statut == "publie":
-            raise serializers.ValidationError({"statut": "Une publication publiée ne peut pas repasser en brouillon."})
-        for champ in ("titre", "contenu", "apercu_public", "statut"):
+        if d.get("statut") in ("brouillon", "programmee") and pub.statut == "publie":
+            raise serializers.ValidationError({"statut": "Une publication déjà publiée ne peut pas être déprogrammée."})
+        for champ in ("titre", "contenu", "apercu_public", "statut", "date_programmee"):
             if champ in d:
                 setattr(pub, champ, d[champ])
-        self._pret(pub.statut, pub.contenu)
+        if pub.statut != "programmee":
+            pub.date_programmee = None
         if pub.statut == "publie" and pub.publie_le is None:
             pub.publie_le = timezone.now()
 

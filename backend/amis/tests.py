@@ -3,7 +3,7 @@ from django.core.cache import cache
 from rest_framework.test import APIClient
 
 from comptes.models import User
-from profils.models import Profil, SituationActuelle
+from profils.models import Domaine, Profil, SituationActuelle
 from scolarite.models import Classe, Cycle, Scolarite
 
 from .models import Amitie
@@ -51,6 +51,28 @@ def test_suggestions_classes_communes_et_annees_qui_se_chevauchent(classes):
     ligne(c, classes[0], 2015, 2016)  # même classe, autre période : pas en commun
     r = api(a).get("/api/amis/suggestions/")
     assert ids(r) == [b.pk] and r.data["results"][0]["classes_communes"] == 2
+
+
+def test_suggestions_priorisent_promotion_domaine_et_amis_communs(db):
+    domaine = Domaine.objects.create(nom="Informatique")
+    alice = membre("Alice", annee_sortie=2020)
+    promo = membre("Promo", annee_sortie=2020)
+    commun = membre("Commun")
+    ami = membre("Ami")
+    ami_ami = membre("AmiAmi")
+    for user in (alice, commun):
+        situation = SituationActuelle.objects.get(profil__user=user)
+        situation.domaine = domaine
+        situation.save(update_fields=["domaine"])
+    Amitie.objects.create(demandeur=alice, destinataire=ami, statut="acceptee")
+    Amitie.objects.create(demandeur=ami, destinataire=ami_ami, statut="acceptee")
+
+    resultat = api(alice).get("/api/amis/suggestions/")
+    cartes = resultat.data["results"]
+    assert [carte["id"] for carte in cartes] == [promo.pk, commun.pk, ami_ami.pk]
+    assert cartes[0]["meme_promo"] is True
+    assert cartes[1]["meme_domaine"] is True
+    assert cartes[2]["amis_communs"] == 1
 
 
 def test_utilisateur_bloque_invisible_partout(classes):

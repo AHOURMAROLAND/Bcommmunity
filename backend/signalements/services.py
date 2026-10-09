@@ -40,6 +40,10 @@ def creer_signalement(auteur, type_, cible_id, motif, commentaire):
     with transaction.atomic():
         s, cree = Signalement.objects.get_or_create(auteur=auteur, type_cible=type_, **filtre, defaults=defauts)
         if cree:
+            en_attente = Signalement.objects.filter(statut__in=["nouveau", "en_cours"]).count()
+            if en_attente and en_attente % settings.SEUIL_ALERTES_ADMIN == 0:
+                s.alerte_seuil = en_attente
+                s.save(update_fields=["alerte_seuil"])
             seuil = settings.SEUIL_MASQUAGE_AUTO
             if type_ == "publication" and seuil and Signalement.objects.filter(
                     publication_cible_id=cible_id, statut__in=["nouveau", "en_cours"]).count() >= seuil:

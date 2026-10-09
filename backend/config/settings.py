@@ -20,7 +20,7 @@ for _env_fichier in (BASE_DIR.parent / ".env", BASE_DIR / ".env"):
                         if _cle and _cle not in os.environ:
                             os.environ[_cle] = _val
             break
-        except Exception:
+        except OSError:
             pass
 
 
@@ -199,7 +199,7 @@ else:
 X_FRAME_OPTIONS = "DENY"
 SECURE_REFERRER_POLICY = "same-origin"
 SECURE_CONTENT_TYPE_NOSNIFF = True
-DATA_UPLOAD_MAX_MEMORY_SIZE = 10_485_760
+DATA_UPLOAD_MAX_MEMORY_SIZE = 26_214_400
 FILE_UPLOAD_MAX_MEMORY_SIZE = 5 * 1024 * 1024
 SESSION_COOKIE_HTTPONLY = True
 if not DEBUG:
@@ -230,7 +230,13 @@ EMAIL_HOST_USER = env("EMAIL_HOST_USER", "")
 EMAIL_HOST_PASSWORD = env("EMAIL_HOST_PASSWORD", "")
 EMAIL_USE_TLS = True
 DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", "Bakhita Community <no-reply@bakhita.example>")
-ADMIN_EMAIL = env("ADMIN_EMAIL", "")  # reçoit une alerte à chaque signalement
+ADMIN_EMAIL = env("ADMIN_EMAIL", "")  # adresse historique, conservée pour compatibilité
+ADMIN_EMAILS = [
+    adresse.strip() for adresse in env("ADMIN_EMAILS", ADMIN_EMAIL).split(",") if adresse.strip()
+]
+SEUIL_ALERTES_ADMIN = int(env("SEUIL_ALERTES_ADMIN", "10"))
+if SEUIL_ALERTES_ADMIN < 1:
+    raise RuntimeError("SEUIL_ALERTES_ADMIN doit être supérieur ou égal à 1.")
 SEUIL_MASQUAGE_AUTO = int(env("SEUIL_MASQUAGE_AUTO", "3"))
 
 # --- Brevo SMTP (actif uniquement si BREVO_SMTP_LOGIN est défini) ---
@@ -300,6 +306,10 @@ CELERY_TASK_SOFT_TIME_LIMIT = 120
 CELERY_TASK_TIME_LIMIT = 150
 CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
 CELERY_BEAT_SCHEDULE = {
+    "publications-programmees": {
+        "task": "publications.taches.publier_programmees",
+        "schedule": crontab(minute="*"),
+    },
     "resume-quotidien": {
         "task": "notifications.taches.resume_quotidien",
         "schedule": crontab(hour=int(env("RESUME_HEURE_UTC", "17")), minute=0),
@@ -389,6 +399,9 @@ UNFOLD = {
                      "permission": _permission("comptes.view_user")},
                     {"title": "Profils", "icon": "badge", "link": _lien("profils_profil"),
                      "permission": _permission("profils.view_profil")},
+                    {"title": "Bons d'anniversaire", "icon": "redeem",
+                     "link": _lien("profils_cadeauanniversaire"),
+                     "permission": _permission("profils.view_cadeauanniversaire")},
                     {"title": "Groupes", "icon": "groups", "link": _lien("auth_group"),
                      "permission": _permission("auth.view_group")},
                 ],
@@ -399,6 +412,9 @@ UNFOLD = {
                 "items": [
                     {"title": "Signalements", "icon": "flag", "link": _lien("signalements_signalement"),
                      "permission": _permission("signalements.view_signalement")},
+                    {"title": "Bouton de support", "icon": "support_agent",
+                     "link": _lien("signalements_configurationsupport"),
+                     "permission": _permission("signalements.view_configurationsupport")},
                     {"title": "Suspensions", "icon": "gavel", "link": _lien("comptes_suspension"),
                      "permission": _permission("comptes.view_suspension")},
                     {"title": "Journal d'activité", "icon": "history", "link": _lien("comptes_activite"),

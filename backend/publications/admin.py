@@ -16,11 +16,17 @@ class PublicationAdmin(ModelAdmin):
     date_hierarchy = "cree_le"
     actions = ["masquer", "reafficher"]
 
-    @display(description="État", label={"Publiée": "success", "Masquée": "danger", "Brouillon": "warning"})
+    @display(description="État", label={
+        "Publiée": "success", "Programmée": "info", "Masquée": "danger", "Brouillon": "warning",
+    })
     def etat(self, p):
         if p.masquee:
             return "Masquée"
-        return "Publiée" if p.statut == "publie" else "Brouillon"
+        return {
+            "publie": "Publiée",
+            "programmee": "Programmée",
+            "brouillon": "Brouillon",
+        }[p.statut]
 
     @admin.action(description="Masquer les publications")
     def masquer(self, request, queryset):

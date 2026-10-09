@@ -7,6 +7,7 @@ from django.dispatch import receiver
 class Publication(models.Model):
     class Statut(models.TextChoices):
         BROUILLON = "brouillon", "Brouillon"
+        PROGRAMMEE = "programmee", "Programmée"
         PUBLIE = "publie", "Publiée"
 
     auteur = models.ForeignKey(settings.AUTH_USER_MODEL, related_name="publications", on_delete=models.CASCADE)
@@ -21,6 +22,7 @@ class Publication(models.Model):
     image_hauteur = models.PositiveIntegerField(null=True, blank=True)
     apercu_public = models.BooleanField(default=True)
     statut = models.CharField(max_length=10, choices=Statut.choices, default=Statut.BROUILLON)
+    date_programmee = models.DateTimeField(null=True, blank=True)
     masquee = models.BooleanField(default=False)
     cree_le = models.DateTimeField(auto_now_add=True)
     modifie_le = models.DateTimeField(auto_now=True)
@@ -30,6 +32,7 @@ class Publication(models.Model):
 
     class Meta:
         indexes = [models.Index(fields=["statut", "masquee", "-publie_le"]),
+                   models.Index(fields=["statut", "date_programmee"]),
                    models.Index(fields=["auteur", "-cree_le"])]
         constraints = [
             models.UniqueConstraint(

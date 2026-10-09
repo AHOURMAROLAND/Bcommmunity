@@ -7,6 +7,7 @@ import {
   GraduationCap,
   MessageCircle,
   MoreHorizontal,
+  Images,
   UserCheck,
   UserPlus,
   Users,
@@ -163,6 +164,15 @@ export default function ProfilPublic() {
 
       {/* Contenu principal sous la photo */}
       <div className="profil-public-corps">
+        {d.galerie?.length > 0 && (
+          <Link
+            to={`/profil/${d.id}/galerie`}
+            className="puce"
+            style={{ display: "inline-flex", alignItems: "center", gap: ".5rem", margin: "1rem 0" }}
+          >
+            <Images size={18} /> Galerie ({d.galerie.length})
+          </Link>
+        )}
         {/* Rangée des deux boutons d'action (Ajouter en ami + Message) */}
         <div className="profil-actions-row">
           {/* Bouton Relation */}

@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field
 
-from django.db.models import Count, Exists, OuterRef, Q, Subquery
+from django.db.models import Case, Count, Exists, F, IntegerField, OuterRef, Q, Subquery, When
 from django.db.models.functions import Coalesce
 from django.utils import timezone
 
@@ -74,19 +74,69 @@ def profils_visibles(user, rel, bloques):
 
 
 def suggestions(user, rel, bloques):
-    """Profils partageant au moins une classe sur des années qui se chevauchent."""
+    """Classe les personnes par proximité scolaire, promotion, domaine et amis communs."""
     mes = Scolarite.objects.filter(profil__user=user)
     communes = (Scolarite.objects.filter(profil=OuterRef("pk"))
                 .filter(Exists(mes.filter(classe=OuterRef("classe"),
                                           annee_debut__lte=OuterRef("annee_fin"),
                                           annee_fin__gte=OuterRef("annee_debut"))))
                 .order_by().values("profil").annotate(n=Count("pk")).values("n"))
-    return (profils_visibles(user, rel, bloques)
+    profil = Profil.objects.filter(user=user).select_related("situation__domaine").first()
+    annee = profil.annee_sortie if profil else None
+    domaine_id = (
+        profil.situation.domaine_id
+        if profil and hasattr(profil, "situation") and profil.situation
+        else None
+    )
+    amis = list(rel.amis)
+    relations_amis = (
+        Amitie.objects.filter(statut="acceptee")
+        .filter(Q(demandeur_id__in=amis) | Q(destinataire_id__in=amis))
+        .annotate(
+            candidat_id=Case(
+                When(demandeur_id__in=amis, then=F("destinataire_id")),
+                default=F("demandeur_id"),
+                output_field=IntegerField(),
+            )
+        )
+        .order_by()
+        .values("candidat_id")
+        .annotate(n=Count("pk"))
+        .filter(candidat_id=OuterRef("user_id"))
+        .values("n")
+    )
+    qs = (profils_visibles(user, rel, bloques)
             .exclude(user_id__in=list(rel.engages))
-            .filter(visibilite_parcours="tous")
-            .annotate(communes=Coalesce(Subquery(communes), 0))
-            .filter(communes__gt=0)
-            .order_by("-communes", "user__nom", "user__prenom", "pk"))
+            .annotate(communes=Case(
+                When(visibilite_parcours="tous", then=Coalesce(Subquery(communes), 0)),
+                default=0,
+                output_field=IntegerField(),
+            ))
+            .annotate(amis_communs=Coalesce(Subquery(relations_amis), 0))
+            .annotate(
+                meme_promo=Case(
+                    *([When(annee_sortie=annee, then=1)] if annee else []),
+                    default=0,
+                    output_field=IntegerField(),
+                ),
+                meme_domaine=Case(
+                    *([When(
+                        situation__domaine_id=domaine_id,
+                        visibilite_situation="tous",
+                        then=1,
+                    )] if domaine_id else []),
+                    default=0,
+                    output_field=IntegerField(),
+                ),
+            )
+    )
+    return (qs.filter(
+        Q(communes__gt=0)
+        | Q(meme_promo=1)
+        | Q(meme_domaine=1)
+        | Q(amis_communs__gt=0)
+    ).order_by("-meme_promo", "-meme_domaine", "-amis_communs", "-communes",
+               "user__nom", "user__prenom", "pk"))
 
 
 def resume_situation(p, est_ami):
@@ -115,4 +165,7 @@ def carte(p, rel, communes=None):
             "situation": resume_situation(p, u.pk in rel.amis)}
     if communes is not None:
         data["classes_communes"] = communes
+        data["amis_communs"] = getattr(p, "amis_communs", 0)
+        data["meme_promo"] = bool(getattr(p, "meme_promo", 0))
+        data["meme_domaine"] = bool(getattr(p, "meme_domaine", 0))
     return data

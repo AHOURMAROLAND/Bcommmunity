@@ -8,6 +8,7 @@ import BoutonRetour from "./components/BoutonRetour";
 import { BandeauHorsLigne, BandeauSynchronisation } from "./components/Bandeaux";
 import PontNatif from "./components/PontNatif";
 import ToastViewport from "./components/ToastViewport";
+import BoutonSupport from "./components/BoutonSupport";
 import { TempsReelProvider } from "./temps-reel/TempsReel";
 
 const Connexion       = lazy(() => import("./pages/Connexion"));
@@ -30,6 +31,8 @@ const PublicationPage = lazy(() => import("./pages/PublicationPage"));
 const Publier         = lazy(() => import("./pages/Publier"));
 const Notifications   = lazy(() => import("./pages/Notifications"));
 const Parametres      = lazy(() => import("./pages/Parametres"));
+const Galerie         = lazy(() => import("./pages/Galerie"));
+const Recherche       = lazy(() => import("./pages/Recherche"));
 
 function Invite({ children }) {
   const { utilisateur, chargement } = useAuth();
@@ -66,6 +69,7 @@ function Plein() {
     <main className="contenu">
       <BandeauHorsLigne />
       <BandeauSynchronisation />
+      <BoutonSupport />
       {!location.pathname.startsWith("/messages/") && <BoutonRetour />}
       <Outlet />
     </main>
@@ -118,9 +122,12 @@ export default function App() {
             <Route path="/fil"              element={<Fil />} />
             <Route path="/publications/:id" element={<PublicationPage />} />
             <Route path="/annuaire"         element={<Annuaire />} />
+            <Route path="/recherche"        element={<Recherche />} />
             <Route path="/amis"             element={<Amis />} />
             <Route path="/messages"         element={<Messages />} />
             <Route path="/profil"           element={<MonProfil />} />
+            <Route path="/profil/galerie"   element={<Galerie />} />
+            <Route path="/profil/:id/galerie" element={<Galerie />} />
             <Route path="/profil/modifier"  element={<ModifierProfil />} />
             <Route path="/profil/:id"       element={<ProfilPublic />} />
             <Route path="/notifications"    element={<Notifications />} />

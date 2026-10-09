@@ -47,8 +47,8 @@ export default function Fil() {
           </button>
           <button
             className="bouton-icone-fil"
-            aria-label="Rechercher dans l'annuaire"
-            onClick={() => navigate("/annuaire")}
+            aria-label="Rechercher une personne ou une publication"
+            onClick={() => navigate("/recherche")}
           >
             <Search size={20} />
           </button>

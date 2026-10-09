@@ -1,4 +1,5 @@
 from django.contrib import admin, messages
+from django.db import transaction
 from django.db.models import Q
 from django.shortcuts import redirect
 from django.utils import timezone
@@ -10,9 +11,24 @@ from comptes import moderation
 from comptes.moderation import MOTIFS_PUBLICS
 from publications.models import Publication
 
-from .models import Signalement
+from .models import ConfigurationSupport, MessageSupport, PieceJointeSignalement, Signalement
 
 OUVERTS = ["nouveau", "en_cours"]
+
+
+class PieceJointeInline(admin.TabularInline):
+    model = PieceJointeSignalement
+    extra = 0
+    fields = ("fichier", "type_contenu", "cree_le")
+    readonly_fields = fields
+    can_delete = False
+
+
+class MessageSupportInline(admin.TabularInline):
+    model = MessageSupport
+    extra = 1
+    fields = ("texte", "cree_le")
+    readonly_fields = ("cree_le",)
 
 
 class SignalementTraitementFilter(admin.SimpleListFilter):
@@ -36,13 +52,37 @@ class SignalementAdmin(ModelAdmin):
     date_hierarchy = "cree_le"
     search_fields = ("auteur__email", "utilisateur_cible__email", "publication_cible__titre", "commentaire")
     fields = ("statut", "decision", "type_cible", "cible", "motif", "commentaire", "auteur", "cree_le",
-              "traite_par", "traite_le", "apercu")
-    readonly_fields = ("type_cible", "cible", "motif", "commentaire", "auteur", "cree_le", "traite_par", "traite_le", "apercu")
+              "traite_par", "traite_le", "apercu", "contexte", "adresse_ip")
+    readonly_fields = ("type_cible", "cible", "motif", "commentaire", "auteur", "cree_le", "traite_par",
+                       "traite_le", "apercu", "contexte", "adresse_ip")
+    inlines = (PieceJointeInline, MessageSupportInline)
     actions = ["en_cours", "ignorer", "masquer_publication", "supprimer_publication", "avertir",
                "suspendre_24h", "suspendre_7j", "suspendre_30j", "bannir"]
 
     def has_add_permission(self, request):
         return False
+
+    def save_formset(self, request, form, formset, change):
+        instances = formset.save(commit=False)
+        for instance in formset.deleted_objects:
+            instance.delete()
+        for instance in instances:
+            nouveau = instance.pk is None
+            if isinstance(instance, MessageSupport) and nouveau:
+                instance.expediteur = request.user
+            instance.save()
+            if isinstance(instance, MessageSupport) and nouveau:
+                from notifications.services import lancer
+
+                from .taches import notifier_reponse_support
+                transaction.on_commit(lambda pk=instance.pk: lancer(notifier_reponse_support, pk))
+        formset.save_m2m()
+
+    def get_inline_instances(self, request, obj=None):
+        instances = super().get_inline_instances(request, obj)
+        if obj and obj.type_cible != "retour":
+            instances = [inline for inline in instances if not isinstance(inline, MessageSupportInline)]
+        return instances
 
     def changelist_view(self, request, extra_context=None):
         if not request.GET:  # par défaut : seulement ce qui attend une décision
@@ -57,6 +97,8 @@ class SignalementAdmin(ModelAdmin):
 
     @admin.display(description="Cible")
     def cible(self, s):
+        if s.type_cible == "retour":
+            return s.contexte.get("chemin", "Retour utilisateur")
         if s.type_cible == "publication":
             return s.extrait.get("titre", "(publication supprimée)")
         nom = s.extrait.get("nom") or (f"{s.utilisateur_cible.prenom} {s.utilisateur_cible.nom}" if s.utilisateur_cible else "(supprimé)")
@@ -68,6 +110,8 @@ class SignalementAdmin(ModelAdmin):
 
     @admin.display(description="Contenu signalé (copie au moment du signalement)")
     def apercu(self, s):
+        if s.type_cible == "retour":
+            return format_html("{}", s.commentaire or "Aucun commentaire (pièce jointe seulement).")
         e = s.extrait or {}
         if s.type_cible == "conversation":
             lignes = ((m["auteur"], m["texte"], m["date"][:16].replace("T", " ")) for m in e.get("messages", []))
@@ -160,3 +204,15 @@ class SignalementAdmin(ModelAdmin):
     @admin.action(description="Bannir définitivement")
     def bannir(self, request, queryset):
         self._sanction(request, queryset, "Bannissement", lambda u, m: moderation.suspendre(u, m, request.user, definitive=True))
+
+
+@admin.register(ConfigurationSupport)
+class ConfigurationSupportAdmin(ModelAdmin):
+    list_display = ("bouton_actif", "ouvert_a_tous")
+    filter_horizontal = ("utilisateurs_autorises",)
+
+    def has_add_permission(self, request):
+        return not ConfigurationSupport.objects.exists()
+
+    def has_delete_permission(self, request, obj=None):
+        return False

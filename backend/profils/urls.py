@@ -10,6 +10,8 @@ urlpatterns = [
     path("profils/me/", views.ProfilMoiView.as_view()),
     path("profils/me/situation/", views.SituationMoiView.as_view()),
     path("profils/me/photo/", views.PhotoProfilView.as_view()),
+    path("profils/me/galerie/", views.GalerieProfilView.as_view()),
+    path("profils/me/galerie/<int:photo_id>/", views.GalerieProfilView.as_view()),
     path("onboarding/brouillon/", views.ParcoursBrouillonView.as_view()),
     path("onboarding/valider/", views.ValiderParcoursView.as_view()),
     path("profils/<int:user_id>/", views.ProfilPublicView.as_view()),

@@ -3,18 +3,19 @@ import { api } from "./client";
 
 const suite = (derniere, toutes) => (derniere.next ? toutes.length + 1 : undefined);
 
-function useListe(cle, chemin, params = "") {
+function useListe(cle, chemin, params = "", actif = true) {
   return useInfiniteQuery({
     queryKey: [cle, params],
     queryFn: ({ pageParam }) => api(`${chemin}?${params}${params ? "&" : ""}page=${pageParam}`),
     initialPageParam: 1,
     getNextPageParam: suite,
+    enabled: actif,
   });
 }
 
-export function useAnnuaire(filtres) {
+export function useAnnuaire(filtres, actif = true) {
   const p = new URLSearchParams(Object.entries(filtres).filter(([, v]) => v !== "" && v != null));
-  return useListe("annuaire", "/annuaire/", p.toString());
+  return useListe("annuaire", "/annuaire/", p.toString(), actif);
 }
 export const useSuggestions = () => useListe("suggestions", "/amis/suggestions/");
 export const useAmis = () => useListe("amis", "/amis/");
@@ -23,8 +24,8 @@ export const useDemandes = (type) => useListe("demandes", "/amis/demandes/", `ty
 export const useCompteurs = () =>
   useQuery({ queryKey: ["compteurs"], queryFn: () => api("/amis/compteurs/"), refetchInterval: 60_000 });
 
-export const useProfilPublic = (id) =>
-  useQuery({ queryKey: ["profil-public", id], queryFn: () => api(`/profils/${id}/`), retry: false });
+export const useProfilPublic = (id, actif = true) =>
+  useQuery({ queryKey: ["profil-public", id], queryFn: () => api(`/profils/${id}/`), enabled: actif, retry: false });
 
 function useAction(fn) {
   const qc = useQueryClient();

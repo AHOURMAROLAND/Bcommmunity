@@ -131,6 +131,22 @@
       {% else %}<p class="bk-vide">Aucun signalement à traiter.</p>{% endif %}
     </div>
     {% endif %}
+    {% if can_comptes and can_profils %}
+    <div class="bk-card">
+      <p class="bk-titre">Anniversaires des 7 prochains jours</p>
+      {% if anniversaires_semaine %}
+      <ul class="bk-liste">
+        {% for p in anniversaires_semaine %}
+        <li>
+          <a href="{% url 'admin:profils_profil_change' p.pk %}">{{ p.user.prenom }} {{ p.user.nom }}</a>
+          <small>{{ p.date_anniversaire|date:"d/m" }}</small>
+        </li>
+        {% endfor %}
+      </ul>
+      <a href="{% url 'admin:profils_cadeauanniversaire_add' %}" style="color:var(--acc)">Créer et envoyer un bon</a>
+      {% else %}<p class="bk-vide">Aucun anniversaire déclaré cette semaine.</p>{% endif %}
+    </div>
+    {% endif %}
     {% if can_actions_admin %}
     <div class="bk-card">
       <p class="bk-titre">Dernières actions de l'équipe</p>

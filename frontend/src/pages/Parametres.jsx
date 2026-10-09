@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import ChargementLong from "@/components/ChargementLong";
 import { api } from "../api/client";
@@ -11,6 +11,11 @@ import {
 import { appliquerTheme, themeActuel } from "../utils/theme";
 import { Bouton, Selecteur } from "../components/ui";
 import { SqFormulaire } from "../components/Squelettes";
+import { ImagePlus, Trash2 } from "lucide-react";
+import DiscussionsSupport from "../components/DiscussionsSupport";
+import { TYPES_IMAGE, verifierFichier } from "../utils/image";
+
+const EditeurImage = lazy(() => import("../editeur/EditeurImage"));
 
 const ERREURS_PUSH = {
   non_supporte: "Ce navigateur ne gere pas les notifications push.",
@@ -47,6 +52,42 @@ export default function Parametres() {
   const [erreurPush, setErreurPush] = useState("");
   const [whatsapp, setWhatsapp] = useState("");
   const [visibiliteWhatsapp, setVisibiliteWhatsapp] = useState("amis");
+  const [anniversaire, setAnniversaire] = useState("");
+  const [photoOriginale, setPhotoOriginale] = useState(null);
+  const [etatEditionGalerie, setEtatEditionGalerie] = useState(null);
+  const [photoGalerieAEditer, setPhotoGalerieAEditer] = useState(null);
+  const [erreurGalerie, setErreurGalerie] = useState("");
+  const [editeurGalerieOuvert, setEditeurGalerieOuvert] = useState(false);
+  const galerie = useQuery({
+    queryKey: ["galerie-profil"],
+    queryFn: () => api("/profils/me/galerie/"),
+  });
+  const ajouterPhoto = useMutation({
+    mutationFn: (fichier) => {
+      const formData = new FormData();
+      formData.append("image", fichier);
+      return api("/profils/me/galerie/", { method: "POST", formData });
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["galerie-profil"] });
+      qc.invalidateQueries({ queryKey: ["profil"] });
+    },
+  });
+  const supprimerPhoto = useMutation({
+    mutationFn: (id) => api(`/profils/me/galerie/${id}/`, { method: "DELETE" }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["galerie-profil"] });
+      qc.invalidateQueries({ queryKey: ["profil"] });
+    },
+  });
+  const modifierPhoto = useMutation({
+    mutationFn: ({ id, fichier }) => {
+      const formData = new FormData();
+      formData.append("image", fichier);
+      return api(`/profils/me/galerie/${id}/`, { method: "PATCH", formData });
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["galerie-profil"] }),
+  });
 
   const bloques = useQuery({
     queryKey: ["bloques"],
@@ -67,6 +108,7 @@ export default function Parametres() {
     if (profil.data) {
       setWhatsapp(profil.data.whatsapp ?? "");
       setVisibiliteWhatsapp(profil.data.whatsapp_visibilite ?? "amis");
+      setAnniversaire(profil.data.date_anniversaire ?? "");
     }
   }, [profil.data]);
 
@@ -76,6 +118,28 @@ export default function Parametres() {
       whatsapp,
       whatsapp_visibilite: visibiliteWhatsapp,
     });
+  }
+
+  function ouvrirEditeurGalerie(fichier, id = null) {
+    const erreur = verifierFichier(fichier);
+    if (erreur) {
+      setErreurGalerie(erreur);
+      return;
+    }
+    setErreurGalerie("");
+    setEtatEditionGalerie(null);
+    setPhotoOriginale(fichier);
+    setPhotoGalerieAEditer(id);
+    setEditeurGalerieOuvert(true);
+  }
+
+  function terminerEditionGalerie(fichier, etat) {
+    setEtatEditionGalerie(etat);
+    setEditeurGalerieOuvert(false);
+    if (photoGalerieAEditer) modifierPhoto.mutate({ id: photoGalerieAEditer, fichier });
+    else ajouterPhoto.mutate(fichier);
+    setPhotoOriginale(null);
+    setPhotoGalerieAEditer(null);
   }
 
   async function basculerPush() {
@@ -103,6 +167,20 @@ export default function Parametres() {
   return (
     <div>
       <h1 style={{ marginTop: 0 }}>Paramètres</h1>
+      {editeurGalerieOuvert && photoOriginale && (
+        <Suspense fallback={<div className="editeur"><SqFormulaire champs={5} /></div>}>
+          <EditeurImage
+            fichier={photoOriginale}
+            initial={etatEditionGalerie ?? undefined}
+            onTerminer={terminerEditionGalerie}
+            onAnnuler={() => {
+              setEditeurGalerieOuvert(false);
+              setPhotoOriginale(null);
+              setPhotoGalerieAEditer(null);
+            }}
+          />
+        </Suspense>
+      )}
 
       <div className="carte" style={{ marginBottom: "1rem" }}>
         <h2 style={{ fontSize: "1.05rem", marginTop: 0 }}>Apparence</h2>
@@ -117,6 +195,92 @@ export default function Parametres() {
             >
               {l}
             </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="carte" style={{ marginBottom: "1rem" }}>
+        <h2 style={{ fontSize: "1.05rem", marginTop: 0 }}>Assistance et retours de test</h2>
+        <p className="doux" style={{ marginTop: 0 }}>
+          Retrouvez ici vos signalements, suggestions et réponses de l’équipe « admin ».
+        </p>
+        <DiscussionsSupport />
+      </div>
+
+      <div className="carte" style={{ marginBottom: "1rem" }}>
+        <h2 style={{ fontSize: "1.05rem", marginTop: 0 }}>Anniversaire et galerie</h2>
+        <label htmlFor="date-anniversaire" style={{ display: "block", fontWeight: 600, marginBottom: ".35rem" }}>
+          Ma date d’anniversaire
+        </label>
+        <input
+          id="date-anniversaire" className="champ" type="date"
+          value={anniversaire}
+          onChange={(e) => {
+            setAnniversaire(e.target.value);
+            majProfil.mutate({ date_anniversaire: e.target.value || null });
+          }}
+        />
+        <p className="doux" style={{ margin: ".35rem 0 1rem", fontSize: ".88rem" }}>
+          Cette date reste privée et sert à préparer les messages d’anniversaire.
+        </p>
+        {majProfil.isError && (
+          <p role="alert" className="erreur">{majProfil.error.message}</p>
+        )}
+        {(profil.data.cadeaux_anniversaire ?? []).length > 0 && (
+          <div style={{ margin: "1rem 0" }}>
+            <strong>Bons reçus de l’administration</strong>
+            {(profil.data.cadeaux_anniversaire ?? []).map((cadeau) => (
+              <article key={cadeau.id} className="carte" style={{ marginTop: ".5rem" }}>
+                {cadeau.message && <p>{cadeau.message}</p>}
+                <strong>Code : {cadeau.code}</strong>
+              </article>
+            ))}
+          </div>
+        )}
+        <strong>Photos de galerie ({galerie.data?.length ?? 0}/10)</strong>
+        <p className="doux" style={{ margin: ".35rem 0 .75rem", fontSize: ".88rem" }}>
+          Ajoutez jusqu’à 10 photos ; elles défileront sur votre profil.
+        </p>
+        <label className="puce" style={{ display: "inline-flex", alignItems: "center", gap: ".4rem", cursor: "pointer" }}>
+          <ImagePlus size={16} /> Ajouter une photo
+          <input
+            type="file" accept={TYPES_IMAGE.join(",")} hidden
+            disabled={ajouterPhoto.isPending || (galerie.data?.length ?? 0) >= 10}
+            onChange={(e) => {
+              if (e.target.files?.[0]) ouvrirEditeurGalerie(e.target.files[0]);
+              e.target.value = "";
+            }}
+          />
+        </label>
+        {erreurGalerie && <p role="alert" className="erreur">{erreurGalerie}</p>}
+        {ajouterPhoto.isError && <p role="alert" className="erreur">{ajouterPhoto.error.message}</p>}
+        {modifierPhoto.isError && <p role="alert" className="erreur">{modifierPhoto.error.message}</p>}
+        {supprimerPhoto.isError && <p role="alert" className="erreur">{supprimerPhoto.error.message}</p>}
+        {galerie.isError && <p role="alert" className="erreur">Impossible de charger la galerie.</p>}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(5rem,1fr))", gap: ".5rem", marginTop: ".75rem" }}>
+          {(galerie.data ?? []).map((photo) => (
+            <div key={photo.id} style={{ position: "relative" }}>
+              <img src={photo.image} alt="Photo de galerie" style={{ width: "100%", aspectRatio: "1", objectFit: "cover", borderRadius: ".6rem" }} />
+              <label
+                className="puce"
+                style={{ display: "block", marginTop: ".25rem", padding: ".2rem", textAlign: "center", cursor: "pointer", fontSize: ".75rem" }}
+              >
+                Modifier
+                <input
+                  type="file" accept={TYPES_IMAGE.join(",")} hidden
+                  disabled={modifierPhoto.isPending}
+                  onChange={(e) => {
+                    if (e.target.files?.[0]) ouvrirEditeurGalerie(e.target.files[0], photo.id);
+                    e.target.value = "";
+                  }}
+                />
+              </label>
+              <button
+                type="button" className="puce" aria-label="Supprimer cette photo"
+                onClick={() => supprimerPhoto.mutate(photo.id)}
+                style={{ position: "absolute", right: ".2rem", top: ".2rem", padding: ".25rem" }}
+              ><Trash2 size={14} /></button>
+            </div>
           ))}
         </div>
       </div>
@@ -175,7 +339,7 @@ export default function Parametres() {
               className="champ"
               value={whatsapp}
               onChange={(e) => setWhatsapp(e.target.value)}
-              placeholder="+2250700000000"
+              placeholder="+22890000000"
             />
             <Selecteur label="Visibilité du WhatsApp" value={visibiliteWhatsapp} onChange={(e) => setVisibiliteWhatsapp(e.target.value)}>
               <option value="tous">Tout le monde</option>

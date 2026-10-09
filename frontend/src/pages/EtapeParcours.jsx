@@ -200,6 +200,16 @@ export default function EtapeParcours({ onSuivant, onRetour }) {
   async function avancerCycle() {
     setErreur("");
     if (!cycle) return;
+    if (config.saute) {
+      try {
+        await sauverBrouillon.mutateAsync({ etape: 2, donnees: { ...donnees, indexCycle: indexCycle + 1 } });
+      } catch (cause) {
+        setErreur(tousMessages(cause));
+        return;
+      }
+      choisirCycleSuivant();
+      return;
+    }
     if (estLycee(cycle) && (!donnees.typeLycee || !donnees.filiereId)) {
       setErreur("Choisissez d'abord le type de lycée et la filière.");
       return;
@@ -244,33 +254,84 @@ export default function EtapeParcours({ onSuivant, onRetour }) {
     }
   }
 
+  const couleurCycle = "#102654";
+  const stylePanneau = {
+    marginTop: ".75rem",
+    padding: ".7rem",
+    border: "1px solid #e3e9f5",
+    borderRadius: ".8rem",
+    background: "#f1f4fa",
+  };
+
   return (
-    <section>
-      <p className="doux" style={{ textAlign: "center", marginTop: 0 }}>
-        Parcours scolaire · {Math.min(indexCycle + 1, cycles.length + 1)} / {cycles.length + 1}
+    <section style={{ maxWidth: "42rem", margin: "0 auto" }}>
+      <p className="doux" style={{ textAlign: "center", margin: "0 0 .85rem" }}>
+        Mon parcours scolaire
       </p>
+      <nav
+        aria-label="Étapes du parcours scolaire"
+        style={{ display: "grid", gridTemplateColumns: `repeat(${Math.max(cycles.length, 1)}, minmax(0, 1fr))`, gap: ".5rem", marginBottom: "1.25rem" }}
+      >
+        {cycles.map((etape, index) => {
+          const active = index === indexCycle;
+          const complete = index < indexCycle;
+          return (
+            <button
+              key={etape.id}
+              type="button"
+              aria-current={active ? "step" : undefined}
+              aria-label={`${etape.nom}${complete ? " (complété ou passé)" : ""}`}
+              disabled={index > indexCycle}
+              onClick={() => setIndexCycle(index)}
+              style={{ border: 0, padding: 0, color: active ? couleurCycle : "var(--texte-doux)", background: "none", cursor: index > indexCycle ? "default" : "pointer", minWidth: 0 }}
+            >
+              <span style={{
+                display: "block", height: ".3rem", borderRadius: "1rem",
+                background: active || complete ? couleurCycle : "#dbe2f1",
+                marginBottom: ".35rem",
+              }} />
+              <span style={{ fontSize: ".75rem", whiteSpace: "nowrap" }}>{etape.nom}</span>
+            </button>
+          );
+        })}
+      </nav>
       {indexCycle < cycles.length ? (
         <>
-          <h1 style={{ marginTop: 0, fontSize: "1.3rem" }}>{cycle.nom}</h1>
+          <h1 style={{ margin: "0 0 .8rem", fontSize: "1.35rem", color: couleurCycle }}>
+            Cycle {cycle.nom}
+          </h1>
           {estLycee(cycle) && (
-            <>
-              <Selecteur
-                label="Type de lycée"
-                value={donnees.typeLycee}
-                onChange={(event) => setDonnees((actuel) => ({
-                  ...actuel,
-                  typeLycee: event.target.value,
-                  filiereId: "",
-                  cycles: {
-                    ...actuel.cycles,
-                    [cycle.id]: { ...actuel.cycles[cycle.id], premiereClasseId: "", derniereClasseId: "" },
-                  },
-                }))}
-              >
-                <option value="">Choisir...</option>
-                <option value="moderne">Lycée moderne</option>
-                <option value="technique">Lycée technique</option>
-              </Selecteur>
+            <div style={{ display: "grid", gap: ".65rem", marginBottom: ".8rem" }}>
+              <div role="group" aria-label="Type de lycée" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: ".4rem" }}>
+                {[
+                  ["moderne", "Lycée moderne"],
+                  ["technique", "Lycée technique"],
+                ].map(([valeur, libelle]) => (
+                  <button
+                    key={valeur}
+                    type="button"
+                    aria-pressed={donnees.typeLycee === valeur}
+                    onClick={() => setDonnees((actuel) => ({
+                      ...actuel,
+                      typeLycee: valeur,
+                      filiereId: "",
+                      cycles: {
+                        ...actuel.cycles,
+                        [cycle.id]: { ...actuel.cycles[cycle.id], premiereClasseId: "", derniereClasseId: "" },
+                      },
+                    }))}
+                    style={{
+                      minHeight: "2.7rem", borderRadius: ".7rem",
+                      border: `1px solid ${donnees.typeLycee === valeur ? couleurCycle : "#dbe2f1"}`,
+                      background: donnees.typeLycee === valeur ? couleurCycle : "#fff",
+                      color: donnees.typeLycee === valeur ? "#fff" : couleurCycle,
+                      fontWeight: 600, cursor: "pointer",
+                    }}
+                  >
+                    {libelle}
+                  </button>
+                ))}
+              </div>
               <Selecteur
                 label="Filière"
                 value={donnees.filiereId}
@@ -289,42 +350,44 @@ export default function EtapeParcours({ onSuivant, onRetour }) {
                   <option key={filiere.id} value={filiere.id}>{filiere.nom}</option>
                 ))}
               </Selecteur>
-            </>
+            </div>
           )}
 
           {!config.saute && (
             <>
-              <Selecteur
-                label="Ma première classe dans ce cycle"
-                value={config.premiereClasseId}
-                disabled={!listeClasses.length}
-                onChange={(event) => {
-                  const premiere = event.target.value;
-                  const premiereIndex = listeClasses.findIndex((item) => String(item.id) === premiere);
-                  const derniereValide = listeClasses.findIndex((item) => String(item.id) === String(config.derniereClasseId)) >= premiereIndex;
-                  majCycle({
-                    saute: false,
-                    premiereClasseId: premiere,
-                    derniereClasseId: derniereValide ? config.derniereClasseId : premiere,
-                  });
-                }}
-              >
-                <option value="">Choisir...</option>
-                {listeClasses.map((item) => <option key={item.id} value={item.id}>{libelleClasse(item)}</option>)}
-              </Selecteur>
-              <Selecteur
-                label="Ma dernière classe dans ce cycle"
-                value={config.derniereClasseId}
-                disabled={indexPremiere < 0}
-                onChange={(event) => majCycle({ derniereClasseId: event.target.value })}
-              >
-                <option value="">Choisir...</option>
-                {listeClasses.slice(Math.max(indexPremiere, 0)).map((item) => (
-                  <option key={item.id} value={item.id}>{libelleClasse(item)}</option>
-                ))}
-              </Selecteur>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: ".6rem" }}>
+                <Selecteur
+                  label="Première classe"
+                  value={config.premiereClasseId}
+                  disabled={!listeClasses.length}
+                  onChange={(event) => {
+                    const premiere = event.target.value;
+                    const premiereIndex = listeClasses.findIndex((item) => String(item.id) === premiere);
+                    const derniereValide = listeClasses.findIndex((item) => String(item.id) === String(config.derniereClasseId)) >= premiereIndex;
+                    majCycle({
+                      saute: false,
+                      premiereClasseId: premiere,
+                      derniereClasseId: derniereValide ? config.derniereClasseId : premiere,
+                    });
+                  }}
+                >
+                  <option value="">Choisir...</option>
+                  {listeClasses.map((item) => <option key={item.id} value={item.id}>{libelleClasse(item)}</option>)}
+                </Selecteur>
+                <Selecteur
+                  label="Dernière classe"
+                  value={config.derniereClasseId}
+                  disabled={indexPremiere < 0}
+                  onChange={(event) => majCycle({ derniereClasseId: event.target.value })}
+                >
+                  <option value="">Choisir...</option>
+                  {listeClasses.slice(Math.max(indexPremiere, 0)).map((item) => (
+                    <option key={item.id} value={item.id}>{libelleClasse(item)}</option>
+                  ))}
+                </Selecteur>
+              </div>
               {anneeAuto && !precedentSaute ? (
-                <p className="doux">Début proposé automatiquement : {anneeAuto}</p>
+                <p className="doux" style={{ margin: ".2rem 0" }}>Année de début calculée : {anneeAuto}</p>
               ) : (
                 <Champ
                   label="Année d'arrivée"
@@ -335,61 +398,111 @@ export default function EtapeParcours({ onSuivant, onRetour }) {
                   onChange={(event) => majCycle({ anneeArrivee: event.target.value })}
                 />
               )}
-              <button type="button" className="lien" onClick={cocherJusquaDerniere}>
-                Tout cocher jusqu'à ma dernière classe
+              <button
+                type="button"
+                onClick={cocherJusquaDerniere}
+                disabled={!listeClasses.length}
+                style={{
+                  width: "100%", minHeight: "2.7rem", borderRadius: ".7rem",
+                  border: `1px solid ${config.premiereClasseId && config.derniereClasseId ? couleurCycle : "#9aa9c8"}`,
+                  color: config.premiereClasseId && config.derniereClasseId ? "#fff" : couleurCycle,
+                  background: config.premiereClasseId && config.derniereClasseId ? couleurCycle : "#fff",
+                  fontWeight: 600, cursor: "pointer",
+                }}
+              >
+                Sélectionner toutes les années
               </button>
               {listeClasses.map((item, index) => {
                 const grise = indexPremiere >= 0 && index < indexPremiere;
                 const retenue = index >= indexPremiere && index <= indexDerniere;
-                if (grise || !retenue) {
-                  return (
-                    <div key={item.id} aria-disabled={grise} style={{
-                      padding: "0.55rem 0.7rem",
-                      marginTop: "0.35rem",
-                      borderRadius: "0.6rem",
-                      background: grise ? "var(--fond)" : "transparent",
-                      color: grise ? "var(--texte-doux)" : "var(--texte)",
-                      opacity: grise ? 0.55 : 1,
-                    }}>
-                      {libelleClasse(item)}{grise ? " · avant mon arrivée" : ""}
-                    </div>
-                  );
-                }
-                const duree = Number(config.durees[item.id] ?? 1);
+                const duree = Number(config.durees?.[item.id] ?? 1);
                 return (
-                  <div key={item.id} style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    padding: "0.55rem 0.7rem",
-                    marginTop: "0.35rem",
-                    border: "1px solid var(--bordure)",
-                    borderRadius: "0.6rem",
-                  }}>
-                    <span>{libelleClasse(item)}</span>
-                    <span style={{ display: "inline-flex", alignItems: "center", gap: "0.55rem" }}>
-                      <button type="button" className="lien" aria-label={`Retirer une année à ${libelleClasse(item)}`}
-                        disabled={duree <= 1}
-                        onClick={() => majCycle({ durees: { ...config.durees, [item.id]: 1 } })}>−</button>
-                      <span>{duree} an{duree > 1 ? "s" : ""}{duree === 2 ? " · redoublée" : ""}</span>
-                      <button type="button" className="lien" aria-label={`Ajouter une année à ${libelleClasse(item)}`}
-                        disabled={duree >= 2}
-                        onClick={() => majCycle({ durees: { ...config.durees, [item.id]: 2 } })}>+</button>
+                  <article
+                    key={item.id}
+                    aria-disabled={grise || !retenue}
+                    style={{
+                      display: "flex", justifyContent: "space-between", alignItems: "center",
+                      gap: ".5rem", minHeight: "3.15rem", padding: ".4rem .7rem",
+                      marginTop: ".4rem", borderRadius: ".8rem",
+                      border: `1px solid ${retenue ? couleurCycle : "#e3e9f5"}`,
+                      background: retenue ? "#f1f4fa" : "#fff",
+                      color: grise || !retenue ? "var(--texte-doux)" : couleurCycle,
+                      opacity: grise ? .55 : 1,
+                    }}
+                  >
+                    <span style={{ fontWeight: retenue ? 600 : 500, display: "flex", alignItems: "center", gap: ".4rem" }}>
+                      {libelleClasse(item)}
+                      {retenue && duree === 2 && (
+                        <span style={{ padding: ".1rem .35rem", borderRadius: ".6rem", background: couleurCycle, color: "#fff", fontSize: ".65rem" }}>
+                          Redoublé
+                        </span>
+                      )}
+                      {grise && <small>avant mon arrivée</small>}
                     </span>
-                  </div>
+                    {retenue && (
+                      <span style={{ display: "inline-flex", alignItems: "center", gap: ".45rem", flexShrink: 0 }}>
+                        <button
+                          type="button"
+                          aria-label={`Retirer une année à ${libelleClasse(item)}`}
+                          disabled={duree <= 1}
+                          onClick={() => majCycle({ durees: { ...config.durees, [item.id]: 1 } })}
+                          style={{
+                            width: "2rem", height: "2rem", borderRadius: "50%",
+                            border: `1px solid ${couleurCycle}`, background: "#fff", color: couleurCycle,
+                            fontSize: "1.15rem", cursor: duree <= 1 ? "not-allowed" : "pointer",
+                          }}
+                        >−</button>
+                        <span style={{ minWidth: "2.4rem", textAlign: "center", fontSize: ".85rem" }}>
+                          {duree}<small style={{ display: "block", color: "var(--texte-doux)", fontSize: ".65rem" }}>
+                            {duree > 1 ? "ans" : "an"}
+                          </small>
+                        </span>
+                        <button
+                          type="button"
+                          aria-label={`Ajouter une année à ${libelleClasse(item)}`}
+                          disabled={duree >= 2}
+                          onClick={() => majCycle({ durees: { ...config.durees, [item.id]: 2 } })}
+                          style={{
+                            width: "2rem", height: "2rem", borderRadius: "50%",
+                            border: `1px solid ${couleurCycle}`, background: "#fff", color: couleurCycle,
+                            fontSize: "1.15rem", cursor: duree >= 2 ? "not-allowed" : "pointer",
+                          }}
+                        >+</button>
+                      </span>
+                    )}
+                  </article>
                 );
               })}
+              <div style={{ ...stylePanneau, display: "grid", gap: ".45rem", marginTop: ".75rem" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", gap: ".5rem" }}>
+                  <span>Année de début</span>
+                  <strong>{cycleCalcule?.anneeDebut ?? "—"}</strong>
+                </div>
+                <div style={{ display: "flex", justifyContent: "space-between", gap: ".5rem" }}>
+                  <span>Année de fin</span>
+                  <strong>{cycleCalcule?.anneeFin ?? (cycleCalcule?.anneeDebut ? "En cours" : "—")}</strong>
+                </div>
+              </div>
             </>
           )}
           {config.saute && <p className="doux">Ce cycle sera ignoré dans votre parcours.</p>}
           {erreur && <p role="alert" className="erreur">{erreur}</p>}
-          <div style={{ display: "flex", gap: "0.75rem", marginTop: "1rem" }}>
+          <div style={{ display: "grid", gap: ".65rem", marginTop: "1.25rem" }}>
+            <Bouton type="button" onClick={avancerCycle} style={{ background: couleurCycle }}>
+              Cycle suivant →
+            </Bouton>
+            {!config.saute ? (
+              <button type="button" className="lien" onClick={passerCycle} style={{ justifySelf: "center" }}>
+                Passer ce cycle
+              </button>
+            ) : (
+              <button type="button" className="lien" onClick={() => majCycle({ saute: false })} style={{ justifySelf: "center" }}>
+                Saisir ce cycle
+              </button>
+            )}
             {indexCycle === 0
-              ? <Bouton type="button" secondaire onClick={revenir}>Retour</Bouton>
-              : <Bouton type="button" secondaire onClick={() => setIndexCycle((index) => index - 1)}>Retour</Bouton>}
-            {!config.saute && <Bouton type="button" secondaire onClick={passerCycle}>Je n'ai pas fait ce cycle</Bouton>}
-            {config.saute && <Bouton type="button" secondaire onClick={() => majCycle({ saute: false })}>Saisir ce cycle</Bouton>}
-            <Bouton type="button" onClick={avancerCycle}>Suivant</Bouton>
+              ? <button type="button" className="lien" onClick={revenir} style={{ justifySelf: "center" }}>Retour</button>
+              : <button type="button" className="lien" onClick={() => setIndexCycle((index) => index - 1)} style={{ justifySelf: "center" }}>Cycle précédent</button>}
           </div>
         </>
       ) : (

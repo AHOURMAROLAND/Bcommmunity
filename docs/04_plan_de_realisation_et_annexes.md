@@ -64,11 +64,21 @@ DATABASE_URL=postgres://...
 REDIS_URL=redis://...
 CORS_ALLOWED_ORIGINS=https://bakhita.example
 CLOUDINARY_URL=   (ou AWS_S3_*)
-EMAIL_HOST= / EMAIL_HOST_USER= / EMAIL_HOST_PASSWORD=
+ADMIN_EMAILS=admin1@example.com,admin2@example.com
+EMAIL_HOST=smtp.gmail.com / EMAIL_HOST_USER= / EMAIL_HOST_PASSWORD= (mot de passe d’application)
+BREVO_SMTP_LOGIN= / BREVO_SMTP_PASSWORD= (alternative SMTP Brevo; ne pas confondre avec BREVO_API_KEY)
 VAPID_PUBLIC_KEY= / VAPID_PRIVATE_KEY= / VAPID_ADMIN_EMAIL=
 FCM_SERVICE_ACCOUNT_JSON=
 SITE_URL=https://bakhita.example
 ```
+
+Les secrets SMTP restent dans l’environnement du serveur et ne sont jamais affichés dans l’application.
+Les alertes de support sont adressées à `ADMIN_EMAILS` lorsque 10 signalements restent à traiter.
+Les membres peuvent envoyer un bug ou une suggestion avec un texte, des images ou une vidéo depuis le bouton
+de support. Le bouton peut être activé globalement ou réservé aux membres autorisés dans l’administration Django.
+Les anniversaires des 7 prochains jours sont visibles sur le tableau de bord admin. Un administrateur peut
+créer un bon dans « Cadeaux d’anniversaire » ; le bon est alors envoyé par e-mail et reste visible dans les
+paramètres privés du bénéficiaire.
 
 ## B. Applications Django
 | App | Contenu |
@@ -171,6 +181,9 @@ npx cap open android     # Android Studio : générer le bundle signé (AAB) ou 
 - **FCM** (APK) : jeton enregistré par `POST /push/fcm`, envoi avec `firebase-admin`
 - **Nouvelle publication** : tâche Celery qui crée les notifications par lots (par exemple 500), envoie le push aux abonnés actifs, saute auteur, suspendus et bloqués ; regroupe si plusieurs en quelques minutes
 - Préférences par utilisateur : immédiat, résumé quotidien (tâche planifiée), désactivé
+- **Connexion** : un compte existant peut se connecter avec son mot de passe même si l'adresse e-mail n'est pas vérifiée ; le code OTP reste disponible pour la vérification après inscription.
+- **Publications programmées** : la date choisie est enregistrée avec le brouillon ; Celery Beat déclenche chaque minute la publication des contenus arrivés à échéance, puis le fan-out habituel des notifications. Le worker et Beat doivent tous deux fonctionner.
+- **Recherche** : la recherche par mots couvre les noms et les champs de profil visibles, ainsi que le titre et le contenu des publications publiques ; les résultats se filtrent par personnes ou publications.
 
 ## H. Protocole WebSocket (JSON)
 Connexion : `wss://.../ws/chat/?token=<JWT>` ; refus si compte suspendu.

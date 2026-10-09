@@ -90,19 +90,39 @@ class ProfilSerializer(serializers.ModelSerializer):
     photo_mini = serializers.SerializerMethodField()
     situation = SituationSerializer(read_only=True, allow_null=True)
     scolarites = ScolariteSerializer(many=True, read_only=True)
+    galerie = serializers.SerializerMethodField()
+    cadeaux_anniversaire = serializers.SerializerMethodField()
 
     class Meta:
         model = Profil
         fields = ("id", "prenom", "nom", "statut", "photo", "photo_mini", "bio", "ville", "annee_sortie",
                   "onboarding_termine", "visibilite_profil", "visibilite_parcours",
                   "visibilite_situation", "qui_peut_inviter", "whatsapp", "whatsapp_visibilite",
-                  "situation", "scolarites")
+                  "situation", "scolarites", "date_anniversaire", "galerie", "cadeaux_anniversaire")
 
     def get_photo(self, o):
         return o.photo.url if o.photo else None
 
     def get_photo_mini(self, o):
         return o.url_mini
+
+    def get_galerie(self, o):
+        return [photo.image.url for photo in o.galerie.all()]
+
+    def get_cadeaux_anniversaire(self, o):
+        return [{
+            "id": cadeau.pk,
+            "code": cadeau.code_bon,
+            "message": cadeau.message,
+            "cree_le": cadeau.cree_le,
+        } for cadeau in o.cadeaux_anniversaire.all()]
+
+    def validate_date_anniversaire(self, valeur):
+        if valeur and valeur > timezone.localdate():
+            raise serializers.ValidationError("La date d’anniversaire ne peut pas être dans le futur.")
+        if valeur and valeur.year < 1900:
+            raise serializers.ValidationError("La date d’anniversaire est invalide.")
+        return valeur
 
     def validate_annee_sortie(self, valeur):
         if valeur and valeur > timezone.now().year + 1:
@@ -114,7 +134,7 @@ class ProfilSerializer(serializers.ModelSerializer):
         if not valeur:
             return ""
         if not valeur.startswith("+"):
-            raise serializers.ValidationError("Utilisez le format international, par exemple +2250700000000.")
+            raise serializers.ValidationError("Utilisez le format international, par exemple +22890000000.")
         try:
             numero = phonenumbers.parse(valeur, None)
         except phonenumbers.NumberParseException as erreur:

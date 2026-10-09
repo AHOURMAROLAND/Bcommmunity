@@ -1,4 +1,4 @@
-from django.core.validators import MinValueValidator
+from django.core.validators import FileExtensionValidator, MinValueValidator
 from django.db import models
 from django.db.models.signals import post_delete
 from django.dispatch import receiver
@@ -26,6 +26,7 @@ class Profil(models.Model):
     user = models.OneToOneField(User, related_name="profil", on_delete=models.CASCADE)
     photo = models.ImageField(upload_to="profils/", null=True, blank=True)
     photo_s = models.ImageField(upload_to="profils/", null=True, blank=True)
+    date_anniversaire = models.DateField(null=True, blank=True)
 
     @property
     def url_mini(self):
@@ -47,6 +48,36 @@ class Profil(models.Model):
 
     def __str__(self):
         return f"Profil de {self.user}"
+
+
+class PhotoGalerie(models.Model):
+    profil = models.ForeignKey(Profil, related_name="galerie", on_delete=models.CASCADE)
+    image = models.ImageField(
+        upload_to="galerie/",
+        validators=[FileExtensionValidator(["jpg", "jpeg", "png", "webp"])],
+    )
+    ordre = models.PositiveSmallIntegerField(default=0)
+    cree_le = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["ordre", "id"]
+
+    def __str__(self):
+        return f"Photo {self.ordre + 1} de {self.profil.user}"
+
+
+class CadeauAnniversaire(models.Model):
+    profil = models.ForeignKey(Profil, related_name="cadeaux_anniversaire", on_delete=models.CASCADE)
+    administrateur = models.ForeignKey(User, on_delete=models.PROTECT)
+    code_bon = models.CharField(max_length=100)
+    message = models.CharField(max_length=500, blank=True)
+    cree_le = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-cree_le", "-pk"]
+
+    def __str__(self):
+        return f"Bon d’anniversaire pour {self.profil.user}"
 
 
 class SituationActuelle(models.Model):
@@ -99,3 +130,9 @@ def supprimer_photos(sender, instance, **kwargs):
     for f in (instance.photo, instance.photo_s):
         if f:
             f.delete(save=False)
+
+
+@receiver(post_delete, sender=PhotoGalerie)
+def supprimer_photo_galerie(sender, instance, **kwargs):
+    if instance.image:
+        instance.image.delete(save=False)

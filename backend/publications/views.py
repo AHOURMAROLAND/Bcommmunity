@@ -83,7 +83,11 @@ class FilView(generics.ListCreateAPIView):
     def get_queryset(self):
         qs = visibles(self.request.user)
         auteur = self.request.query_params.get("auteur", "")
-        return qs.filter(auteur_id=int(auteur)) if auteur.isdigit() else qs
+        if auteur.isdigit():
+            qs = qs.filter(auteur_id=int(auteur))
+        for mot in (self.request.query_params.get("q") or "").strip()[:120].split()[:8]:
+            qs = qs.filter(Q(titre__icontains=mot) | Q(contenu__icontains=mot))
+        return qs
 
     def create(self, request, *args, **kwargs):
         ser = PublicationEcritureSerializer(data=request.data)
@@ -106,7 +110,7 @@ class MesPublicationsView(generics.ListAPIView):
     def get_queryset(self):
         qs = avec_likes(Publication.objects.filter(auteur=self.request.user), self.request.user)
         statut = self.request.query_params.get("statut")
-        return qs.filter(statut=statut) if statut in ("brouillon", "publie") else qs
+        return qs.filter(statut=statut) if statut in ("brouillon", "programmee", "publie") else qs
 
 
 class PublicationDetailView(APIView):
@@ -122,7 +126,7 @@ class PublicationDetailView(APIView):
         pub = Publication.objects.filter(auteur=request.user, pk=pk).first()
         if pub is None:
             raise NotFound()
-        ser = PublicationEcritureSerializer(data=request.data, partial=True)
+        ser = PublicationEcritureSerializer(pub, data=request.data, partial=True)
         ser.is_valid(raise_exception=True)
         etait_publiee = pub.statut == "publie"
         ser.modifier(pub)

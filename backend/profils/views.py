@@ -1,6 +1,7 @@
 from django.core.cache import cache
 from django.core.files.storage import default_storage
 from django.db import IntegrityError, transaction
+from django.db.models import Max
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework import generics, viewsets
@@ -10,11 +11,11 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from amis.services import carte, ids_bloques, profils_actifs, relations
-from config.imagerie import ImageInvalide, preparer_avatar
+from config.imagerie import ImageInvalide, preparer_avatar, preparer_image
 from discussions.services import etat_discussion
 from scolarite.models import Classe, Cycle, Filiere, ParcoursBrouillon, Scolarite
 
-from .models import Domaine, Profil, SituationActuelle
+from .models import Domaine, PhotoGalerie, Profil, SituationActuelle
 from .serializers import (
     CycleSerializer,
     DomaineSerializer,
@@ -223,7 +224,7 @@ class ProfilPublicView(APIView):
             raise NotFound()
         rel = relations(moi)
         profil = get_object_or_404(
-            profils_actifs().prefetch_related("scolarites__classe__cycle"), user_id=user_id)
+            profils_actifs().prefetch_related("scolarites__classe__cycle", "galerie"), user_id=user_id)
         est_ami = user_id in rel.amis
         if profil.visibilite_profil == "personne":
             raise NotFound()
@@ -239,6 +240,7 @@ class ProfilPublicView(APIView):
             return Response(data)
 
         data.update(bio=profil.bio, ville=profil.ville)
+        data["galerie"] = [photo.image.url for photo in profil.galerie.all()]
         vis_whatsapp = profil.whatsapp_visibilite
         if profil.whatsapp and (
             vis_whatsapp == "tous" or (vis_whatsapp == "amis" and est_ami)
@@ -259,6 +261,58 @@ class ProfilPublicView(APIView):
         else:
             data["parcours"] = None
         return Response(data)
+
+
+class GalerieProfilView(APIView):
+    parser_classes = [MultiPartParser]
+    throttle_scope = "photo"
+
+    def get(self, request):
+        profil = profil_de(request.user)
+        return Response([{"id": p.pk, "image": p.image.url} for p in profil.galerie.all()])
+
+    def post(self, request):
+        fichier = request.FILES.get("image")
+        if not fichier:
+            raise ValidationError({"image": "Choisissez une image."})
+        try:
+            variantes = preparer_image(fichier, verifier_ratio=False)
+        except ImageInvalide as erreur:
+            raise ValidationError({"image": str(erreur)}) from erreur
+        profil = profil_de(request.user)
+        with transaction.atomic():
+            profil = Profil.objects.select_for_update().get(pk=profil.pk)
+            if profil.galerie.count() >= 10:
+                raise ValidationError({"image": "La galerie est limitée à 10 photos."})
+            ordre = (profil.galerie.aggregate(dernier=Max("ordre"))["dernier"] or -1) + 1
+            image = variantes["grande"]
+            photo = PhotoGalerie(profil=profil, ordre=ordre)
+            photo.image.save(image.name, image, save=True)
+        return Response({"id": photo.pk, "image": photo.image.url}, status=201)
+
+    def delete(self, request, photo_id):
+        deleted, _ = PhotoGalerie.objects.filter(profil__user=request.user, pk=photo_id).delete()
+        if not deleted:
+            raise NotFound()
+        return Response(status=204)
+
+    def patch(self, request, photo_id):
+        fichier = request.FILES.get("image")
+        if not fichier:
+            raise ValidationError({"image": "Choisissez une image."})
+        try:
+            variantes = preparer_image(fichier, verifier_ratio=False)
+        except ImageInvalide as erreur:
+            raise ValidationError({"image": str(erreur)}) from erreur
+        photo = PhotoGalerie.objects.filter(profil__user=request.user, pk=photo_id).first()
+        if photo is None:
+            raise NotFound()
+        ancien = photo.image.name
+        image = variantes["grande"]
+        photo.image.save(image.name, image, save=True)
+        if ancien:
+            default_storage.delete(ancien)
+        return Response({"id": photo.pk, "image": photo.image.url})
 
 
 class PhotoProfilView(APIView):

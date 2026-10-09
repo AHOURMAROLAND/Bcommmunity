@@ -4,7 +4,6 @@ import { Eye, EyeOff } from "lucide-react";
 import { useAuth } from "../auth/AuthContext";
 import { Bouton, Champ, Marque } from "../components/ui";
 import { tousMessages } from "../api/erreurs";
-import { api } from "../api/client";
 import AccesGoogle from "../components/AccesGoogle";
 import ChargementLong from "@/components/ChargementLong";
 import "./Connexion.css";
@@ -27,20 +26,6 @@ export default function Connexion() {
       await connexion(email.trim(), password);
       navigate("/fil", { replace: true });
     } catch (err) {
-      if (err.status === 403 && err.data?.code === "email_non_verifie") {
-        const adresse = err.data.email ?? email.trim();
-        let erreurEnvoi = "";
-        try {
-          await api("/auth/otp/envoyer/", { method: "POST", body: { email: adresse } });
-        } catch (echec) {
-          erreurEnvoi = tousMessages(echec);
-        }
-        navigate(`/verifier-email?email=${encodeURIComponent(adresse)}`, {
-          replace: true,
-          state: erreurEnvoi ? { erreurEnvoi } : { codeEnvoye: true },
-        });
-        return;
-      }
       if (err.status === 403 && err.data?.code) {
         navigate("/en-attente", { replace: true, state: err.data });
       } else {

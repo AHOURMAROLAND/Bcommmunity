@@ -9,23 +9,6 @@ const chemin = (p) => fileURLToPath(new URL(p, import.meta.url));
 export default defineConfig(({ mode }) => {
   const natif = mode === "native"; // l'application Android embarque déjà tout : pas de service worker
   const variables = loadEnv(mode, "..", ["VITE_", "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_IDS", "SITE_URL"]);
-  if (process.env.VERCEL && mode === "production") {
-    for (const nom of ["VITE_API_URL", "VITE_WS_URL", "VITE_SITE_URL"]) {
-      if (!variables[nom]) throw new Error(`La variable ${nom} doit être configurée dans Vercel.`);
-    }
-    const apiUrl = new URL(variables.VITE_API_URL);
-    const wsUrl = new URL(variables.VITE_WS_URL);
-    const siteUrl = new URL(variables.VITE_SITE_URL);
-    if (apiUrl.protocol !== "https:" || apiUrl.pathname !== "/api") {
-      throw new Error("VITE_API_URL doit être une URL HTTPS terminant exactement par /api.");
-    }
-    if (wsUrl.protocol !== "wss:" || wsUrl.pathname !== "/ws/") {
-      throw new Error("VITE_WS_URL doit être une URL WSS pointant exactement vers /ws/.");
-    }
-    if (siteUrl.protocol !== "https:" || siteUrl.pathname !== "/") {
-      throw new Error("VITE_SITE_URL doit être l'origine HTTPS du backend, sans chemin.");
-    }
-  }
   const googleClientId = variables.VITE_GOOGLE_CLIENT_ID
     || variables.GOOGLE_CLIENT_ID
     || variables.GOOGLE_CLIENT_IDS?.split(",")[0]?.trim()

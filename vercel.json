@@ -1,0 +1,57 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "services": {
+    "backend": {
+      "root": "backend",
+      "framework": "django"
+    },
+    "frontend": {
+      "root": "frontend",
+      "framework": "vite"
+    }
+  },
+  "rewrites": [
+    {
+      "source": "/api/(.*)",
+      "destination": {
+        "service": "backend"
+      }
+    },
+    {
+      "source": "/p/(.*)",
+      "destination": {
+        "service": "backend"
+      }
+    },
+    {
+      "source": "/profil-partage/(.*)",
+      "destination": {
+        "service": "backend"
+      }
+    },
+    {
+      "source": "/gestion-bakhita-x7/(.*)",
+      "destination": {
+        "service": "backend"
+      }
+    },
+    {
+      "source": "/gestion-bakhita-x7",
+      "destination": {
+        "service": "backend"
+      }
+    },
+    {
+      "source": "/static/(.*)",
+      "destination": {
+        "service": "backend"
+      }
+    },
+    {
+      "source": "/(.*)",
+      "destination": {
+        "service": "frontend"
+      }
+    }
+  ]
+}

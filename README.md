@@ -121,33 +121,23 @@ docker compose logs --tail=100 api web
 
 Les donnees PostgreSQL et les fichiers media utilisent des volumes Docker persistants. Mettez-les dans une strategie de sauvegarde adaptee avant toute mise a jour; ne lancez pas `docker compose down -v` sur une instance qui contient des donnees.
 
-### Deployer le frontend sur Vercel
+### Deploiement du frontend sur Vercel
 
-Vercel heberge ici uniquement le frontend React/Vite. Le backend Django doit rester deploye sur un hote Docker public disposant de PostgreSQL et Redis persistants, ainsi que des processus Daphne, Celery worker et Celery Beat. Cela conserve les WebSockets de discussion et les taches planifiees ; ne configurez pas le backend comme une fonction serverless Vercel.
+Le depot contient maintenant un `vercel.json` a sa racine, avec deux services : `frontend` (React/Vite) et `backend` (Django). Importez le depot entier dans Vercel en conservant le **Root Directory `./`** : ne choisissez ni `frontend` ni `backend`, car cela empecherait Vercel de lire le fichier multi-services a la racine. Le frontend appelle les API par `/api` sur la meme origine ; les reecritures dirigent `/api/*`, les pages de partage, le chemin d'administration `gestion-bakhita-x7` et `/static/*` vers Django. La variable `ADMIN_URL` doit rester coherente avec ce chemin.
 
-Pour que le cookie de renouvellement `SameSite=Lax` fonctionne entre le navigateur et l'API, utilisez en production un domaine personnalise Vercel et un domaine backend sous le meme domaine racine (par exemple `community.example.org` et `api.example.org`). Un frontend sur `*.vercel.app` et une API sur un autre domaine racine sont cross-site et peuvent empecher l'envoi du cookie lors des appels API.
+Le backend possede deja `STATIC_ROOT`; Vercel lance `collectstatic` pendant le build Django et sert les fichiers collectes (dont CSS/JS de l'admin) sous `/static/` via son CDN. La reecriture `/static/*` cible le service backend pour que les assets collectes soient associes au bon service. Les migrations de base de donnees ne sont pas lancees automatiquement par cette configuration ; executez-les contre la base de production avant le premier trafic.
 
-1. Deployez d'abord la pile de production Docker decrite ci-dessus, avec un domaine HTTPS pour son Nginx/Caddy. Verifiez que `/api/vivant/`, `/ws/` (WebSocket) et `/p/<id>/` sont servis par ce domaine.
-2. Dans Vercel, importez le depot GitHub et choisissez `frontend` comme **Root Directory**. Gardez le repertoire frontend configure comme racine du projet Vercel. La configuration `frontend/vercel.json` lance `npm ci`, construit Vite et publie `dist`, avec un fallback SPA pour les routes React.
-3. Ajoutez les variables d'environnement Vercel pour les environnements Preview et Production. Remplacez les exemples par les domaines reels ; `VITE_SITE_URL` est le domaine public du backend afin que les apercus Open Graph de profils et publications atteignent Django :
-```dotenv
-VITE_API_URL=https://api.example.org/api
-VITE_WS_URL=wss://api.example.org/ws/
-VITE_SITE_URL=https://api.example.org
-VITE_GOOGLE_CLIENT_ID=
-VITE_CONTACT_EMAIL=
-```
-Le client ajoute les chemins des endpoints a `VITE_API_URL` ; ne mettez pas de barre oblique finale apres `/api`. Ces trois premieres variables sont requises pour le build de production Vercel. `VITE_GOOGLE_CLIENT_ID` et `VITE_CONTACT_EMAIL` sont facultatifs si ces fonctions ne sont pas configurees.
-4. Dans l'environnement de production du backend (`/opt/bakhita/.env`), autorisez le domaine Vercel (et le domaine personnalise du frontend, s'il existe) dans `CORS_ALLOWED_ORIGINS` et `CSRF_TRUSTED_ORIGINS`. Ajoutez aussi ces noms d'hote a `ALLOWED_HOSTS` : Channels valide l'origine WebSocket contre cette liste. Definissez `FRONTEND_URL` sur l'origine du frontend, `SITE_URL` sur l'origine du backend et conservez `SECURE_SSL_REDIRECT=1`. Pour l'envoi des courriels, ajoutez les variables suivantes dans ce meme fichier backend, et non dans Vercel :
+Le bouton Deploy ne sera disponible qu'une fois le depot configure/importé avec cette configuration multi-services. Pour la production, configurez un domaine personnalise sur ce projet et renseignez dans les variables Vercel celles dont Django a besoin (`DJANGO_SECRET_KEY`, `DJANGO_DEBUG=0`, `ALLOWED_HOSTS`, `DATABASE_URL`, `REDIS_URL`, `CELERY_BROKER_URL`, `ADMIN_URL`, `FRONTEND_URL`, `SITE_URL`, `CSRF_TRUSTED_ORIGINS`, `CORS_ALLOWED_ORIGINS`, ainsi que les secrets de stockage et services externes utilises). Ne collez pas `.env` ou `.env.example` au complet dans Vercel ; utilisez des secrets forts et des valeurs de production, jamais celles d'exemple.
+
+Les notifications email Brevo doivent etre configurees cote backend Vercel, pas dans les variables `VITE_*` du frontend :
 ```dotenv
 BREVO_SMTP_LOGIN=<login SMTP fourni par Brevo>
 BREVO_SMTP_PASSWORD=<cle SMTP complete creee dans Brevo>
 DEFAULT_FROM_EMAIL=Bakhita Community <adresse expediteur verifiee>
 ```
-Le backend utilise alors `smtp-relay.brevo.com`, le port `587` et TLS. La cle SMTP est differente de la cle API Brevo ; la capture masque sa valeur complete, il faut donc la copier depuis Brevo et ne pas l'envoyer dans le depot ou dans le chat. Redemarrez les services backend apres la mise a jour de `.env`.
-5. Si Google OAuth est active, ajoutez l'origine du frontend a la configuration OAuth Google. Dans Vercel, choisissez `main` comme branche de production ; les pushs ulterieurs declencheront alors automatiquement les builds et deployments du frontend.
+Le backend utilise `smtp-relay.brevo.com`, port `587` et TLS. La cle SMTP est distincte de la cle API Brevo ; ne l'ajoutez jamais au depot ou au frontend. Configurez egalement les domaines dans Google OAuth, si cette connexion est active, et faites correspondre `ALLOWED_HOSTS`, `FRONTEND_URL`, `SITE_URL`, `CSRF_TRUSTED_ORIGINS` et `CORS_ALLOWED_ORIGINS` a votre domaine Vercel.
 
-Vercel ne reverse-proxy pas ici les API, les WebSockets ni les medias. Le navigateur contacte directement le domaine backend configure dans les variables `VITE_*`. Les televersements et medias doivent donc utiliser le stockage durable deja configure pour le backend (par exemple Cloudflare R2), et non le systeme de fichiers ephemere de Vercel. Les modifications Django, migrations, Celery ou infrastructure continuent a se deployer sur l'hote backend, independamment du build frontend Vercel.
+**Limites fonctionnelles importantes :** un service Django Vercel est une fonction serverless, pas un serveur Daphne persistant. La messagerie WebSocket `/ws/` ne sera donc pas disponible sur cette architecture. Celery worker/Beat ne sont pas des services de fond persistants deployables avec ces deux services ; sans un worker externe, les taches planifiees (publications programmees, emails hebdomadaires, etc.) ne tourneront pas. PostgreSQL, Redis et les medias doivent utiliser des services persistants externes (par exemple PostgreSQL heberge, Redis heberge et R2). Pour obtenir l'application complete, gardez plutot le backend/worker/Redis/PostgreSQL dans le deploiement Docker documente et utilisez Vercel uniquement pour le frontend.
 
 4. Charger les referentiels de base et creer un compte administrateur :
 ```bash

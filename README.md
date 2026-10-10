@@ -123,7 +123,7 @@ Les donnees PostgreSQL et les fichiers media utilisent des volumes Docker persis
 
 ### Deploiement recommande : Render, Vercel, Neon et Cloudflare
 
-Le guide complet et ordonne de mise en production se trouve dans [DEPLOYMENT.md](./DEPLOYMENT.md).
+Le guide technique complet est dans [DEPLOYMENT.md](./DEPLOYMENT.md). Pour créer les comptes et suivre les boutons des consoles cloud étape par étape, consultez [GUIDE_DEPLOIEMENT_PAS_A_PAS.md](./GUIDE_DEPLOIEMENT_PAS_A_PAS.md).
 
 Le fichier `render.yaml` configure un service web Django/Daphne, un worker Celery, Celery Beat et un Redis prive. Ces plans Render `starter` sont payants; verifiez les tarifs avant de synchroniser le Blueprint. Importez le depot comme Blueprint dans Render et renseignez les variables demandees lors de la creation. Les migrations Django s'executent avant le deploiement du service web. Utilisez une URL PostgreSQL **directe Neon** (`sslmode=require`) dans `DATABASE_URL`, car Render execute les migrations pendant ce pre-deploiement.
 

@@ -2,6 +2,8 @@
 
 Ce guide décrit le déploiement recommandé : API Django et tâches de fond sur Render, interface web sur Vercel, PostgreSQL Neon, médias Cloudflare R2 et notifications web OneSignal. Le dépôt contient déjà les modèles Render et Vercel ; les comptes fournisseurs, domaines et secrets de production doivent être fournis par le propriétaire du projet.
 
+Pour des instructions « clic par clic » de création des comptes et de saisie des réglages, consultez [GUIDE_DEPLOIEMENT_PAS_A_PAS.md](./GUIDE_DEPLOIEMENT_PAS_A_PAS.md).
+
 ## Architecture configurée
 
 | Composant | Fournisseur | Configuration dans le dépôt |

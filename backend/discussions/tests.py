@@ -12,7 +12,7 @@ from comptes.models import User
 from profils.models import Profil, SituationActuelle
 
 from .consumers import HubConsumer
-from .models import Conversation, Message, Participant, ReactionMessage
+from .models import Conversation, Message, MessageMasque, Participant, ReactionMessage
 
 
 @pytest.fixture
@@ -295,6 +295,112 @@ def test_favorites_are_personal_and_pin_is_conversation_wide(discussion):
     assert next(item for item in items if item["id"] == first.pk)["epingle"] is False
     assert next(item for item in items if item["id"] == second.pk)["epingle"] is True
     assert client(bob).delete(f"{second_url}/epingler/").status_code == 204
+
+
+@pytest.mark.django_db
+def test_search_messages_filters_types_dates_and_hidden_messages(discussion):
+    conversation, (alice, bob) = discussion
+    maintenant = timezone.now()
+    lien = Message.objects.create(
+        conversation=conversation,
+        auteur=bob,
+        texte="Voir https://example.com",
+        cree_le=maintenant - timedelta(days=2),
+    )
+    image = Message.objects.create(
+        conversation=conversation,
+        auteur=alice,
+        type=Message.Type.IMAGE,
+        nom_fichier="photo.jpg",
+        cree_le=maintenant - timedelta(days=1),
+    )
+    fichier = Message.objects.create(
+        conversation=conversation,
+        auteur=bob,
+        type=Message.Type.FICHIER,
+        nom_fichier="document.pdf",
+        cree_le=maintenant - timedelta(days=1),
+    )
+    vocal = Message.objects.create(
+        conversation=conversation,
+        auteur=alice,
+        type=Message.Type.VOCAL,
+        cree_le=maintenant - timedelta(days=1),
+    )
+    ancien = Message.objects.create(
+        conversation=conversation,
+        auteur=bob,
+        texte="alpha ancien",
+        cree_le=maintenant - timedelta(days=3),
+    )
+    recent = Message.objects.create(
+        conversation=conversation,
+        auteur=bob,
+        texte="alpha récent",
+        cree_le=maintenant - timedelta(days=1),
+    )
+    masque = Message.objects.create(
+        conversation=conversation,
+        auteur=bob,
+        texte="alpha masqué",
+        cree_le=maintenant,
+    )
+    supprime = Message.objects.create(
+        conversation=conversation,
+        auteur=bob,
+        texte="alpha supprimé",
+        supprime_pour_tous=True,
+        cree_le=maintenant,
+    )
+    MessageMasque.objects.create(message=masque, user=alice)
+    base_url = f"/api/conversations/{conversation.pk}/recherche/"
+
+    liens = client(alice).get(f"{base_url}?type=liens")
+    images = client(alice).get(f"{base_url}?type=images")
+    fichiers = client(alice).get(f"{base_url}?type=fichiers")
+    vocaux = client(alice).get(f"{base_url}?type=vocaux")
+    historique = client(alice).get(
+        f"{base_url}?q=alpha&date_debut={(maintenant - timedelta(days=2)).date()}",
+    )
+    ordre = client(alice).get(
+        f"{base_url}?q=alpha&date_debut={(maintenant - timedelta(days=4)).date()}&ordre=ancien",
+    )
+
+    assert liens.status_code == 200
+    assert [message["id"] for message in liens.data["results"]] == [lien.pk]
+    assert images.status_code == 200
+    assert [message["id"] for message in images.data["results"]] == [image.pk]
+    assert fichiers.status_code == 200
+    assert [message["id"] for message in fichiers.data["results"]] == [fichier.pk]
+    assert vocaux.status_code == 200
+    assert [message["id"] for message in vocaux.data["results"]] == [vocal.pk]
+    assert historique.status_code == 200
+    assert [message["id"] for message in historique.data["results"]] == [recent.pk]
+    assert ordre.status_code == 200
+    assert [message["id"] for message in ordre.data["results"]] == [ancien.pk, recent.pk]
+    assert masque.pk not in [message["id"] for message in ordre.data["results"]]
+    assert supprime.pk not in [message["id"] for message in ordre.data["results"]]
+
+
+@pytest.mark.django_db
+def test_search_messages_validates_filters_and_conversation_membership(discussion):
+    conversation, (alice, _) = discussion
+    base_url = f"/api/conversations/{conversation.pk}/recherche/"
+    invalide = client(alice).get(f"{base_url}?date_debut=hier")
+    sans_filtre = client(alice).get(base_url)
+
+    autre = User.objects.create_user(
+        "charlie@example.com",
+        "MotDePasseSecurise123!",
+        prenom="Charlie",
+        nom="Test",
+        valide=True,
+    )
+    interdit = client(autre).get(f"{base_url}?q=secret")
+
+    assert invalide.status_code == 400
+    assert sans_filtre.status_code == 400
+    assert interdit.status_code == 404
 
 
 @pytest.mark.django_db

@@ -207,13 +207,37 @@ class ValiderParcoursView(APIView):
             premier_index, dernier_index = ids.index(premiere_id), ids.index(derniere_id)
             if premier_index > dernier_index:
                 raise ValidationError({"classes": "La classe de départ vient après la dernière classe."})
+            classe_ids = choix.get("classe_ids")
+            if classe_ids is None:
+                classes_retenues = classes[premier_index:dernier_index + 1]
+            else:
+                if (
+                    not isinstance(classe_ids, list)
+                    or not classe_ids
+                    or any(isinstance(classe_id, bool) or not isinstance(classe_id, int)
+                           for classe_id in classe_ids)
+                    or len(set(classe_ids)) != len(classe_ids)
+                ):
+                    raise ValidationError({"classes": "La sélection des classes est invalide."})
+                indices = [ids.index(classe_id) if classe_id in ids else -1 for classe_id in classe_ids]
+                if (
+                    indices[0] != premier_index
+                    or indices[-1] != dernier_index
+                    or any(index < 0 for index in indices)
+                    or indices != sorted(indices)
+                ):
+                    raise ValidationError({"classes": "Les classes sélectionnées ne correspondent pas au cycle."})
+                classes_retenues = [classes[index] for index in indices]
             durees = choix.get("durees", {})
             if not isinstance(durees, dict):
                 raise ValidationError({"durees": "Durées de classe invalides."})
-            annee = debut_cycle if debut_cycle is not None else annee_arrivee
-            if debut_cycle is not None and annee_arrivee != debut_cycle:
-                raise ValidationError({"annee_arrivee": "Les cycles doivent s'enchaîner sans chevauchement."})
-            for classe in classes[premier_index:dernier_index + 1]:
+            annee = annee_arrivee
+            index_precedent = None
+            for classe in classes_retenues:
+                index_classe = ids.index(classe.pk)
+                if index_precedent is not None:
+                    annee += index_classe - index_precedent - 1
+                index_precedent = index_classe
                 duree = durees.get(str(classe.pk), durees.get(classe.pk, 1))
                 if isinstance(duree, bool) or not isinstance(duree, int) or duree not in (1, 2):
                     raise ValidationError({"durees": "Chaque classe doit durer un ou deux ans."})

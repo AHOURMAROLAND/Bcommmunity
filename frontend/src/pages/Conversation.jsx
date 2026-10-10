@@ -4,11 +4,13 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowLeft, Check, CheckCheck, ChevronUp, Copy, ExternalLink, File as FileIcon, Flag, Forward,
   Link2, Mic, MoreHorizontal, Paperclip, Pause, Pencil, Pin, Play, Reply,
-  Send, Smile, Star, Timer, Trash2, X,
+  Search, Send, Smile, Star, Timer, Trash2, X,
 } from "lucide-react";
 import { api } from "../api/client";
 import { estErreurReseau } from "../api/stockage-hors-ligne";
-import { useConversation, useConversations, useMessages } from "../api/discussions";
+import {
+  useConversation, useConversations, useMessages, useRechercheMessages,
+} from "../api/discussions";
 import { useAuth } from "../auth/AuthContext";
 import { majMessage, useTempsReel } from "../temps-reel/TempsReel";
 import Avatar from "../components/Avatar";
@@ -192,10 +194,13 @@ export default function Conversation() {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const { utilisateur } = useAuth();
-  const { envoyer, abonner, mettreEnFile } = useTempsReel();
-  const conv = useConversation(id);
-  const conversations = useConversations();
-  const msgs = useMessages(id);
+  const {
+    envoyer, abonner, mettreEnFile, etat, fileHorsLigne, retenterElement,
+  } = useTempsReel();
+  const tempsReelActif = etat === "ouvert";
+  const conv = useConversation(id, tempsReelActif);
+  const conversations = useConversations(tempsReelActif);
+  const msgs = useMessages(id, tempsReelActif);
   const configurationSecurite = useQuery({
     queryKey: ["configuration-securite-discussions"],
     queryFn: () => api("/discussions/configuration-securite/"),
@@ -264,6 +269,28 @@ export default function Conversation() {
   const [erreurEnvoi, setErreurEnvoi] = useState("");
   const [maintenant, setMaintenant] = useState(null);
   const [messageEpingleCible, setMessageEpingleCible] = useState(null);
+  const [rechercheOuverte, setRechercheOuverte] = useState(false);
+  const [rechercheSaisie, setRechercheSaisie] = useState("");
+  const [termeRecherche, setTermeRecherche] = useState("");
+  const [typeRecherche, setTypeRecherche] = useState("tous");
+  const [dateDebutRecherche, setDateDebutRecherche] = useState("");
+  const [dateFinRecherche, setDateFinRecherche] = useState("");
+  const [ordreRecherche, setOrdreRecherche] = useState("recent");
+  const filtresRecherche = useMemo(() => ({
+    q: termeRecherche.trim(),
+    type: typeRecherche,
+    date_debut: dateDebutRecherche,
+    date_fin: dateFinRecherche,
+    ordre: ordreRecherche,
+  }), [termeRecherche, typeRecherche, dateDebutRecherche, dateFinRecherche, ordreRecherche]);
+  const rechercheActive = Boolean(
+    filtresRecherche.q || typeRecherche !== "tous" || dateDebutRecherche || dateFinRecherche,
+  );
+  const resultatsRecherche = useRechercheMessages(
+    id,
+    filtresRecherche,
+    rechercheOuverte && rechercheActive,
+  );
 
   const fil = useRef(null);
   const saisieTexte = useRef(null);
@@ -291,6 +318,11 @@ export default function Conversation() {
   const derniereMesureAudio = useRef(0);
   const minuterieVocale = useRef(0);
   const minuterieEnregistrement = useRef(0);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setTermeRecherche(rechercheSaisie), 300);
+    return () => window.clearTimeout(timer);
+  }, [rechercheSaisie]);
 
   const liste = useMemo(
     () => (msgs.data?.pages.flatMap((p) => p.results) ?? []).slice().reverse(),
@@ -578,8 +610,8 @@ export default function Conversation() {
       entrees,
     };
     const mettreEnAttente = async () => {
-      await mettreEnFile(operationFile);
-      majMessage(qc, id, { ...local, statut: "hors-ligne" });
+      const element = await mettreEnFile(operationFile);
+      majMessage(qc, id, { ...local, fileId: element.id, statut: "hors-ligne" });
       setTexte("");
       setFichierChoisi(null);
       setEnReponseA(null);
@@ -784,8 +816,8 @@ export default function Conversation() {
           message: { texte: contenu, cid, en_reponse_a_id: enReponseA?.id },
         };
     const mettreEnAttente = async () => {
-      await mettreEnFile(operationFile);
-      majMessage(qc, id, { ...local, statut: "hors-ligne" });
+      const element = await mettreEnFile(operationFile);
+      majMessage(qc, id, { ...local, fileId: element.id, statut: "hors-ligne" });
       setFichierChoisi(null);
       setEnReponseA(null);
     };
@@ -815,13 +847,6 @@ export default function Conversation() {
         return;
       }
       setFichierChoisi(null);
-      if (envoyer({
-        type: "message.send",
-        conversation: Number(id),
-        texte: contenu,
-        cid,
-        en_reponse_a_id: enReponseA?.id,
-      })) return;
       const m = await api(`/conversations/${id}/messages/`, {
         method: "POST",
         body: { texte: contenu, cid, en_reponse_a_id: enReponseA?.id },
@@ -909,25 +934,30 @@ export default function Conversation() {
   async function allerAuMessageEpingle() {
     const epingle = conv.data?.message_epingle;
     if (!epingle) return;
+    await allerAuMessage(epingle.id);
+  }
+
+  async function allerAuMessage(messageId) {
     try {
       let donnees = qc.getQueryData(["messages", String(id)]);
       if (!donnees) {
         donnees = (await msgs.refetch()).data;
       }
-      while (!donnees?.pages?.some((page) => page.results.some((message) => message.id === epingle.id))) {
+      while (!donnees?.pages?.some((page) => page.results.some((message) => message.id === messageId))) {
         const pageSuivante = await msgs.fetchNextPage();
         donnees = pageSuivante.data;
         if (pageSuivante.isError) {
           throw pageSuivante.error;
         }
         if (!pageSuivante.hasNextPage) {
-          afficherToast("Le message épinglé n’est plus disponible dans l’historique.", "avertissement");
+          afficherToast("Ce message n’est plus disponible dans l’historique.", "avertissement");
           return;
         }
       }
-      setMessageEpingleCible(epingle.id);
+      setRechercheOuverte(false);
+      setMessageEpingleCible(messageId);
     } catch (err) {
-      afficherToast(err.message || "Le message épinglé n’a pas pu être chargé.", "erreur");
+      afficherToast(err.message || "Le message n’a pas pu être chargé.", "erreur");
     }
   }
 
@@ -1051,7 +1081,17 @@ export default function Conversation() {
           </Link>
         ) : <Sq w="10rem" h="1.2rem" />}
         {autre && (
-          <div className="chat-menu">
+          <div className="chat-actions">
+            <button
+              type="button"
+              className="puce"
+              aria-label={rechercheOuverte ? "Fermer la recherche" : "Rechercher dans la conversation"}
+              aria-expanded={rechercheOuverte}
+              onClick={() => setRechercheOuverte((ouverte) => !ouverte)}
+            >
+              {rechercheOuverte ? <X size={18} /> : <Search size={18} />}
+            </button>
+            <div className="chat-menu">
             <button
               className="puce"
               aria-label="Options de la conversation"
@@ -1072,9 +1112,110 @@ export default function Conversation() {
                 </button>
               </div>
             )}
+            </div>
           </div>
         )}
       </header>
+
+      {rechercheOuverte && (
+        <section className="chat-recherche" aria-label="Recherche dans la conversation">
+          <label className="chat-recherche-terme">
+            <Search size={17} aria-hidden="true" />
+            <input
+              type="search"
+              maxLength={100}
+              value={rechercheSaisie}
+              onChange={(event) => setRechercheSaisie(event.target.value)}
+              placeholder="Rechercher un message"
+              aria-label="Rechercher un message"
+            />
+          </label>
+          <div className="chat-recherche-filtres">
+            <label>
+              Type
+              <select value={typeRecherche} onChange={(event) => setTypeRecherche(event.target.value)}>
+                <option value="tous">Tous</option>
+                <option value="liens">Liens</option>
+                <option value="images">Images</option>
+                <option value="fichiers">Fichiers</option>
+                <option value="vocaux">Messages vocaux</option>
+              </select>
+            </label>
+            <label>
+              Du
+              <input
+                type="date"
+                value={dateDebutRecherche}
+                onChange={(event) => setDateDebutRecherche(event.target.value)}
+                aria-label="Date de début"
+              />
+            </label>
+            <label>
+              Au
+              <input
+                type="date"
+                value={dateFinRecherche}
+                onChange={(event) => setDateFinRecherche(event.target.value)}
+                aria-label="Date de fin"
+              />
+            </label>
+            <label>
+              Ordre
+              <select value={ordreRecherche} onChange={(event) => setOrdreRecherche(event.target.value)}>
+                <option value="recent">Plus récents</option>
+                <option value="ancien">Plus anciens</option>
+              </select>
+            </label>
+          </div>
+          {rechercheActive ? (
+            <div className="chat-recherche-resultats" aria-live="polite">
+              {resultatsRecherche.isPending && <p role="status">Recherche en cours…</p>}
+              {resultatsRecherche.isError && (
+                <div role="alert" className="chat-recherche-erreur">
+                  <span>{resultatsRecherche.error.message || "La recherche a échoué."}</span>
+                  <button type="button" onClick={() => resultatsRecherche.refetch()}>Réessayer</button>
+                </div>
+              )}
+              {resultatsRecherche.data?.pages.flatMap((page) => page.results).map((message) => (
+                <button
+                  type="button"
+                  className="chat-recherche-resultat"
+                  key={message.id}
+                  onClick={() => allerAuMessage(message.id)}
+                >
+                  <span className="chat-recherche-resultat-meta">
+                    <strong>{message.auteur === utilisateur.id ? "Vous" : autre?.prenom}</strong>
+                    <time>{message.cree_le ? `${libelleJour(message.cree_le)} · ${heure(message.cree_le)}` : ""}</time>
+                  </span>
+                  <span className="chat-recherche-resultat-texte">
+                    {message.texte
+                      || (message.type === "image" ? "Photo" : null)
+                      || (message.type === "vocal" ? "Message vocal" : null)
+                      || (message.type === "fichier" ? message.nom_fichier || "Pièce jointe" : "Message")}
+                  </span>
+                </button>
+              ))}
+              {!resultatsRecherche.isPending
+                && !resultatsRecherche.isError
+                && resultatsRecherche.data?.pages[0]?.count === 0 && (
+                <p>Aucun message ne correspond à cette recherche.</p>
+              )}
+              {resultatsRecherche.hasNextPage && (
+                <button
+                  type="button"
+                  className="chat-recherche-plus"
+                  disabled={resultatsRecherche.isFetchingNextPage}
+                  onClick={() => resultatsRecherche.fetchNextPage()}
+                >
+                  {resultatsRecherche.isFetchingNextPage ? "Chargement…" : "Voir plus de résultats"}
+                </button>
+              )}
+            </div>
+          ) : (
+            <p className="chat-recherche-aide">Saisissez un texte ou choisissez un filtre pour commencer.</p>
+          )}
+        </section>
+      )}
 
       {conv.data?.message_epingle && (
         <button
@@ -1127,6 +1268,10 @@ export default function Conversation() {
         {listeAvecSeparateurs.map((m) => {
           const moi = m.auteur === utilisateur.id;
           const vu = moi && typeof m.id === "number" && luAutre >= m.id;
+          const elementEnAttente = fileHorsLigne.find((element) => element.id === m.fileId);
+          const fileExpire = Boolean(
+            elementEnAttente && maintenant && Date.parse(elementEnAttente.expireLe) <= maintenant,
+          );
           return (
             <div
               className={`message-groupe${messageEpingleCible === m.id ? " message-epingle-cible" : ""}`}
@@ -1147,8 +1292,8 @@ export default function Conversation() {
                     <time>{m.cree_le && heure(m.cree_le)}</time>
                     {m.modifie_le && <small className="message-modifie">modifié</small>}
                     {moi && (
-                      m.statut === "echec"
-                        ? <span className="message-echec" aria-label="Échec de l'envoi">!</span>
+                      m.statut === "echec" || fileExpire
+                        ? <span className="message-echec" aria-label={fileExpire ? "Délai de renvoi expiré" : "Échec de l'envoi"}>!</span>
                         : m.statut === "hors-ligne"
                           ? <span className="message-envoi" aria-label="En attente de connexion">◷</span>
                         : m.statut === "envoi"
@@ -1251,6 +1396,25 @@ export default function Conversation() {
                     )}
                   </div>
                   <div className="message-bas">
+                    {elementEnAttente && (
+                      <div className="message-file-attente">
+                        <small>
+                          {fileExpire
+                            ? "Délai de 48 h expiré."
+                            : elementEnAttente.derniereErreur
+                              ? "L’envoi a échoué."
+                              : "Message conservé jusqu’à 48 h."}
+                        </small>
+                        <button
+                          type="button"
+                          onClick={() => retenterElement(elementEnAttente.id).catch((erreur) => {
+                            afficherToast(erreur.message || "Le message n’a pas pu être relancé.", "erreur");
+                          })}
+                        >
+                          Réessayer
+                        </button>
+                      </div>
+                    )}
                     {m.epingle && (
                       <span className="message-indicateur epingle" title="Message épinglé dans cette conversation">
                         <Pin size={13} /> Épinglé

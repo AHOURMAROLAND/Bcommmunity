@@ -165,6 +165,9 @@ h1, h2, h3, .titre { font-weight: 700; }
 .recherche { position: relative; margin-bottom: 0.75rem; }
 .recherche svg { position: absolute; left: 0.8rem; top: 50%; transform: translateY(-50%); color: var(--texte-doux); }
 .recherche .champ { padding-left: 2.5rem; border-radius: 999px; }
+.recherche-contact { width: 100%; }
+.recherche-contact svg { width: 1.05rem; height: 1.05rem; }
+.recherche-contact .champ { min-width: 0; padding: 0.6rem 0.75rem 0.6rem 2.35rem; font-size: 0.92rem; }
 .puces { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1rem; }
 .puce {
   display: inline-flex; align-items: center; gap: 0.3rem; padding: 0.35rem 0.8rem; border-radius: 999px;
@@ -477,8 +480,25 @@ h1, h2, h3, .titre { font-weight: 700; }
 .chat-contact-infos small { color: var(--texte-doux); font-size: 0.76rem; }
 .chat-avatar-enligne, .message-avatar { position: relative; flex: 0 0 auto; }
 .chat-avatar-enligne > i, .message-avatar > i { position: absolute; right: 0; bottom: 0; width: 0.55rem; height: 0.55rem; background: var(--en-ligne); border: 2px solid var(--bg); border-radius: 50%; }
+.chat-actions { display: flex; align-items: center; gap: 0.35rem; flex: 0 0 auto; }
 .chat-menu { position: relative; }
 .chat-menu .menu-contextuel { position: absolute; right: 0; top: 2.6rem; z-index: 5; width: 14rem; }
+.chat-recherche { flex: 0 0 auto; padding: 0.7rem 0.85rem; border-bottom: 1px solid var(--bordure); background: var(--carte); }
+.chat-recherche-terme { display: flex; align-items: center; gap: 0.55rem; padding: 0.55rem 0.7rem; border: 1px solid var(--bordure); border-radius: 0.7rem; color: var(--texte-doux); }
+.chat-recherche-terme input { width: 100%; min-width: 0; border: 0; outline: 0; background: transparent; color: var(--texte); font: inherit; }
+.chat-recherche-filtres { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.6rem; }
+.chat-recherche-filtres label { display: flex; align-items: center; gap: 0.35rem; color: var(--texte-doux); font-size: 0.75rem; }
+.chat-recherche-filtres select, .chat-recherche-filtres input { max-width: 11rem; padding: 0.35rem; border: 1px solid var(--bordure); border-radius: 0.45rem; background: var(--bg); color: var(--texte); font: inherit; }
+.chat-recherche-resultats { display: flex; flex-direction: column; max-height: 13rem; overflow-y: auto; margin-top: 0.5rem; }
+.chat-recherche-resultats > p, .chat-recherche-aide { margin: 0.45rem 0 0; color: var(--texte-doux); font-size: 0.82rem; }
+.chat-recherche-resultat { display: flex; flex-direction: column; gap: 0.2rem; padding: 0.55rem 0.4rem; border: 0; border-bottom: 1px solid var(--bordure); background: transparent; color: var(--texte); text-align: left; font: inherit; cursor: pointer; }
+.chat-recherche-resultat:hover { background: color-mix(in srgb, var(--primaire) 8%, var(--bg)); }
+.chat-recherche-resultat-meta { display: flex; justify-content: space-between; gap: 0.6rem; font-size: 0.75rem; }
+.chat-recherche-resultat-meta time { color: var(--texte-doux); }
+.chat-recherche-resultat-texte { overflow: hidden; color: var(--texte-doux); font-size: 0.83rem; text-overflow: ellipsis; white-space: nowrap; }
+.chat-recherche-erreur { display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; padding: 0.5rem 0; color: var(--danger); font-size: 0.82rem; }
+.chat-recherche-erreur button, .chat-recherche-plus { align-self: center; padding: 0.45rem 0.7rem; border: 0; border-radius: 0.5rem; background: color-mix(in srgb, var(--primaire) 10%, var(--bg)); color: var(--primaire); font: inherit; cursor: pointer; }
+.chat-recherche-plus:disabled { opacity: 0.6; cursor: wait; }
 .chat-epingle-banniere {
   flex: 0 0 auto; display: flex; align-items: center; gap: 0.65rem; width: 100%;
   padding: 0.6rem 1rem; border: 0; border-bottom: 1px solid var(--bordure);
@@ -542,6 +562,8 @@ h1, h2, h3, .titre { font-weight: 700; }
 .message-legende { margin: 0.45rem 0 0; font-size: 0.88rem; white-space: pre-wrap; }
 .message-bas { position: relative; display: flex; flex-wrap: wrap; align-items: center; gap: 0.3rem; min-height: 1.4rem; }
 .message-ligne.sortant .message-bas { justify-content: flex-end; }
+.message-file-attente { display: inline-flex; align-items: center; gap: 0.4rem; margin-right: 0.35rem; color: var(--texte-doux); font-size: 0.72rem; }
+.message-file-attente button { padding: 0.12rem 0.35rem; border: 0; border-radius: 0.4rem; background: color-mix(in srgb, var(--primaire) 10%, var(--bg)); color: var(--primaire); font: inherit; font-weight: 700; cursor: pointer; }
 .reaction-puce { display: inline-flex; align-items: center; gap: 0.22rem; padding: 0.12rem 0.38rem; border: 1px solid var(--bordure); border-radius: 999px; background: var(--bg); color: var(--texte); font: inherit; cursor: pointer; }
 .reaction-puce.selectionnee { border-color: #9b75ed; background: color-mix(in srgb, #9b75ed 10%, var(--bg)); }
 .reaction-puce small { font-size: 0.7rem; }

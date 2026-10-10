@@ -7,6 +7,7 @@ import logging
 from concurrent.futures import ThreadPoolExecutor
 from urllib.parse import urlparse
 
+import requests
 from django.conf import settings
 from django.db.models import F
 
@@ -83,6 +84,34 @@ def _envoyer_fcm(a, charge):
         return a.pk, "mort" if "Unregistered" in e.__class__.__name__ else "erreur"
 
 
+def _envoyer_onesignal(a, charge):
+    if not settings.ONESIGNAL_APP_ID or not settings.ONESIGNAL_REST_API_KEY:
+        logger.error("Configuration OneSignal absente; notification push impossible")
+        return a.pk, "erreur"
+    try:
+        response = requests.post(
+            "https://api.onesignal.com/notifications",
+            headers={"Authorization": f"Key {settings.ONESIGNAL_REST_API_KEY}"},
+            json={
+                "app_id": settings.ONESIGNAL_APP_ID,
+                "include_subscription_ids": [a.cible],
+                "target_channel": "push",
+                "headings": {"fr": charge["titre"]},
+                "contents": {"fr": charge["corps"]},
+                "url": f"{settings.SITE_URL.rstrip('/')}{charge.get('url', '/fil')}",
+                "data": charge,
+            },
+            timeout=5,
+        )
+        if response.ok:
+            return a.pk, None
+        logger.warning("OneSignal a refuse une notification (HTTP %s)", response.status_code)
+        return a.pk, "erreur"
+    except requests.RequestException:
+        logger.exception("Erreur de connexion a OneSignal")
+        return a.pk, "erreur"
+
+
 def pousser(paires):
     """
     paires : liste de (user_id, charge).
@@ -101,7 +130,12 @@ def pousser(paires):
     if not travaux:
         return
 
-    fn = lambda t: (_envoyer_web if t[0].type == "web" else _envoyer_fcm)(*t)  # noqa: E731
+    fonctions = {
+        PushAbonnement.Type.WEB: _envoyer_web,
+        PushAbonnement.Type.FCM: _envoyer_fcm,
+        PushAbonnement.Type.ONESIGNAL: _envoyer_onesignal,
+    }
+    fn = lambda t: fonctions[t[0].type](*t)  # noqa: E731
     with ThreadPoolExecutor(max_workers=16) as pool:
         resultats = list(pool.map(fn, travaux))
 

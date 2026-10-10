@@ -6,7 +6,7 @@ import { api, effacerRefresh, lireRefresh, rafraichir, sauverRefresh, setAccessT
 import {
   effacerCacheHorsLigne, effacerFileHorsLigne, persisterRequetes,
 } from "../api/stockage-hors-ligne";
-import { desactiverPush } from "../utils/push";
+import { desactiverPush, synchroniserPushWeb } from "../utils/push";
 import { estNatif } from "../utils/plateforme";
 
 const AuthContext = createContext(null);
@@ -25,6 +25,13 @@ export function AuthProvider({ children }) {
   }), [utilisateur?.id]);
 
   useEffect(() => { connecte.current = !!utilisateur; }, [utilisateur]);
+
+  useEffect(() => {
+    if (!utilisateur?.id || estNatif()) return;
+    synchroniserPushWeb(utilisateur.id).catch((error) => {
+      console.error("Impossible de synchroniser OneSignal avec le compte.", error);
+    });
+  }, [utilisateur?.id]);
 
   useEffect(() => {
     let actif = true;

@@ -1,5 +1,6 @@
 from datetime import timedelta
 
+from django.core.cache import cache
 from django.db import transaction
 from django.utils import timezone
 from rest_framework.exceptions import AuthenticationFailed
@@ -55,9 +56,15 @@ def obtenir_session(user_id, sid):
     if session.derniere_activite <= maintenant - DUREE_INACTIVITE_SESSION:
         raise AuthenticationFailed("Cette session a expiré après une période d’inactivité.")
     if session.derniere_activite <= maintenant - INTERVALLE_MAJ_ACTIVITE:
-        SessionCompte.objects.filter(pk=session.pk, active=True).update(
-            derniere_activite=maintenant
-        )
+        cle_rafraichissement = f"session_touch:{user_id}:{sid}"
+        if cache.add(
+            cle_rafraichissement,
+            True,
+            timeout=int(INTERVALLE_MAJ_ACTIVITE.total_seconds()),
+        ):
+            SessionCompte.objects.filter(pk=session.pk, active=True).update(
+                derniere_activite=maintenant
+            )
     return session
 
 

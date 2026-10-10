@@ -1,3 +1,5 @@
+import uuid
+
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core import signing
@@ -114,6 +116,29 @@ class PushFcmView(APIView):
                 "type": "fcm",
                 "cles": None,
                 "agent": "android",
+                "actif": True,
+                "echecs": 0,
+            })
+        return Response(status=201)
+
+
+class PushOneSignalView(APIView):
+    throttle_scope = "push"
+
+    def post(self, request):
+        subscription_id = request.data.get("subscription_id")
+        try:
+            if not isinstance(subscription_id, str) or str(uuid.UUID(subscription_id)) != subscription_id:
+                raise ValueError
+        except ValueError:
+            raise ValidationError({"detail": "Abonnement OneSignal invalide."})
+        PushAbonnement.objects.update_or_create(
+            cible=subscription_id,
+            defaults={
+                "user": request.user,
+                "type": PushAbonnement.Type.ONESIGNAL,
+                "cles": None,
+                "agent": request.headers.get("User-Agent", "")[:200],
                 "actif": True,
                 "echecs": 0,
             })

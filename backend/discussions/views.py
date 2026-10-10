@@ -2,9 +2,10 @@ import json
 
 import urllib3
 from django.db import transaction
-from django.db.models import Count, F, OuterRef, Prefetch, Subquery
+from django.db.models import Count, F, OuterRef, Prefetch, Q, Subquery
 from django.db.models.functions import Coalesce
 from django.utils import timezone
+from django.utils.dateparse import parse_date
 from rest_framework.exceptions import APIException, NotFound, PermissionDenied, ValidationError
 from rest_framework.pagination import CursorPagination, PageNumberPagination
 from rest_framework.response import Response
@@ -156,6 +157,70 @@ class InvitationsView(APIView):
         if conv:
             return Response({"etat": "conversation", "conversation": conv.pk}, status=200)
         return Response({"etat": "envoyee", "invitation": inv.pk}, status=201)
+
+
+class RechercheMessagesView(APIView):
+    class Pagination(PageNumberPagination):
+        page_size = 20
+        page_size_query_param = "page_size"
+        max_page_size = 50
+
+    def get(self, request, pk):
+        _, autres = contexte(request.user, pk)
+        if set(autres) & ids_bloques(request.user):
+            raise NotFound()
+
+        terme = request.query_params.get("q", "").strip()
+        type_message = request.query_params.get("type", "tous")
+        ordre = request.query_params.get("ordre", "recent")
+        debut_brut = request.query_params.get("date_debut", "")
+        fin_brut = request.query_params.get("date_fin", "")
+        if len(terme) > 100:
+            raise ValidationError({"q": "La recherche est limitée à 100 caractères."})
+        if type_message not in {"tous", "liens", "images", "fichiers", "vocaux"}:
+            raise ValidationError({"type": "Filtre de message invalide."})
+        if ordre not in {"recent", "ancien"}:
+            raise ValidationError({"ordre": "Ordre de tri invalide."})
+        date_debut = parse_date(debut_brut) if debut_brut else None
+        date_fin = parse_date(fin_brut) if fin_brut else None
+        if (debut_brut and date_debut is None) or (fin_brut and date_fin is None):
+            raise ValidationError({"date": "Les dates doivent être au format AAAA-MM-JJ."})
+        if date_debut and date_fin and date_debut > date_fin:
+            raise ValidationError({"date_fin": "La date de fin doit suivre la date de début."})
+        if not terme and type_message == "tous" and not date_debut and not date_fin:
+            raise ValidationError({"q": "Saisissez un texte ou choisissez un filtre."})
+
+        qs = (Message.objects.filter(conversation_id=pk)
+              .exclude(masques__user=request.user)
+              .exclude(supprime_pour_tous=True))
+        if terme:
+            qs = qs.filter(Q(texte__icontains=terme) | Q(nom_fichier__icontains=terme))
+        if type_message == "liens":
+            qs = qs.filter(texte__icontains="http")
+        elif type_message == "images":
+            qs = qs.filter(type=Message.Type.IMAGE)
+        elif type_message == "fichiers":
+            qs = qs.filter(type=Message.Type.FICHIER)
+        elif type_message == "vocaux":
+            qs = qs.filter(type=Message.Type.VOCAL)
+        if date_debut:
+            qs = qs.filter(cree_le__date__gte=date_debut)
+        if date_fin:
+            qs = qs.filter(cree_le__date__lte=date_fin)
+        qs = qs.select_related("en_reponse_a", "auteur").prefetch_related(
+            "reactions",
+            Prefetch(
+                "favoris",
+                queryset=MessageFavori.objects.filter(user=request.user),
+                to_attr="_favoris_moi",
+            ),
+        )
+        qs = qs.order_by("cree_le", "pk") if ordre == "ancien" else qs.order_by("-cree_le", "-pk")
+        pagination = self.Pagination()
+        page = pagination.paginate_queryset(qs, request, view=self)
+        return pagination.get_paginated_response([
+            serialiser_message(message, user_id=request.user.pk) for message in page
+        ])
 
 
 class InvitationActionView(APIView):

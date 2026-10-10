@@ -1,13 +1,9 @@
 import { api } from "../api/client";
 
-/** Convertit une cle VAPID Base64url en Uint8Array. */
-const versBytes = (s) => {
-  const b64 = (s + "=".repeat((4 - (s.length % 4)) % 4))
-    .replace(/-/g, "+")
-    .replace(/_/g, "/");
-  const raw = atob(b64);
-  return Uint8Array.from(raw, (c) => c.charCodeAt(0));
-};
+const APP_ID = import.meta.env.VITE_ONESIGNAL_APP_ID;
+const SCRIPT_URL = "https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js";
+let sdkPromise;
+let ecouteurAjoute = false;
 
 export const pushSupporte = () =>
   "serviceWorker" in navigator &&
@@ -21,57 +17,129 @@ export const estInstalle = () =>
   window.matchMedia("(display-mode: standalone)").matches ||
   navigator.standalone === true;
 
-/** Vrai si l'abonnement push est actif sur cet appareil. */
-export async function pushActif() {
-  if (!pushSupporte() || Notification.permission !== "granted") return false;
-  const reg = await navigator.serviceWorker.getRegistration("/sw.js");
-  return !!(await reg?.pushManager.getSubscription());
+function chargerOneSignal() {
+  if (!APP_ID) throw new Error("onesignal_non_configure");
+  if (!sdkPromise) {
+    window.OneSignalDeferred = window.OneSignalDeferred || [];
+    sdkPromise = new Promise((resolve, reject) => {
+      const script = document.querySelector('script[data-onesignal-sdk="true"]');
+      const timeout = window.setTimeout(() => reject(new Error("onesignal_echec")), 15000);
+      window.OneSignalDeferred.push(async (OneSignal) => {
+        try {
+          await OneSignal.init({
+            appId: APP_ID,
+            serviceWorkerPath: "/onesignal/OneSignalSDKWorker.js",
+            serviceWorkerParam: { scope: "/onesignal/" },
+            welcomeNotification: { disable: true },
+            notifyButton: { enable: false },
+          });
+          window.clearTimeout(timeout);
+          resolve(OneSignal);
+        } catch (error) {
+          window.clearTimeout(timeout);
+          reject(error);
+        }
+      });
+      if (!script) {
+        const element = document.createElement("script");
+        element.src = SCRIPT_URL;
+        element.defer = true;
+        element.dataset.onesignalSdk = "true";
+        element.onerror = () => {
+          window.clearTimeout(timeout);
+          reject(new Error("onesignal_echec"));
+        };
+        document.head.append(element);
+      }
+    }).catch((error) => {
+      sdkPromise = null;
+      throw error;
+    });
+  }
+  return sdkPromise;
 }
 
-/**
- * Demande la permission, enregistre le SW, cree l'abonnement et
- * l'enregistre sur le serveur.
- * Lance une erreur avec message "non_supporte", "ios_installer" ou "refuse".
- */
-export async function activerPush() {
+async function enregistrerAbonnement(OneSignal) {
+  const abonnement = OneSignal.User.PushSubscription;
+  if (!abonnement.id || !abonnement.optedIn) return false;
+  await api("/notifications/push/onesignal/", {
+    method: "POST",
+    body: { subscription_id: abonnement.id },
+  });
+  return true;
+}
+
+async function lierCompte(OneSignal, utilisateurId) {
+  if (!utilisateurId) return;
+  await OneSignal.login(String(utilisateurId));
+  if (!ecouteurAjoute) {
+    OneSignal.User.PushSubscription.addEventListener("change", (event) => {
+      if (event.current.id && event.current.optedIn) {
+        enregistrerAbonnement(OneSignal).catch((error) => {
+          console.error("Impossible d'enregistrer l'abonnement OneSignal.", error);
+        });
+      } else if (event.previous.id && event.previous.optedIn) {
+        api("/notifications/push/", {
+          method: "DELETE",
+          body: { cible: event.previous.id },
+        }).catch((error) => {
+          console.error("Impossible de retirer l'abonnement OneSignal.", error);
+        });
+      }
+    });
+    ecouteurAjoute = true;
+  }
+  await enregistrerAbonnement(OneSignal);
+}
+
+/** Lie l'abonnement deja actif au compte connecte. */
+export async function synchroniserPushWeb(utilisateurId) {
+  if (!APP_ID || !pushSupporte()) return;
+  const OneSignal = await chargerOneSignal();
+  await lierCompte(OneSignal, utilisateurId);
+}
+
+/** Vrai si les notifications OneSignal sont activees sur cet appareil. */
+export async function pushActif(utilisateurId) {
+  if (!APP_ID || !pushSupporte()) return false;
+  const OneSignal = await chargerOneSignal();
+  await lierCompte(OneSignal, utilisateurId);
+  return OneSignal.User.PushSubscription.optedIn;
+}
+
+/** Demande la permission, active OneSignal et associe l'abonnement au compte. */
+export async function activerPush(utilisateurId) {
   if (!pushSupporte()) throw new Error("non_supporte");
   if (estIOS() && !estInstalle()) throw new Error("ios_installer");
+  if (!utilisateurId) throw new Error("onesignal_echec");
 
-  const perm = await Notification.requestPermission();
-  if (perm !== "granted") throw new Error("refuse");
+  const OneSignal = await chargerOneSignal();
+  await lierCompte(OneSignal, utilisateurId);
+  const autorise = await OneSignal.Notifications.requestPermission();
+  if (!autorise) throw new Error("refuse");
+  await OneSignal.User.PushSubscription.optIn();
 
-  const reg = await navigator.serviceWorker.register("/sw.js");
-  await navigator.serviceWorker.ready;
-
-  const { cle } = await api("/notifications/push/cle/");
-  const sub =
-    (await reg.pushManager.getSubscription()) ??
-    (await reg.pushManager.subscribe({
-      userVisibleOnly: true,
-      applicationServerKey: versBytes(cle),
-    }));
-
-  const { endpoint, keys } = sub.toJSON();
-  await api("/notifications/push/web/", {
-    method: "POST",
-    body: { endpoint, keys },
-  });
+  for (let tentative = 0; tentative < 40; tentative += 1) {
+    if (await enregistrerAbonnement(OneSignal)) return;
+    await new Promise((resolve) => window.setTimeout(resolve, 250));
+  }
+  throw new Error("onesignal_echec");
 }
 
-/**
- * Retire l'abonnement push de cet appareil.
- * Appele a la deconnexion pour que le compte suivant ne recoit pas les alertes.
- */
+/** Desactive l'abonnement de cet appareil avant la deconnexion du compte. */
 export async function desactiverPush() {
-  if (!pushSupporte()) return;
-  const reg = await navigator.serviceWorker.getRegistration("/sw.js");
-  const sub = await reg?.pushManager.getSubscription();
-  if (!sub) return;
-  await api("/notifications/push/", {
-    method: "DELETE",
-    body: { cible: sub.endpoint },
-  }).catch(() => {});
-  await sub.unsubscribe();
+  if (!APP_ID || !pushSupporte()) return;
+  const OneSignal = await chargerOneSignal();
+  const abonnement = OneSignal.User.PushSubscription;
+  const id = abonnement.id;
+  await abonnement.optOut();
+  if (id) {
+    await api("/notifications/push/", {
+      method: "DELETE",
+      body: { cible: id },
+    });
+  }
+  await OneSignal.logout();
 }
 
 /**

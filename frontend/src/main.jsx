@@ -14,7 +14,7 @@ import App from "./App";
 initialiserTheme();
 
 const queryClient = new QueryClient({
-  defaultOptions: { queries: { staleTime: 30_000, retry: 1, refetchOnWindowFocus: false } },
+  defaultOptions: { queries: { staleTime: 120_000, retry: 1, refetchOnWindowFocus: false } },
 });
 
 createRoot(document.getElementById("root")).render(

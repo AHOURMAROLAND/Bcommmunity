@@ -60,9 +60,10 @@ class PushAbonnement(models.Model):
     class Type(models.TextChoices):
         WEB = "web"
         FCM = "fcm"
+        ONESIGNAL = "onesignal", "OneSignal"
 
     user    = models.ForeignKey(U, related_name="abonnements_push", on_delete=models.CASCADE)
-    type    = models.CharField(max_length=5, choices=Type.choices)
+    type    = models.CharField(max_length=9, choices=Type.choices)
     cible   = models.TextField()          # endpoint (web) ou jeton (fcm)
     cles    = models.JSONField(null=True, blank=True)
     agent   = models.CharField(max_length=200, blank=True)

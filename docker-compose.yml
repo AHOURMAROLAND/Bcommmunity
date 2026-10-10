@@ -106,6 +106,7 @@ services:
       args:
         VITE_GOOGLE_CLIENT_ID: ${VITE_GOOGLE_CLIENT_ID:-}
         VITE_SITE_URL: ${SITE_URL:-http://localhost:8080}
+        VITE_ONESIGNAL_APP_ID: ${VITE_ONESIGNAL_APP_ID:-}
     environment:
       ADMIN_URL: ${ADMIN_URL:-admin/}
     depends_on:

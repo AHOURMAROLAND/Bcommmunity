@@ -121,23 +121,33 @@ docker compose logs --tail=100 api web
 
 Les donnees PostgreSQL et les fichiers media utilisent des volumes Docker persistants. Mettez-les dans une strategie de sauvegarde adaptee avant toute mise a jour; ne lancez pas `docker compose down -v` sur une instance qui contient des donnees.
 
-### Deploiement du frontend sur Vercel
+### Deploiement recommande : Render, Vercel, Neon et Cloudflare
 
-Le depot contient maintenant un `vercel.json` a sa racine, avec deux services : `frontend` (React/Vite) et `backend` (Django). Importez le depot entier dans Vercel en conservant le **Root Directory `./`** : ne choisissez ni `frontend` ni `backend`, car cela empecherait Vercel de lire le fichier multi-services a la racine. Le frontend appelle les API par `/api` sur la meme origine ; les reecritures dirigent `/api/*`, les pages de partage, le chemin d'administration `gestion-bakhita-x7` et `/static/*` vers Django. La variable `ADMIN_URL` doit rester coherente avec ce chemin.
+Le guide complet et ordonne de mise en production se trouve dans [DEPLOYMENT.md](./DEPLOYMENT.md).
 
-Le backend possede deja `STATIC_ROOT`; Vercel lance `collectstatic` pendant le build Django et sert les fichiers collectes (dont CSS/JS de l'admin) sous `/static/` via son CDN. La reecriture `/static/*` cible le service backend pour que les assets collectes soient associes au bon service. Les migrations de base de donnees ne sont pas lancees automatiquement par cette configuration ; executez-les contre la base de production avant le premier trafic.
+Le fichier `render.yaml` configure un service web Django/Daphne, un worker Celery, Celery Beat et un Redis prive. Ces plans Render `starter` sont payants; verifiez les tarifs avant de synchroniser le Blueprint. Importez le depot comme Blueprint dans Render et renseignez les variables demandees lors de la creation. Les migrations Django s'executent avant le deploiement du service web. Utilisez une URL PostgreSQL **directe Neon** (`sslmode=require`) dans `DATABASE_URL`, car Render execute les migrations pendant ce pre-deploiement.
 
-Le bouton Deploy ne sera disponible qu'une fois le depot configure/importé avec cette configuration multi-services. Pour la production, configurez un domaine personnalise sur ce projet et renseignez dans les variables Vercel celles dont Django a besoin (`DJANGO_SECRET_KEY`, `DJANGO_DEBUG=0`, `ALLOWED_HOSTS`, `DATABASE_URL`, `REDIS_URL`, `CELERY_BROKER_URL`, `ADMIN_URL`, `FRONTEND_URL`, `SITE_URL`, `CSRF_TRUSTED_ORIGINS`, `CORS_ALLOWED_ORIGINS`, ainsi que les secrets de stockage et services externes utilises). Ne collez pas `.env` ou `.env.example` au complet dans Vercel ; utilisez des secrets forts et des valeurs de production, jamais celles d'exemple.
+Le `vercel.json` a la racine configure le build Vite (`frontend/`) et relaie `/api/*`, `/static/*`, l'administration et les pages de partage vers `https://bakhita-api.onrender.com`. Gardez le Root Directory Vercel a `./`. Si le nom du service Render change, adaptez ces destinations. Configurez ces variables de build dans Vercel :
 
-Les notifications email Brevo doivent etre configurees cote backend Vercel, pas dans les variables `VITE_*` du frontend :
 ```dotenv
-BREVO_SMTP_LOGIN=<login SMTP fourni par Brevo>
-BREVO_SMTP_PASSWORD=<cle SMTP complete creee dans Brevo>
-DEFAULT_FROM_EMAIL=Bakhita Community <adresse expediteur verifiee>
+VITE_GOOGLE_CLIENT_ID=<identifiant client OAuth public, si utilise>
+VITE_WS_URL=wss://bakhita-api.onrender.com/ws/
+VITE_ONESIGNAL_APP_ID=<identifiant public de l'application OneSignal>
 ```
-Le backend utilise `smtp-relay.brevo.com`, port `587` et TLS. La cle SMTP est distincte de la cle API Brevo ; ne l'ajoutez jamais au depot ou au frontend. Configurez egalement les domaines dans Google OAuth, si cette connexion est active, et faites correspondre `ALLOWED_HOSTS`, `FRONTEND_URL`, `SITE_URL`, `CSRF_TRUSTED_ORIGINS` et `CORS_ALLOWED_ORIGINS` a votre domaine Vercel.
 
-**Limites fonctionnelles importantes :** un service Django Vercel est une fonction serverless, pas un serveur Daphne persistant. La messagerie WebSocket `/ws/` ne sera donc pas disponible sur cette architecture. Celery worker/Beat ne sont pas des services de fond persistants deployables avec ces deux services ; sans un worker externe, les taches planifiees (publications programmees, emails hebdomadaires, etc.) ne tourneront pas. PostgreSQL, Redis et les medias doivent utiliser des services persistants externes (par exemple PostgreSQL heberge, Redis heberge et R2). Pour obtenir l'application complete, gardez plutot le backend/worker/Redis/PostgreSQL dans le deploiement Docker documente et utilisez Vercel uniquement pour le frontend.
+Renseignez dans Render le domaine Vercel dans `FRONTEND_URL`, `SITE_URL`, `CORS_ALLOWED_ORIGINS` et `CSRF_TRUSTED_ORIGINS`. `ALLOWED_HOSTS` doit contenir, separes par des virgules et sans schema, `bakhita-api.onrender.com` et le domaine Vercel : Channels utilise aussi cette liste pour verifier l'origine WebSocket. `DATABASE_URL` doit contenir la connexion directe Neon. Le Blueprint provisionne Redis pour Channels et Celery. Configurez les variables `R2_*` avec un bucket Cloudflare R2 et un domaine public pour les images/media. Les notifications web OneSignal utilisent `ONESIGNAL_APP_ID` et `ONESIGNAL_REST_API_KEY` dans Render; l'identifiant public `VITE_ONESIGNAL_APP_ID` reste cote build Vercel. Ne placez jamais la cle REST OneSignal dans une variable `VITE_*`.
+
+Dans OneSignal, creez une plateforme Web Push pour le domaine public Vercel (un seul domaine/origine par application OneSignal), puis copiez l'App ID dans Vercel et la REST API Key dans Render. L'application sert le worker requis sous `/onesignal/OneSignalSDKWorker.js`. Les notifications Android natives conservent FCM; configurez alors `FCM_SERVICE_ACCOUNT_JSON` dans Render avec le compte de service Firebase.
+
+Configurez aussi Brevo dans Render (`BREVO_SMTP_LOGIN`, `BREVO_SMTP_PASSWORD` et `DEFAULT_FROM_EMAIL`) pour l'envoi des e-mails. Stockez toutes les valeurs privees dans les consoles des fournisseurs, jamais dans `.env.example`, le frontend ou Git. Les variables `sync: false` de `render.yaml` doivent etre renseignees avec les vraies valeurs de production avant le premier trafic.
+
+Au premier deploiement, ouvrez le Shell du service web Render pour charger les referentiels et creer l'administrateur :
+```bash
+python manage.py charger_referentiels
+python manage.py createsuperuser
+```
+
+Ne lancez pas en meme temps une seconde pile de production avec Docker Compose si Render est la cible active. Le Compose Caddy ci-dessous reste une option d'auto-hebergement distincte; son `.env` et ses images GHCR ne sont pas la configuration Render.
 
 4. Charger les referentiels de base et creer un compte administrateur :
 ```bash
@@ -159,7 +169,7 @@ La commande demande le mot de passe deux fois sans l'afficher et le valide avec 
 docker compose exec api pytest -q
 ```
 
-### Deploiement de production avec Caddy
+### Alternative d'auto-hebergement : production avec Caddy
 
 La pile de production est separee du Compose local : elle utilise Caddy pour HTTPS, Redis interne et une base PostgreSQL externe (aucun PostgreSQL local n'est demarre). Les deux endpoints de supervision sont `/api/vivant/` (liveness, sans acces aux dependances) et `/api/sante/` (readiness, base et Redis).
 
@@ -169,7 +179,7 @@ La pile de production est separee du Compose local : elle utilise Caddy pour HTT
 echo "$GHCR_READ_TOKEN" | docker login ghcr.io -u VOTRE_COMPTE --password-stdin
 ```
 Ne stockez pas le token dans le depot ni dans l'historique shell.
-3. Dans les parametres GitHub du depot, configurez les secrets d'environnement `production` : `SSH_HOST`, `SSH_USER`, `SSH_KEY` et `SSH_FINGERPRINT` (empreinte de la cle d'hote SSH). Ajoutez les variables de build frontend `VITE_GOOGLE_CLIENT_ID`, `VITE_ADMIN_URL` et `VITE_CONTACT_EMAIL` si necessaires. Le compte SSH doit pouvoir executer Docker et deployer sous `/opt/bakhita`.
+3. Dans les parametres GitHub du depot, configurez les secrets d'environnement `production` : `SSH_HOST`, `SSH_USER`, `SSH_KEY` et `SSH_FINGERPRINT` (empreinte de la cle d'hote SSH). Ajoutez les variables de build frontend `VITE_GOOGLE_CLIENT_ID`, `VITE_ADMIN_URL`, `VITE_CONTACT_EMAIL` et `VITE_ONESIGNAL_APP_ID` si necessaires. Le compte SSH doit pouvoir executer Docker et deployer sous `/opt/bakhita`.
 4. Poussez un tag `v*` pour declencher les tests, la publication des images API/frontend dans GHCR et le deploiement. Le workflow migre la base avec `DIRECT_DATABASE_URL`, puis attend que l'API soit saine. Un lancement manuel est aussi disponible depuis Actions. Le serveur doit deja contenir le Compose et son `.env`.
 5. Au premier demarrage, lancez les commandes d'initialisation depuis `/opt/bakhita` :
 ```bash
@@ -316,12 +326,27 @@ Fonctionnalites administratives implementees :
 - Alerte de vigilance lorsqu'un ancien ayant une date de naissance indiquant 18 ans ou plus envoie au moins 5 invitations en attente ou acceptees a des eleves mineurs connus sur 7 jours. Les dates de naissance non renseignees ne sont pas estimees.
 - Apercus Open Graph/Twitter pour les liens partageables de publications et de profils publics. La photo de profil est utilisee pour l'aperçu d'une publication sans image.
 - Le blocage des captures est desactive par defaut et activable dans l'administration > Discussions > Configuration des captures. Dans l'APK Android, Android `FLAG_SECURE` masque alors l'ecran pendant les captures, enregistrement d'ecran et apercus des applications recentes. Cette protection native ne peut pas etre imposee au navigateur/PWA ni a iOS.
+- Les messages envoyes hors connexion restent dans le stockage local pendant 48 heures. Ils sont renvoyes automatiquement au retour du reseau; le bouton « Réessayer » sur le message relance le delai de 48 heures apres expiration ou echec.
 
 ### APK Android et mises a jour en ligne
 
-La commande `cd frontend; npm run build:natif` produit les ressources web et les synchronise avec Capacitor. Configurez `SITE_URL` avec le domaine public avant de fabriquer un APK distribue : les liens partages embarquent cette origine. Pour generer un APK de test, ouvrez `frontend/android` et lancez `.\gradlew assembleDebug`; le fichier est produit dans `frontend/android/app/build/outputs/apk/debug/`. Les modifications de code natif ou de plugins necessitent une nouvelle version de l'APK.
+La commande `cd frontend; npm run build:natif` produit les ressources web et les synchronise avec Capacitor. Configurez `SITE_URL` avec le domaine public avant de fabriquer un APK distribue : les liens partages embarquent cette origine. Le build natif exige aussi `VITE_API_URL` (URL HTTPS reelle terminant par `/api`) et `VITE_ANDROID_UPDATE_MANIFEST_URL` dans `frontend/.env.native`; il echoue volontairement si ces valeurs sont absentes ou utilisent le domaine d'exemple.
 
-Pour actualiser a distance les ecrans et la logique web sans reinstaller l'APK, une solution de mises a jour live Capacitor telle que Capgo peut distribuer un bundle web signe apres publication. Elle doit etre configuree dans le projet; elle n'est pas active dans cette version. Les mises a jour natives (plugins, permissions, Android) continueront de passer par une nouvelle version publiee, idealement via Google Play avec les mises a jour In-App.
+Pour un APK de test, ouvrez `frontend/android` et lancez `.\gradlew assembleDebug`; le fichier est produit dans `frontend/android/app/build/outputs/apk/debug/`. Pour une mise a jour installable, signez chaque APK de publication avec la meme cle. La cle et ses mots de passe doivent rester hors du depot et etre fournis via `BK_KEYSTORE`, `BK_STORE_PASS` et `BK_KEY_PASS`. Une nouvelle cle ne peut pas mettre a jour un APK deja signe avec une autre cle.
+
+Les mises a jour APK directes sont reservees a la distribution hors Google Play : Android demande a l'utilisateur d'autoriser les installations provenant de Bakhita, puis affiche sa confirmation habituelle avant l'installation. Pour chaque publication, deposez l'APK signe sur le meme domaine public Cloudflare R2 que le manifeste, calculez son SHA-256 avec `Get-FileHash -Algorithm SHA256`, puis publiez `app-update.json` :
+
+```json
+{
+  "versionCode": 10001,
+  "versionName": "1.00",
+  "apkUrl": "https://<domaine-public-r2>/bakhita-1.0.1.apk",
+  "sha256": "<sha256-hexadecimal-de-64-caracteres>",
+  "releaseNotes": "Corrections et ameliorations."
+}
+```
+
+Augmentez la version dans `frontend/package.json` pour chaque nouvelle publication. Le bucket R2 doit autoriser les requetes GET CORS depuis l'origine Capacitor `https://localhost`. La page Parametres permet de verifier le manifeste, telecharger l'APK, verifier son empreinte et ouvrir l'installateur Android.
 
 ---
 

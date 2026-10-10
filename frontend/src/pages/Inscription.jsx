@@ -85,7 +85,10 @@ export default function Inscription() {
         <Champ label="Confirmer le mot de passe" type="password" autoComplete="new-password" value={f.confirmation} onChange={maj("confirmation")} erreur={erreurs.confirmation} />
         <label style={{ display: "flex", gap: "0.5rem", alignItems: "flex-start", marginBottom: "1rem" }}>
           <input type="checkbox" checked={accepte} onChange={(e) => setAccepte(e.target.checked)} />
-          <span>J'accepte les conditions d'utilisation et la politique de confidentialité.</span>
+          <span>
+            J'accepte les <Link className="lien" to="/conditions">conditions d'utilisation</Link>
+            {" "}et la <Link className="lien" to="/confidentialite">politique de confidentialité</Link>.
+          </span>
         </label>
         {erreurs.accepte && <p role="alert" className="erreur">{erreurs.accepte}</p>}
         {general && <p role="alert" className="erreur" style={{ marginBottom: "1rem" }}>{general}</p>}

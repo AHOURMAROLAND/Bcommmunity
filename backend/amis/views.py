@@ -117,8 +117,12 @@ class SuggestionsView(APIView):
 class AmisListeView(APIView):
     def get(self, request):
         rel = relations(request.user)
+        bloques = ids_bloques(request.user)
         qs = (profils_actifs().filter(user_id__in=list(rel.amis))
+              .exclude(user_id__in=bloques)
               .order_by("user__nom", "user__prenom", "pk"))
+        for mot in (request.query_params.get("q") or "").strip()[:120].split()[:8]:
+            qs = qs.filter(Q(user__prenom__icontains=mot) | Q(user__nom__icontains=mot))
         return paginer(request, qs, lambda x: carte(x, rel))
 
 

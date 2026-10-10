@@ -12,6 +12,7 @@ from comptes.models import User
 from comptes.tableau_de_bord import contexte as contexte_admin
 from profils.models import CadeauAnniversaire, PhotoGalerie, Profil
 from profils.taches import envoyer_cadeau_anniversaire
+from scolarite.models import Classe, Cycle, Scolarite
 
 pytestmark = pytest.mark.django_db
 
@@ -94,6 +95,74 @@ def test_tableau_admin_liste_les_anniversaires_des_huit_prochains_jours():
     request.user = admin
     context = contexte_admin(request, {})
     assert [profil.pk for profil in context["anniversaires_semaine"]] == [alice.profil.pk]
+
+
+def test_parcours_accepte_des_classes_deselectionnees_et_annee_arrivee_par_cycle():
+    alice = membre("Alice")
+    primaire = Cycle.objects.create(nom="Primaire", ordre=1)
+    college = Cycle.objects.create(nom="Collège", ordre=2)
+    ce1 = Classe.objects.create(cycle=primaire, nom="CE1", ordre=1)
+    Classe.objects.create(cycle=primaire, nom="CE2", ordre=2)
+    Classe.objects.create(cycle=primaire, nom="CM1", ordre=3)
+    cm2 = Classe.objects.create(cycle=primaire, nom="CM2", ordre=4)
+    sixieme = Classe.objects.create(cycle=college, nom="6e", ordre=1)
+
+    response = client(alice).post(
+        "/api/onboarding/valider/",
+        {
+            "cycles": [
+                {
+                    "cycle_id": primaire.pk,
+                    "premiere_classe_id": ce1.pk,
+                    "derniere_classe_id": cm2.pk,
+                    "classe_ids": [ce1.pk, cm2.pk],
+                    "annee_arrivee": 2012,
+                    "durees": {},
+                },
+                {
+                    "cycle_id": college.pk,
+                    "premiere_classe_id": sixieme.pk,
+                    "derniere_classe_id": sixieme.pk,
+                    "classe_ids": [sixieme.pk],
+                    "annee_arrivee": 2020,
+                    "durees": {},
+                },
+            ],
+            "toujours_a_ecole": False,
+        },
+        format="json",
+    )
+
+    assert response.status_code == 200
+    assert list(
+        Scolarite.objects.filter(profil=alice.profil)
+        .order_by("annee_debut")
+        .values_list("classe__nom", "annee_debut", "annee_fin")
+    ) == [("CE1", 2012, 2013), ("CM2", 2015, 2016), ("6e", 2020, 2021)]
+
+
+def test_parcours_refuse_une_selection_de_classes_non_ordonnees():
+    alice = membre("Alice")
+    primaire = Cycle.objects.create(nom="Primaire")
+    ce1 = Classe.objects.create(cycle=primaire, nom="CE1", ordre=1)
+    cm2 = Classe.objects.create(cycle=primaire, nom="CM2", ordre=2)
+    response = client(alice).post(
+        "/api/onboarding/valider/",
+        {
+            "cycles": [{
+                "cycle_id": primaire.pk,
+                "premiere_classe_id": ce1.pk,
+                "derniere_classe_id": cm2.pk,
+                "classe_ids": [cm2.pk, ce1.pk],
+                "annee_arrivee": 2012,
+                "durees": {},
+            }],
+            "toujours_a_ecole": False,
+        },
+        format="json",
+    )
+    assert response.status_code == 400
+    assert not Scolarite.objects.filter(profil=alice.profil).exists()
 
 
 def test_galerie_ajout_visible_sur_profil_et_suppression_privee():

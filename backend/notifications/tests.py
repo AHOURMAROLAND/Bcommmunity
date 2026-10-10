@@ -106,6 +106,58 @@ def test_abonnement_push_refuse_les_adresses_internes():
     assert PushAbonnement.objects.count() == 1
 
 
+def test_abonnement_onesignal_valide_et_relie_au_compte():
+    a = membre("Alice")
+    subscription_id = "1dd608f2-c6a1-11e3-851d-000c2940e62c"
+    reponse = api(a).post(
+        "/api/notifications/push/onesignal/",
+        {"subscription_id": subscription_id},
+        format="json",
+    )
+    assert reponse.status_code == 201
+    abonnement = PushAbonnement.objects.get(cible=subscription_id)
+    assert abonnement.user == a
+    assert abonnement.type == PushAbonnement.Type.ONESIGNAL
+
+    invalide = api(a).post(
+        "/api/notifications/push/onesignal/",
+        {"subscription_id": "not-a-uuid"},
+        format="json",
+    )
+    assert invalide.status_code == 400
+
+
+def test_envoi_onesignal_utilise_l_identifiant_d_abonnement(monkeypatch, settings):
+    a = membre("Alice")
+    abonnement = PushAbonnement.objects.create(
+        user=a,
+        type=PushAbonnement.Type.ONESIGNAL,
+        cible="1dd608f2-c6a1-11e3-851d-000c2940e62c",
+    )
+    settings.ONESIGNAL_APP_ID = "app-id"
+    settings.ONESIGNAL_REST_API_KEY = "rest-key"
+    settings.SITE_URL = "https://bakhita.example"
+
+    class Reponse:
+        ok = True
+        status_code = 200
+
+    def post(url, *, headers, json, timeout):
+        assert url == "https://api.onesignal.com/notifications"
+        assert headers == {"Authorization": "Key rest-key"}
+        assert json["app_id"] == "app-id"
+        assert json["include_subscription_ids"] == [abonnement.cible]
+        assert json["contents"] == {"fr": "corps"}
+        assert json["url"] == "https://bakhita.example/fil"
+        assert timeout == 5
+        return Reponse()
+
+    monkeypatch.setattr(push.requests, "post", post)
+    assert push._envoyer_onesignal(
+        abonnement, {"titre": "titre", "corps": "corps", "url": "/fil"}
+    ) == (abonnement.pk, None)
+
+
 def test_abonnement_mort_supprime_et_echecs_desactivent(monkeypatch):
     a = membre("Alice")
     mort = PushAbonnement.objects.create(

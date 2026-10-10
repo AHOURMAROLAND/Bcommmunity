@@ -40,6 +40,7 @@ const invalider = (qc, ...cles) =>
 
 export function TempsReelProvider({ children }) {
   const { utilisateur } = useAuth();
+  const utilisateurId = utilisateur?.id;
   const qc = useQueryClient();
   const sock = useRef(null);
   const abonnes = useRef(new Set());
@@ -51,19 +52,25 @@ export function TempsReelProvider({ children }) {
   const synchronisationEnCours = useRef(false);
 
   const actualiserFile = useCallback(async () => {
-    if (!utilisateur?.id) {
+    if (!utilisateurId) {
       setFileHorsLigne([]);
       return;
     }
-    setFileHorsLigne(await lireFile(utilisateur.id));
-  }, [utilisateur?.id]);
+    setFileHorsLigne(await lireFile(utilisateurId));
+  }, [utilisateurId]);
+
+  useEffect(() => {
+    if (!utilisateurId) return undefined;
+    const intervalle = setInterval(() => void actualiserFile(), 60_000);
+    return () => clearInterval(intervalle);
+  }, [actualiserFile, utilisateurId]);
 
   const mettreEnFile = useCallback(async (operation) => {
-    if (!utilisateur?.id) throw new Error("Connectez-vous pour mettre ce contenu en attente.");
-    const element = await ajouterALaFile({ ...operation, utilisateurId: utilisateur.id });
+    if (!utilisateurId) throw new Error("Connectez-vous pour mettre ce contenu en attente.");
+    const element = await ajouterALaFile({ ...operation, utilisateurId });
     await actualiserFile();
     return element;
-  }, [actualiserFile, utilisateur?.id]);
+  }, [actualiserFile, utilisateurId]);
 
   useEffect(() => {
     if (!utilisateur) return undefined;
@@ -85,7 +92,7 @@ export function TempsReelProvider({ children }) {
       try {
         const enAttente = await lireFile(utilisateur.id);
         for (const element of enAttente) {
-          if (element.derniereErreur) continue;
+          if (element.derniereErreur || Date.parse(element.expireLe) <= Date.now()) continue;
           try {
             let resultat;
             if (element.type === "message.texte") {
@@ -93,7 +100,11 @@ export function TempsReelProvider({ children }) {
                 method: "POST",
                 body: element.message,
               });
-              majMessage(qc, element.conversationId, resultat);
+              majMessage(qc, element.conversationId, {
+                ...resultat,
+                fileId: null,
+                statut: "envoye",
+              });
               qc.invalidateQueries({ queryKey: ["messages", String(element.conversationId)] });
               invalider(qc, "conversations", "compteurs-disc");
             } else if (element.type === "message.media") {
@@ -101,7 +112,11 @@ export function TempsReelProvider({ children }) {
                 method: "POST",
                 formData: creerFormData(element.entrees),
               });
-              majMessage(qc, element.conversationId, resultat);
+              majMessage(qc, element.conversationId, {
+                ...resultat,
+                fileId: null,
+                statut: "envoye",
+              });
               qc.invalidateQueries({ queryKey: ["messages", String(element.conversationId)] });
               invalider(qc, "conversations", "compteurs-disc");
             } else if (element.type === "publication") {
@@ -118,6 +133,11 @@ export function TempsReelProvider({ children }) {
           } catch (erreur) {
             if (estErreurReseau(erreur)) break;
             await noterEchecFile(element, erreur.message || "Le contenu n'a pas pu être synchronisé.");
+            const cid = element.message?.cid
+              ?? element.entrees?.find(([cle]) => cle === "cid")?.[1];
+            if (cid && element.conversationId) {
+              majMessage(qc, element.conversationId, { id: cid, cid, statut: "echec" });
+            }
             break;
           }
         }
@@ -294,20 +314,38 @@ export function TempsReelProvider({ children }) {
   const effacerNouvelles = useCallback(() => setNouvelles(0), []);
 
   const synchroniser = useCallback(async () => {
-    if (!utilisateur?.id) return;
-    const elements = await lireFile(utilisateur.id);
+    if (!utilisateurId) return;
+    const elements = await lireFile(utilisateurId);
     for (const element of elements) {
       if (element.derniereErreur) await retenterElementFile(element);
     }
     window.dispatchEvent(new Event("online"));
-  }, [utilisateur?.id]);
+  }, [utilisateurId]);
+
+  const retenterElement = useCallback(async (id) => {
+    if (!utilisateurId) return;
+    const element = (await lireFile(utilisateurId)).find((item) => item.id === id);
+    if (!element) return;
+    await retenterElementFile(element);
+    const cid = element.message?.cid
+      ?? element.entrees?.find(([cle]) => cle === "cid")?.[1];
+    if (cid && element.conversationId) {
+      majMessage(qc, element.conversationId, {
+        id: cid,
+        cid,
+        fileId: element.id,
+        statut: "hors-ligne",
+      });
+    }
+    window.dispatchEvent(new Event("online"));
+  }, [qc, utilisateurId]);
 
   const valeur = useMemo(
     () => ({
       etat, envoyer, abonner, nouvelles, effacerNouvelles, activites,
-      fileHorsLigne, mettreEnFile, synchroniser,
+      fileHorsLigne, mettreEnFile, synchroniser, retenterElement,
     }),
-    [etat, envoyer, abonner, nouvelles, effacerNouvelles, activites, fileHorsLigne, mettreEnFile, synchroniser],
+    [etat, envoyer, abonner, nouvelles, effacerNouvelles, activites, fileHorsLigne, mettreEnFile, synchroniser, retenterElement],
   );
 
   return <Ctx.Provider value={valeur}>{children}</Ctx.Provider>;

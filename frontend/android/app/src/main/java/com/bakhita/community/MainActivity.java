@@ -8,6 +8,7 @@ public class MainActivity extends BridgeActivity {
     @Override
     public void onCreate(android.os.Bundle savedInstanceState) {
         registerPlugin(ScreenshotProtectionPlugin.class);
+        registerPlugin(ApkUpdaterPlugin.class);
         super.onCreate(savedInstanceState);
     }
 

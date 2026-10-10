@@ -102,6 +102,7 @@ jobs:
             VITE_GOOGLE_CLIENT_ID=${{ vars.VITE_GOOGLE_CLIENT_ID }}
             VITE_ADMIN_URL=${{ vars.VITE_ADMIN_URL }}
             VITE_CONTACT_EMAIL=${{ vars.VITE_CONTACT_EMAIL }}
+            VITE_ONESIGNAL_APP_ID=${{ vars.VITE_ONESIGNAL_APP_ID }}
           tags: |
             ghcr.io/${{ steps.owner.outputs.value }}/bakhita-web:${{ github.sha }}
             ghcr.io/${{ steps.owner.outputs.value }}/bakhita-web:latest

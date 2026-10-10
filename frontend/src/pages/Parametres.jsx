@@ -12,16 +12,21 @@ import { appliquerTheme, themeActuel } from "../utils/theme";
 import { Bouton, Selecteur } from "../components/ui";
 import { SqFormulaire } from "../components/Squelettes";
 import {
-  Bell, ChevronRight, CircleHelp, ImagePlus, Images, Laptop, LockKeyhole,
+  Bell, ChevronRight, CircleHelp, FileText, ImagePlus, Images, Info, Laptop, LockKeyhole,
   LogOut, Palette, Shield, Trash2, UserRound, Users, X,
 } from "lucide-react";
+import { Link } from "react-router-dom";
 import DiscussionsSupport from "../components/DiscussionsSupport";
+import MiseAJourAndroid from "../components/MiseAJourAndroid";
 import { TYPES_IMAGE, verifierFichier } from "../utils/image";
+import { VERSION_APPLICATION } from "../utils/version";
 
 const EditeurImage = lazy(() => import("../editeur/EditeurImage"));
 
 const ERREURS_PUSH = {
   non_supporte: "Ce navigateur ne gere pas les notifications push.",
+  onesignal_non_configure: "Les notifications OneSignal ne sont pas configurees pour ce site.",
+  onesignal_echec: "Impossible de joindre OneSignal. Reessayez plus tard.",
   ios_installer:
     "Sur iPhone, ajoutez d'abord l'application a l'ecran d'accueil (Partager, puis Sur l'ecran d'accueil), puis rouvrez-la.",
   refuse:
@@ -157,8 +162,11 @@ export default function Parametres() {
   });
 
   useEffect(() => {
-    pushActif().then(setPush).catch(() => {});
-  }, []);
+    pushActif(utilisateur?.id).then(setPush).catch((error) => {
+      console.error("Impossible de verifier l'abonnement push.", error);
+      setErreurPush(ERREURS_PUSH[error.message] ?? "Impossible de verifier les notifications.");
+    });
+  }, [utilisateur?.id]);
 
   useEffect(() => {
     if (profil.data) {
@@ -206,7 +214,7 @@ export default function Parametres() {
         await desactiverPush();
         setPush(false);
       } else {
-        await activerPush();
+        await activerPush(utilisateur?.id);
         setPush(true);
       }
     } catch (e) {
@@ -349,6 +357,9 @@ export default function Parametres() {
           <p className="doux" style={{ marginTop: 0 }}>
             Retrouvez ici vos signalements, suggestions et réponses de l’équipe « admin ».
           </p>
+          <Link className="btn" to="/assistance" style={{ display: "inline-flex", textDecoration: "none", marginBottom: ".75rem" }}>
+            Envoyer un message à l’assistance
+          </Link>
           <DiscussionsSupport />
         </OptionParametres>
       </GroupeParametres>
@@ -569,6 +580,25 @@ export default function Parametres() {
         >
           <Bouton secondaire onClick={deconnexion}>Se déconnecter</Bouton>
         </OptionParametres>
+      </GroupeParametres>
+
+      <GroupeParametres titre="À propos" Icon={Info}>
+        <OptionParametres
+          titre="Conditions d'utilisation"
+          description="Consulter les règles d'utilisation de Bakhita Community"
+          Icon={FileText}
+        >
+          <Link className="lien" to="/conditions">Lire les conditions d'utilisation</Link>
+        </OptionParametres>
+        <OptionParametres
+          titre="Politique de confidentialité"
+          description="Comprendre l'utilisation et la protection de vos données"
+          Icon={Shield}
+        >
+          <Link className="lien" to="/confidentialite">Lire la politique de confidentialité</Link>
+        </OptionParametres>
+        <p className="doux" style={{ padding: "0 1rem" }}>Version de l'application : {VERSION_APPLICATION}</p>
+        <MiseAJourAndroid />
       </GroupeParametres>
 
       <ChargementLong actif={occupe} label="Activation des notifications..." />

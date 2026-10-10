@@ -3,6 +3,7 @@ const VERSION_BD = 1;
 const TABLE_FILE = "file";
 const TABLE_CACHE = "caches";
 const EVENEMENT_FILE = "bakhita-file-change";
+const DUREE_FILE_MS = 48 * 60 * 60 * 1000;
 
 let ouverture;
 
@@ -62,6 +63,7 @@ export async function ajouterALaFile(operationHorsLigne) {
     ...operationHorsLigne,
     id: operationHorsLigne.id ?? crypto.randomUUID(),
     creeLe: operationHorsLigne.creeLe ?? new Date().toISOString(),
+    expireLe: operationHorsLigne.expireLe ?? new Date(Date.now() + DUREE_FILE_MS).toISOString(),
     essais: 0,
   };
   await operation(TABLE_FILE, "readwrite", (store) => store.put(element));
@@ -73,6 +75,11 @@ export async function lireFile(utilisateurId) {
   const elements = await operation(TABLE_FILE, "readonly", (store) => store.getAll());
   return (elements ?? [])
     .filter((element) => element.utilisateurId === utilisateurId)
+    .map((element) => ({
+      ...element,
+      expireLe: element.expireLe
+        ?? new Date(Date.parse(element.creeLe) + DUREE_FILE_MS).toISOString(),
+    }))
     .sort((a, b) => a.creeLe.localeCompare(b.creeLe));
 }
 
@@ -94,6 +101,7 @@ export async function retenterElementFile(element) {
   await operation(TABLE_FILE, "readwrite", (store) => store.put({
     ...element,
     derniereErreur: "",
+    expireLe: new Date(Date.now() + DUREE_FILE_MS).toISOString(),
   }));
   window.dispatchEvent(new Event(EVENEMENT_FILE));
 }

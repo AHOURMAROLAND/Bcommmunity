@@ -31,8 +31,11 @@ const PublicationPage = lazy(() => import("./pages/PublicationPage"));
 const Publier         = lazy(() => import("./pages/Publier"));
 const Notifications   = lazy(() => import("./pages/Notifications"));
 const Parametres      = lazy(() => import("./pages/Parametres"));
+const Assistance      = lazy(() => import("./pages/Assistance"));
 const Galerie         = lazy(() => import("./pages/Galerie"));
 const Recherche       = lazy(() => import("./pages/Recherche"));
+const ConditionsUtilisation = lazy(() => import("./pages/ConditionsUtilisation"));
+const PolitiqueConfidentialite = lazy(() => import("./pages/PolitiqueConfidentialite"));
 
 function Invite({ children }) {
   const { utilisateur, chargement } = useAuth();
@@ -97,6 +100,8 @@ export default function App() {
           <Route path="/reinitialiser"     element={<PageAvecRetour><Reinitialiser /></PageAvecRetour>} />
           <Route path="/en-attente"        element={<PageAvecRetour><EnAttente /></PageAvecRetour>} />
           <Route path="/suppression-compte" element={<PageAvecRetour><PageSuppression /></PageAvecRetour>} />
+          <Route path="/conditions" element={<PageAvecRetour><ConditionsUtilisation /></PageAvecRetour>} />
+          <Route path="/confidentialite" element={<PageAvecRetour><PolitiqueConfidentialite /></PageAvecRetour>} />
           <Route path="/onboarding"        element={<Connecte><Onboarding /></Connecte>} />
 
           {/* Pages connectees sans Coque (plein ecran) */}
@@ -138,6 +143,7 @@ export default function App() {
             <Route path="/profil/:id"       element={<ProfilPublic />} />
             <Route path="/notifications"    element={<Notifications />} />
             <Route path="/parametres"       element={<Parametres />} />
+            <Route path="/assistance"       element={<Assistance />} />
           </Route>
 
           <Route path="*" element={<Navigate to="/fil" replace />} />

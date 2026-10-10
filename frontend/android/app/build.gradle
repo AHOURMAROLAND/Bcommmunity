@@ -1,5 +1,11 @@
 apply plugin: 'com.android.application'
 
+def versionApp = new groovy.json.JsonSlurper().parse(file("../../package.json")).version
+def partiesVersion = versionApp.tokenize('.').collect { it.toInteger() }
+def versionMajeure = partiesVersion[0]
+def versionMineure = partiesVersion.size() > 1 ? partiesVersion[1] : 0
+def versionCorrective = partiesVersion.size() > 2 ? partiesVersion[2] : 0
+
 android {
     namespace = "com.bakhita.community"
     compileSdk = rootProject.ext.compileSdkVersion
@@ -7,8 +13,8 @@ android {
         applicationId "com.bakhita.community"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0"
+        versionCode versionMajeure * 10000 + versionMineure * 100 + versionCorrective
+        versionName "${versionMajeure}.${versionMineure.toString().padLeft(2, '0')}"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.

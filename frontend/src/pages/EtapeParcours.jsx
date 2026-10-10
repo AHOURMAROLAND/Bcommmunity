@@ -10,7 +10,14 @@ const CYCLES_VIDES = [];
 const FILIERES_VIDES = [];
 
 function configVide() {
-  return { saute: false, premiereClasseId: "", derniereClasseId: "", anneeArrivee: "", durees: {} };
+  return {
+    saute: false,
+    premiereClasseId: "",
+    derniereClasseId: "",
+    classeIds: [],
+    anneeArrivee: "",
+    durees: {},
+  };
 }
 
 function estLycee(cycle) {
@@ -25,6 +32,16 @@ function classesDuCycle(cycle, filiereId) {
 
 function libelleClasse(classe) {
   return `${classe.nom}${classe.filiere ? ` ${classe.filiere}` : ""}`;
+}
+
+function classesSelectionnees(config, classes) {
+  if (Array.isArray(config.classeIds)) {
+    const selection = new Set(config.classeIds.map(String));
+    return classes.filter((classe) => selection.has(String(classe.id)));
+  }
+  const debut = classes.findIndex((classe) => String(classe.id) === String(config.premiereClasseId));
+  const fin = classes.findIndex((classe) => String(classe.id) === String(config.derniereClasseId));
+  return debut >= 0 && fin >= debut ? classes.slice(debut, fin + 1) : [];
 }
 
 export default function EtapeParcours({ onSuivant, onRetour }) {
@@ -91,26 +108,31 @@ export default function EtapeParcours({ onSuivant, onRetour }) {
           durees: config.durees,
         };
       });
-      return calculerParcours(definitions, { toujoursALEcole: donnees.toujoursAEcole });
+      const dernierCycleActif = definitions.filter((item) => !item.saute).at(-1);
+      let anneeSuivante = null;
+      return definitions.map((definition) => {
+        if (definition.saute) {
+          anneeSuivante = null;
+          return { ...definition, classes: [], anneeDebut: null, anneeFin: null };
+        }
+        try {
+          const calcule = calculerParcours([{
+            ...definition,
+            anneeArrivee: definition.anneeArrivee || anneeSuivante,
+          }], {
+            toujoursALEcole: donnees.toujoursAEcole && definition === dernierCycleActif,
+          })[0];
+          anneeSuivante = calcule.anneeFin;
+          return calcule;
+        } catch {
+          anneeSuivante = null;
+          return { ...definition, classes: [], anneeDebut: null, anneeFin: null };
+        }
+      });
     } catch {
       return [];
     }
   }, [cycles, donnees]);
-
-  const anneeCyclePrecedent = useMemo(() => {
-    if (!donnees || indexCycle === 0) return null;
-    try {
-      const definitions = cycles.slice(0, indexCycle).map((cycle) => ({
-        ...donnees.cycles[cycle.id],
-        id: cycle.id,
-        nom: cycle.nom,
-        classes: classesDuCycle(cycle, donnees.filiereId),
-      }));
-      return calculerParcours(definitions).at(-1)?.anneeFin ?? null;
-    } catch {
-      return null;
-    }
-  }, [cycles, donnees, indexCycle]);
 
   if (referentiels.isPending || brouillon.isPending || !donnees) return <SqFormulaire champs={5} />;
   if (referentiels.isError || brouillon.isError) {
@@ -120,12 +142,11 @@ export default function EtapeParcours({ onSuivant, onRetour }) {
   const cycle = cycles[indexCycle];
   const config = cycle ? donnees.cycles[cycle.id] : null;
   const listeClasses = cycle ? classesDuCycle(cycle, donnees.filiereId) : [];
+  const selectionClasses = cycle ? classesSelectionnees(config, listeClasses) : [];
+  const idsClassesSelectionnees = new Set(selectionClasses.map((item) => String(item.id)));
   const indexPremiere = listeClasses.findIndex((classe) => String(classe.id) === String(config?.premiereClasseId));
-  const indexDerniere = listeClasses.findIndex((classe) => String(classe.id) === String(config?.derniereClasseId));
   const cycleCalcule = parcours.find((item) => String(item.id) === String(cycle?.id));
-  const precedent = cycles[indexCycle - 1];
-  const precedentSaute = precedent && donnees.cycles[precedent.id]?.saute;
-  const anneeAuto = anneeCyclePrecedent ?? cycleCalcule?.anneeDebut;
+  const anneeAuto = cycleCalcule?.anneeDebut;
   function majCycle(changements) {
     setDonnees((actuel) => ({
       ...actuel,
@@ -157,12 +178,14 @@ export default function EtapeParcours({ onSuivant, onRetour }) {
   }
 
   function preparerClasses() {
-    const debut = listeClasses.findIndex((classe) => String(classe.id) === String(config.premiereClasseId));
-    const fin = listeClasses.findIndex((classe) => String(classe.id) === String(config.derniereClasseId));
-    if (debut < 0 || fin < debut) return null;
-    const arrival = anneeAuto ?? Number(config.anneeArrivee);
+    const selection = classesSelectionnees(config, listeClasses);
+    if (!selection.length) return null;
+    const debut = listeClasses.findIndex((classe) => String(classe.id) === String(selection[0].id));
+    const fin = listeClasses.findIndex((classe) => String(classe.id) === String(selection.at(-1).id));
+    const valeurArrivee = config.anneeArrivee || anneeAuto;
+    const arrival = Number(valeurArrivee);
     if (!Number.isInteger(arrival) || arrival < 1950 || arrival > ANNEE_COURANTE) return null;
-    return { debut, fin, arrival };
+    return { debut, fin, arrival, classeIds: selection.map((item) => String(item.id)) };
   }
 
   async function terminerParcours() {
@@ -171,13 +194,15 @@ export default function EtapeParcours({ onSuivant, onRetour }) {
       const choix = donnees.cycles[item.id] ?? configVide();
       if (choix.saute) return { cycle_id: item.id, saute: true };
       const trouve = parcours.find((resultat) => String(resultat.id) === String(item.id));
-      if (!trouve || !choix.premiereClasseId || !choix.derniereClasseId) {
+      const selection = classesSelectionnees(choix, classesDuCycle(item, donnees.filiereId));
+      if (!trouve || !selection.length) {
         throw new Error(`Complétez le parcours ${item.nom} ou indiquez que vous n'avez pas fait ce cycle.`);
       }
       return {
         cycle_id: item.id,
-        premiere_classe_id: Number(choix.premiereClasseId),
-        derniere_classe_id: Number(choix.derniereClasseId),
+        premiere_classe_id: Number(selection[0].id),
+        derniere_classe_id: Number(selection.at(-1).id),
+        classe_ids: selection.map((classe) => Number(classe.id)),
         annee_arrivee: trouve.anneeDebut,
         durees: choix.durees,
       };
@@ -238,11 +263,31 @@ export default function EtapeParcours({ onSuivant, onRetour }) {
 
   function cocherJusquaDerniere() {
     if (!listeClasses.length) return;
-    const first = indexPremiere < 0 ? listeClasses[0].id : config.premiereClasseId;
+    if (selectionClasses.length === listeClasses.length) {
+      majCycle({ premiereClasseId: "", derniereClasseId: "", classeIds: [] });
+      return;
+    }
+    const classeIds = listeClasses.map((classe) => String(classe.id));
     majCycle({
       saute: false,
-      premiereClasseId: String(first),
-      derniereClasseId: String(listeClasses.at(-1).id),
+      premiereClasseId: classeIds[0],
+      derniereClasseId: classeIds.at(-1),
+      classeIds,
+    });
+  }
+
+  function choisirSelectionClasse(classeId, cochee) {
+    const selection = new Set(idsClassesSelectionnees);
+    if (cochee) selection.add(String(classeId));
+    else selection.delete(String(classeId));
+    const classeIds = listeClasses
+      .filter((classe) => selection.has(String(classe.id)))
+      .map((classe) => String(classe.id));
+    majCycle({
+      saute: false,
+      premiereClasseId: classeIds[0] ?? "",
+      derniereClasseId: classeIds.at(-1) ?? "",
+      classeIds,
     });
   }
 
@@ -362,12 +407,26 @@ export default function EtapeParcours({ onSuivant, onRetour }) {
                   disabled={!listeClasses.length}
                   onChange={(event) => {
                     const premiere = event.target.value;
+                    if (!premiere) {
+                      majCycle({
+                        saute: false,
+                        premiereClasseId: "",
+                        derniereClasseId: "",
+                        classeIds: [],
+                      });
+                      return;
+                    }
                     const premiereIndex = listeClasses.findIndex((item) => String(item.id) === premiere);
-                    const derniereValide = listeClasses.findIndex((item) => String(item.id) === String(config.derniereClasseId)) >= premiereIndex;
+                    const derniereIndex = listeClasses.findIndex((item) => String(item.id) === String(config.derniereClasseId));
+                    const fin = derniereIndex >= premiereIndex ? derniereIndex : premiereIndex;
+                    const classeIds = listeClasses
+                      .slice(premiereIndex, fin + 1)
+                      .map((item) => String(item.id));
                     majCycle({
                       saute: false,
                       premiereClasseId: premiere,
-                      derniereClasseId: derniereValide ? config.derniereClasseId : premiere,
+                      derniereClasseId: classeIds.at(-1) ?? "",
+                      classeIds,
                     });
                   }}
                 >
@@ -378,7 +437,25 @@ export default function EtapeParcours({ onSuivant, onRetour }) {
                   label="Dernière classe"
                   value={config.derniereClasseId}
                   disabled={indexPremiere < 0}
-                  onChange={(event) => majCycle({ derniereClasseId: event.target.value })}
+                  onChange={(event) => {
+                    if (!event.target.value) {
+                      majCycle({
+                        saute: false,
+                        premiereClasseId: "",
+                        derniereClasseId: "",
+                        classeIds: [],
+                      });
+                      return;
+                    }
+                    const fin = listeClasses.findIndex((item) => String(item.id) === event.target.value);
+                    const classeIds = listeClasses
+                      .slice(indexPremiere, fin + 1)
+                      .map((item) => String(item.id));
+                    majCycle({
+                      derniereClasseId: event.target.value,
+                      classeIds,
+                    });
+                  }}
                 >
                   <option value="">Choisir...</option>
                   {listeClasses.slice(Math.max(indexPremiere, 0)).map((item) => (
@@ -386,17 +463,18 @@ export default function EtapeParcours({ onSuivant, onRetour }) {
                   ))}
                 </Selecteur>
               </div>
-              {anneeAuto && !precedentSaute ? (
-                <p className="doux" style={{ margin: ".2rem 0" }}>Année de début calculée : {anneeAuto}</p>
-              ) : (
-                <Champ
-                  label="Année d'arrivée"
-                  type="number"
-                  min={1950}
-                  max={ANNEE_COURANTE}
-                  value={config.anneeArrivee}
-                  onChange={(event) => majCycle({ anneeArrivee: event.target.value })}
-                />
+              <Champ
+                label="Année d'arrivée dans ce cycle"
+                type="number"
+                min={1950}
+                max={ANNEE_COURANTE}
+                value={config.anneeArrivee || anneeAuto || ""}
+                onChange={(event) => majCycle({ anneeArrivee: event.target.value })}
+              />
+              {anneeAuto && !config.anneeArrivee && (
+                <p className="doux" style={{ margin: ".2rem 0" }}>
+                  Année proposée d'après le cycle précédent : {anneeAuto}. Vous pouvez la modifier.
+                </p>
               )}
               <button
                 type="button"
@@ -410,37 +488,53 @@ export default function EtapeParcours({ onSuivant, onRetour }) {
                   fontWeight: 600, cursor: "pointer",
                 }}
               >
-                Sélectionner toutes les années
+                {selectionClasses.length === listeClasses.length && listeClasses.length
+                  ? "Désélectionner toutes les classes"
+                  : "Sélectionner toutes les classes"}
               </button>
-              {listeClasses.map((item, index) => {
-                const grise = indexPremiere >= 0 && index < indexPremiere;
-                const retenue = index >= indexPremiere && index <= indexDerniere;
+              <p className="doux" style={{ margin: ".35rem 0" }}>
+                Une classe décochée entre deux classes suivies représente un saut de classe; son année
+                est comptée dans le calendrier.
+              </p>
+              {listeClasses.map((item) => {
+                const retenue = idsClassesSelectionnees.has(String(item.id));
                 const duree = Number(config.durees?.[item.id] ?? 1);
                 return (
                   <article
                     key={item.id}
-                    aria-disabled={grise || !retenue}
                     style={{
                       display: "flex", justifyContent: "space-between", alignItems: "center",
                       gap: ".5rem", minHeight: "3.15rem", padding: ".4rem .7rem",
                       marginTop: ".4rem", borderRadius: ".8rem",
                       border: `1px solid ${retenue ? couleurCycle : "#e3e9f5"}`,
                       background: retenue ? "#f1f4fa" : "#fff",
-                      color: grise || !retenue ? "var(--texte-doux)" : couleurCycle,
-                      opacity: grise ? .55 : 1,
+                      color: retenue ? couleurCycle : "var(--texte-doux)",
                     }}
                   >
-                    <span style={{ fontWeight: retenue ? 600 : 500, display: "flex", alignItems: "center", gap: ".4rem" }}>
-                      {libelleClasse(item)}
+                    <span style={{ fontWeight: retenue ? 600 : 500, display: "flex", alignItems: "center", gap: ".4rem", minWidth: 0 }}>
+                      <input
+                        type="checkbox"
+                        checked={retenue}
+                        aria-label={`Inclure ${libelleClasse(item)} dans mon parcours`}
+                        onChange={(event) => choisirSelectionClasse(item.id, event.target.checked)}
+                      />
+                      <span>{libelleClasse(item)}</span>
                       {retenue && duree === 2 && (
                         <span style={{ padding: ".1rem .35rem", borderRadius: ".6rem", background: couleurCycle, color: "#fff", fontSize: ".65rem" }}>
                           Redoublé
                         </span>
                       )}
-                      {grise && <small>avant mon arrivée</small>}
                     </span>
                     {retenue && (
                       <span style={{ display: "inline-flex", alignItems: "center", gap: ".45rem", flexShrink: 0 }}>
+                        <small className="doux">
+                          {cycleCalcule?.classes.find((classe) => String(classe.id) === String(item.id))?.anneeDebut ?? "—"}
+                          –
+                          {cycleCalcule?.classes.find((classe) => String(classe.id) === String(item.id))?.anneeFin
+                            ?? (donnees.toujoursAEcole && String(item.id) === String(selectionClasses.at(-1)?.id)
+                              ? "en cours"
+                              : "—")}
+                        </small>
                         <button
                           type="button"
                           aria-label={`Retirer une année à ${libelleClasse(item)}`}

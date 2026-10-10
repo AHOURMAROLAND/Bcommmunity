@@ -341,6 +341,8 @@ VAPID_PUBLIC_KEY    = env("VAPID_PUBLIC_KEY", "")
 VAPID_PRIVATE_KEY   = env("VAPID_PRIVATE_KEY", "")
 VAPID_ADMIN_EMAIL   = env("VAPID_ADMIN_EMAIL", "admin@bakhita.example")
 FCM_SERVICE_ACCOUNT_JSON = env("FCM_SERVICE_ACCOUNT_JSON", "")
+ONESIGNAL_APP_ID = env("ONESIGNAL_APP_ID", "")
+ONESIGNAL_REST_API_KEY = env("ONESIGNAL_REST_API_KEY", "")
 
 # ---- Google & CORS (M7 Natif & PWA) ----
 from corsheaders.defaults import default_headers  # noqa: E402

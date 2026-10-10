@@ -124,6 +124,23 @@ def test_cycle_de_vie_d_une_amitie(classes):
     assert ids(api(a).get("/api/amis/")) == []
 
 
+def test_recherche_dans_les_amis_renvoie_les_amis_acceptes_sans_conversation(classes):
+    alice, amira, amine, bob = (
+        membre("Alice"),
+        membre("Amira"),
+        membre("Amine"),
+        membre("Bob"),
+    )
+    Amitie.objects.create(demandeur=alice, destinataire=amira, statut="acceptee")
+    Amitie.objects.create(demandeur=alice, destinataire=amine, statut="acceptee")
+    Amitie.objects.create(demandeur=alice, destinataire=bob, statut="attente")
+
+    resultats = api(alice).get("/api/amis/?q=ami")
+
+    assert resultats.status_code == 200
+    assert ids(resultats) == [amine.pk, amira.pk]
+
+
 def test_demande_croisee_acceptee_automatiquement(classes):
     a, b = membre("Alice"), membre("Bob")
     api(a).post("/api/amis/demandes/", {"user": b.pk}, format="json")

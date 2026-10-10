@@ -1,6 +1,6 @@
 import { estNatif } from "../utils/plateforme";
 
-const BASE = import.meta.env.VITE_API_URL ?? "/api";
+const BASE = import.meta.env.VITE_API_URL || "/api";
 const CLE_REFRESH = "bk_refresh";
 let accessToken = null;
 let rafraichissement = null;

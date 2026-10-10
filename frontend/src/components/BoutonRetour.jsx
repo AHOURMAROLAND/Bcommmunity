@@ -2,7 +2,8 @@ import { ArrowLeft } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 
 function destinationRepli(pathname) {
-  if (pathname === "/inscription" || pathname === "/mot-de-passe-oublie") return "/connexion";
+  if (pathname === "/inscription" || pathname === "/mot-de-passe-oublie"
+    || pathname === "/conditions" || pathname === "/confidentialite") return "/connexion";
   if (pathname === "/verifier-email") return "/inscription";
   if (pathname === "/reinitialiser") return "/mot-de-passe-oublie";
   if (pathname === "/en-attente") return "/connexion";

@@ -15,38 +15,38 @@ export const useInvitations = (type) =>
   });
 
 // ---- Conversations ----
-export const useConversations = () =>
+export const useConversations = (tempsReelActif = false) =>
   useInfiniteQuery({
     queryKey: ["conversations"],
     initialPageParam: 1,
     getNextPageParam: suite,
     queryFn: ({ pageParam }) => api(`/conversations/?page=${pageParam}`),
-    // Fallback si WS déconnecté ; le WS invalide ce cache à la reconnexion.
-    refetchInterval: 30_000,
+    staleTime: 120_000,
+    refetchInterval: tempsReelActif ? false : 120_000,
   });
 
 // ---- Compteurs (badge nav) ----
-export const useCompteursDisc = () =>
+export const useCompteursDisc = (tempsReelActif = false) =>
   useQuery({
     queryKey: ["compteurs-disc"],
     queryFn: () => api("/discussions/compteurs/"),
-    refetchInterval: 30_000,
+    staleTime: 120_000,
+    refetchInterval: tempsReelActif ? false : 120_000,
   });
 
 // ---- Detail d'une conversation ----
-export const useConversation = (id) =>
+export const useConversation = (id, tempsReelActif = false) =>
   useQuery({
     queryKey: ["conversation", String(id)],
     queryFn: () => api(`/conversations/${id}/`),
     retry: false,
     enabled: !!id,
-    // Pas de polling : le WS envoie message.lu et invalide ce cache.
-    // Fallback doux uniquement si la page reste ouverte sans WS.
-    refetchInterval: 30_000,
+    staleTime: 120_000,
+    refetchInterval: tempsReelActif ? false : 120_000,
   });
 
 // ---- Messages (curseur) ----
-export const useMessages = (id) =>
+export const useMessages = (id, tempsReelActif = false) =>
   useInfiniteQuery({
     queryKey: ["messages", String(id)],
     initialPageParam: null,
@@ -55,9 +55,24 @@ export const useMessages = (id) =>
     getNextPageParam: (d) => curseur(d.next),
     queryFn: ({ pageParam }) =>
       api(`/conversations/${id}/messages/${pageParam ? `?cursor=${pageParam}` : ""}`),
-    // Pas de polling : le WS pousse les nouveaux messages via majMessage().
-    // Fallback doux uniquement si WS absent.
-    refetchInterval: 30_000,
+    staleTime: 120_000,
+    refetchInterval: tempsReelActif ? false : 120_000,
+  });
+
+export const useRechercheMessages = (id, filtres, actif = false) =>
+  useInfiniteQuery({
+    queryKey: ["recherche-messages", String(id), filtres],
+    initialPageParam: 1,
+    enabled: !!id && actif,
+    staleTime: 60_000,
+    getNextPageParam: (page, pages) => (page.next ? pages.length + 1 : undefined),
+    queryFn: ({ pageParam }) => {
+      const params = new URLSearchParams({ page: String(pageParam) });
+      for (const [cle, valeur] of Object.entries(filtres)) {
+        if (valeur) params.set(cle, valeur);
+      }
+      return api(`/conversations/${id}/recherche/?${params}`);
+    },
   });
 
 // ---- Mutations ----

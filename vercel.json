@@ -1,57 +1,36 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "services": {
-    "backend": {
-      "root": "backend",
-      "framework": "django"
-    },
-    "frontend": {
-      "root": "frontend",
-      "framework": "vite"
-    }
-  },
+  "installCommand": "npm --prefix frontend ci",
+  "buildCommand": "npm --prefix frontend run build",
+  "outputDirectory": "frontend/dist",
   "rewrites": [
     {
       "source": "/api/(.*)",
-      "destination": {
-        "service": "backend"
-      }
+      "destination": "https://bakhita-api.onrender.com/api/$1"
     },
     {
       "source": "/p/(.*)",
-      "destination": {
-        "service": "backend"
-      }
+      "destination": "https://bakhita-api.onrender.com/p/$1"
     },
     {
       "source": "/profil-partage/(.*)",
-      "destination": {
-        "service": "backend"
-      }
+      "destination": "https://bakhita-api.onrender.com/profil-partage/$1"
     },
     {
       "source": "/gestion-bakhita-x7/(.*)",
-      "destination": {
-        "service": "backend"
-      }
+      "destination": "https://bakhita-api.onrender.com/gestion-bakhita-x7/$1"
     },
     {
       "source": "/gestion-bakhita-x7",
-      "destination": {
-        "service": "backend"
-      }
+      "destination": "https://bakhita-api.onrender.com/gestion-bakhita-x7"
     },
     {
       "source": "/static/(.*)",
-      "destination": {
-        "service": "backend"
-      }
+      "destination": "https://bakhita-api.onrender.com/static/$1"
     },
     {
       "source": "/(.*)",
-      "destination": {
-        "service": "frontend"
-      }
+      "destination": "/index.html"
     }
   ]
 }

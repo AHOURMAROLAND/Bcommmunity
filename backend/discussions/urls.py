@@ -21,6 +21,8 @@ urlpatterns = [
          views.ConversationDetailView.as_view()),
     path("conversations/<int:pk>/messages/",
          views.MessagesView.as_view()),
+    path("conversations/<int:pk>/recherche/",
+         views.RechercheMessagesView.as_view()),
     path("conversations/<int:pk>/messages/media/",
          views.MessagesMediaView.as_view()),
     path("conversations/<int:pk>/messages/<int:msg_id>/modifier/",

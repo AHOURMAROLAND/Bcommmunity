@@ -18,7 +18,10 @@ export function useAnnuaire(filtres, actif = true) {
   return useListe("annuaire", "/annuaire/", p.toString(), actif);
 }
 export const useSuggestions = () => useListe("suggestions", "/amis/suggestions/");
-export const useAmis = () => useListe("amis", "/amis/");
+export const useAmis = (recherche = "", actif = true) => {
+  const params = recherche ? new URLSearchParams({ q: recherche }).toString() : "";
+  return useListe("amis", "/amis/", params, actif);
+};
 export const useDemandes = (type) => useListe("demandes", "/amis/demandes/", `type=${type}`);
 
 export const useCompteurs = () =>
